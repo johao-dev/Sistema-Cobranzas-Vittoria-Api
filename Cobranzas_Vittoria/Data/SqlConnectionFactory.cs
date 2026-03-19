@@ -13,6 +13,12 @@ namespace Cobranzas_Vittoria.Data
                 ?? throw new InvalidOperationException("Falta ConnectionStrings:Default");
         }
 
-        public IDbConnection CreateConnection() => new SqlConnection(_connectionString);
+        public IDbConnection CreateConnection()
+        {
+            var cn = new SqlConnection(_connectionString);
+            if (cn.State != System.Data.ConnectionState.Open)
+                cn.Open();
+            return cn;
+        }
     }
 }

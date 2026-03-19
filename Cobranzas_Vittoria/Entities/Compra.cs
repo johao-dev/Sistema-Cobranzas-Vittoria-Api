@@ -9,6 +9,9 @@ public class Compra
     public string? Proveedor { get; set; }
     public DateTime FechaCompra { get; set; }
     public bool Aceptada { get; set; }
+    public bool IncluyeIGV { get; set; }
+    public decimal SubtotalSinIGV { get; set; }
+    public decimal MontoIGV { get; set; }
     public decimal MontoTotal { get; set; }
     public string? Observacion { get; set; }
     public DateTime FechaCreacion { get; set; }
