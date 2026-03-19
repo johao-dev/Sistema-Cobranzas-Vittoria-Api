@@ -31,6 +31,8 @@ builder.Services.AddScoped<IOrdenCompraRepository, OrdenCompraRepository>();
 builder.Services.AddScoped<ICompraRepository, CompraRepository>();
 builder.Services.AddScoped<IKardexRepository, KardexRepository>();
 builder.Services.AddScoped<IUnidadMedidaRepository, UnidadMedidaRepository>();
+builder.Services.AddScoped<IValorizacionRepository, ValorizacionRepository>();
+
 
 // Services
 builder.Services.AddScoped<IRolService, RolService>();
@@ -45,6 +47,7 @@ builder.Services.AddScoped<IOrdenCompraService, OrdenCompraService>();
 builder.Services.AddScoped<ICompraService, CompraService>();
 builder.Services.AddScoped<IKardexService, KardexService>();
 builder.Services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
+builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
 
 var app = builder.Build();
 
