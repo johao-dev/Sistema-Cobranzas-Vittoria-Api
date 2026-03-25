@@ -61,7 +61,7 @@ namespace Cobranzas_Vittoria.Controllers
                 var safeName = $"{Guid.NewGuid():N}_{Path.GetFileName(file.FileName)}";
                 var fullPath = Path.Combine(root, safeName);
 
-                using var stream = System.IO.File.Create(fullPath);
+                await using var stream = System.IO.File.Create(fullPath);
                 await file.CopyToAsync(stream);
 
                 var relative = Path.Combine("uploads", "compras", id.ToString(), safeName).Replace("\\", "/");
@@ -70,6 +70,31 @@ namespace Cobranzas_Vittoria.Controllers
 
             await _service.SaveDocumentosAsync(id, docs);
             return Ok(new { ok = true });
+        }
+
+        [HttpGet("{id:int}/documentos/{docId:int}/download")]
+        public async Task<IActionResult> DownloadDocumento(int id, int docId)
+        {
+            var docs = await _service.GetDocumentosAsync(id);
+            var doc = docs.FirstOrDefault(d =>
+                (int?)((object?)d.IdCompraDocumento ?? (object?)d.idCompraDocumento ?? 0) == docId);
+
+            if (doc == null)
+                return NotFound(new { message = "No se encontró el documento solicitado." });
+
+            var nombreArchivo = (string?)((object?)doc.NombreArchivo ?? (object?)doc.nombreArchivo) ?? $"compra_{id}_{docId}.pdf";
+            var rutaRelativa = (string?)((object?)doc.RutaArchivo ?? (object?)doc.rutaArchivo);
+
+            if (string.IsNullOrWhiteSpace(rutaRelativa))
+                return NotFound(new { message = "El documento no tiene ruta registrada." });
+
+            var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var rutaFisica = Path.Combine(webRoot, rutaRelativa.Replace("/", Path.DirectorySeparatorChar.ToString()));
+
+            if (!System.IO.File.Exists(rutaFisica))
+                return NotFound(new { message = "No se encontró el archivo físico del documento." });
+
+            return PhysicalFile(rutaFisica, "application/pdf", nombreArchivo);
         }
     }
 }
