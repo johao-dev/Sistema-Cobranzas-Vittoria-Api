@@ -16,6 +16,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddHttpClient<ISunatService, SunatService>();
 builder.Services.AddTransient<ApiExceptionMiddleware>();
 
 // Repositories
@@ -48,6 +49,7 @@ builder.Services.AddScoped<ICompraService, CompraService>();
 builder.Services.AddScoped<IKardexService, KardexService>();
 builder.Services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
 builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
+builder.Services.AddScoped<ISunatService, SunatService>();
 
 var app = builder.Build();
 
