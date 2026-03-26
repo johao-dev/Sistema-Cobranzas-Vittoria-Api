@@ -1,7 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\repositories\\valorizacionrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:repositories\\valorizacionrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -9,11 +14,20 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": -1,
+          "SelectedChildIndex": 0,
           "Children": [
             {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ValorizacionRepository.cs",
+              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Repositories\\ValorizacionRepository.cs",
+              "RelativeDocumentMoniker": "Repositories\\ValorizacionRepository.cs",
+              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Repositories\\ValorizacionRepository.cs",
+              "RelativeToolTip": "Repositories\\ValorizacionRepository.cs",
+              "ViewState": "AgIAACQAAAAAAAAAAAApwDEAAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-23T23:19:47.511Z",
+              "EditorCaption": ""
             }
           ]
         }

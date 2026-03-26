@@ -23,20 +23,17 @@ namespace Cobranzas_Vittoria.Repositories
             return rows.Select(x => new
             {
                 idConfiguracion = (int?)x.IdProveedorEspecialidadCotizacion,
-                idProveedorEspecialidadCotizacion = (int?)x.IdProveedorEspecialidadCotizacion,
                 idProyecto = (int?)x.IdProyecto,
-                nombreProyecto = (string?)x.NombreProyecto,
                 proyecto = (string?)x.NombreProyecto,
                 idProveedor = (int?)x.IdProveedor,
                 proveedor = (string?)x.Proveedor,
-                razonSocial = (string?)x.Proveedor,
                 idEspecialidad = (int?)x.IdEspecialidad,
                 especialidad = (string?)x.Especialidad,
-                nombreEspecialidad = (string?)x.Especialidad,
+                empresa = (string?)x.Empresa,
                 servicio = (string?)x.Servicio,
                 moneda = (string?)x.Moneda,
                 montoCotizacion = (decimal?)x.MontoCotizacion ?? 0m,
-                porcentajeGarantia = (decimal?)x.PorcentajeGarantia ?? 0.05m,
+                porcentajeGarantia = (decimal?)x.PorcentajeGarantia ?? 0.04m,
                 porcentajeDetraccion = (decimal?)x.PorcentajeDetraccion ?? 0.04m
             });
         }
@@ -50,6 +47,7 @@ namespace Cobranzas_Vittoria.Repositories
                 dto.IdProyecto,
                 dto.IdProveedor,
                 dto.IdEspecialidad,
+                dto.Empresa,
                 dto.Servicio,
                 dto.Moneda,
                 dto.MontoCotizacion,
@@ -86,125 +84,105 @@ namespace Cobranzas_Vittoria.Repositories
                 idValorizacion = (int?)x.IdValorizacion,
                 periodo = (string?)x.NumeroValorizacion,
                 proyecto = (string?)x.NombreProyecto,
-                nombreProyecto = (string?)x.NombreProyecto,
                 proveedor = (string?)x.Proveedor,
-                razonSocial = (string?)x.Proveedor,
                 especialidad = (string?)x.Especialidad,
-                nombreEspecialidad = (string?)x.Especialidad,
+                empresa = (string?)x.Empresa,
+                servicio = (string?)x.Servicio,
                 moneda = (string?)x.Moneda,
-                montoCotizacion = (decimal?)x.Cotizacion ?? 0m,
-                porcentajeGarantia = (decimal?)x.PorcentajeGarantia ?? 0.05m,
-                porcentajeDetraccion = (decimal?)x.PorcentajeDetraccion ?? 0.04m,
+                cotizacion = (decimal?)x.Cotizacion ?? 0m,
                 facturado = (decimal?)x.Facturado ?? 0m,
                 transferido = (decimal?)x.Transferido ?? 0m,
-                garantiaRetenida = (decimal?)x.GarantiaRetenida ?? 0m,
-                detraccionAcumulada = (decimal?)x.DetraccionAcumulada ?? 0m
+                garantia = (decimal?)x.GarantiaRetenida ?? 0m,
+                detraccion = (decimal?)x.DetraccionAcumulada ?? 0m,
+                resta = (decimal?)x.Resta ?? 0m,
+                liquidar = (decimal?)x.Liquidar ?? 0m
             });
         }
 
         public async Task<object> GetByIdAsync(int idValorizacion)
         {
             using var db = Open();
-            using var multi = await db.QueryMultipleAsync(
-                "contable.usp_Valorizacion_Get",
-                new { IdValorizacion = idValorizacion },
-                commandType: CommandType.StoredProcedure);
+            using var multi = await db.QueryMultipleAsync("contable.usp_Valorizacion_Get", new { IdValorizacion = idValorizacion }, commandType: CommandType.StoredProcedure);
 
-            var cabeceraRaw = await multi.ReadFirstOrDefaultAsync();
+            var cabecera = await multi.ReadFirstOrDefaultAsync();
             var detalleRaw = (await multi.ReadAsync()).ToList();
-            var resumenRaw = await multi.ReadFirstOrDefaultAsync();
+            var resumen = await multi.ReadFirstOrDefaultAsync();
+            var archivosRaw = (await multi.ReadAsync()).ToList();
 
-            object? cabecera = null;
-            if (cabeceraRaw != null)
+            var archivos = archivosRaw.Select(a => new
             {
-                cabecera = new
-                {
-                    idValorizacion = (int?)cabeceraRaw.IdValorizacion,
-                    idConfiguracion = (int?)cabeceraRaw.IdProveedorEspecialidadCotizacion,
-                    periodo = (string?)cabeceraRaw.NumeroValorizacion,
-                    observacion = (string?)cabeceraRaw.Observacion,
-                    proveedor = (string?)cabeceraRaw.Proveedor,
-                    especialidad = (string?)cabeceraRaw.Especialidad,
-                    proyecto = (string?)cabeceraRaw.NombreProyecto,
-                    servicio = (string?)cabeceraRaw.Servicio,
-                    moneda = (string?)cabeceraRaw.Moneda,
-                    montoCotizacion = (decimal?)cabeceraRaw.Cotizacion ?? 0m,
-                    porcentajeGarantia = (decimal?)cabeceraRaw.PorcentajeGarantia ?? 0.05m,
-                    porcentajeDetraccion = (decimal?)cabeceraRaw.PorcentajeDetraccion ?? 0.04m
-                };
-            }
+                idArchivo = (int?)a.IdValorizacionDetalleArchivo,
+                idDetalle = (int?)a.IdValorizacionDetalle,
+                nombreArchivo = (string?)a.NombreArchivo,
+                rutaArchivo = (string?)a.RutaArchivo,
+                extension = (string?)a.Extension
+            }).ToList();
 
-            var detalle = detalleRaw.Select(x => new
+            var detalle = detalleRaw.Select(d => new
             {
-                idDetalle = (int?)x.IdValorizacionDetalle,
-                fechaFactura = (DateTime?)x.FechaFactura,
-                numeroFactura = (string?)x.NumeroFactura,
-                baseImponible = (decimal?)x.BaseImponible ?? 0m,
-                igv = (decimal?)x.Igv ?? 0m,
-                montoFactura = (decimal?)x.MontoFactura ?? 0m,
-                descripcion = (string?)x.Descripcion,
-                detraccion = (decimal?)x.Detraccion ?? (decimal?)x.MontoDetraccion ?? 0m,
-                garantia = (decimal?)x.Garantia ?? (decimal?)x.MontoGarantia ?? 0m,
-                otrosDescuentos = (decimal?)x.OtrosDescuentos ?? 0m,
-                aAbonar = (decimal?)x.AAbonar ?? (decimal?)x.MontoAbonar ?? 0m,
-                fechaTransferencia = (DateTime?)x.FechaTransferencia,
-                numeroOperacion = (string?)x.NumeroOperacion,
-                bancoTransferencia = (string?)x.BancoTransferencia,
-                bancoDestino = (string?)x.BancoDestino,
-                montoTransferido = (decimal?)x.MontoTransferido ?? 0m,
-                aFavor = (decimal?)x.AFavor ?? (decimal?)x.MontoAFavor ?? 0m,
-                deuda = (decimal?)x.Deuda ?? (decimal?)x.MontoDeuda ?? 0m,
-                porcentajeAvance = (decimal?)x.PorcentajeAvance ?? 0m,
-                porcentajeAcumulado = (decimal?)x.PorcentajeAcumulado ?? 0m,
-                porcentajeInicial = (decimal?)x.PorcentajeInicial ?? 0m,
-                porcentajeFinal = (decimal?)x.PorcentajeFinal ?? 0m
+                idDetalle = (int?)d.IdValorizacionDetalle,
+                fechaFactura = (DateTime?)d.FechaFactura,
+                numeroFactura = (string?)d.NumeroFactura,
+                montoFactura = (decimal?)d.MontoFactura ?? 0m,
+                descripcion = (string?)d.Descripcion,
+                detraccion = (decimal?)d.Detraccion ?? 0m,
+                garantia = (decimal?)d.Garantia ?? 0m,
+                montoTransferido = (decimal?)d.MontoTransferido ?? 0m,
+                fechaTransferencia = (DateTime?)d.FechaTransferencia,
+                archivos = archivos.Where(a => a.idDetalle == (int?)d.IdValorizacionDetalle).ToList()
             });
 
-            object? resumen = null;
-            if (resumenRaw != null)
+            return new
             {
-                resumen = new
+                cabecera = cabecera == null ? null : new
                 {
-                    cotizacion = (decimal?)resumenRaw.Cotizacion ?? 0m,
-                    porcentajeGarantia = (decimal?)resumenRaw.PorcentajeGarantia ?? 0.05m,
-                    porcentajeDetraccion = (decimal?)resumenRaw.PorcentajeDetraccion ?? 0.04m,
-                    facturado = (decimal?)resumenRaw.Facturado ?? 0m,
-                    transferido = (decimal?)resumenRaw.Transferido ?? 0m,
-                    garantiaRetenida = (decimal?)resumenRaw.GarantiaRetenida ?? 0m,
-                    detraccionAcumulada = (decimal?)resumenRaw.DetraccionAcumulada ?? 0m,
-                    otrosDescuentos = (decimal?)resumenRaw.OtrosDescuentos ?? 0m,
-                    resta = (decimal?)resumenRaw.Resta ?? 0m,
-                    liquidar = (decimal?)resumenRaw.Liquidar ?? 0m,
-                    aFavor = (decimal?)resumenRaw.AFavor ?? 0m,
-                    deuda = (decimal?)resumenRaw.Deuda ?? 0m
-                };
-            }
-
-            return new { cabecera, detalle, resumen };
+                    idValorizacion = (int?)cabecera.IdValorizacion,
+                    idConfiguracion = (int?)cabecera.IdProveedorEspecialidadCotizacion,
+                    periodo = (string?)cabecera.NumeroValorizacion,
+                    proyecto = (string?)cabecera.NombreProyecto,
+                    proveedor = (string?)cabecera.Proveedor,
+                    especialidad = (string?)cabecera.Especialidad,
+                    empresa = (string?)cabecera.Empresa,
+                    servicio = (string?)cabecera.Servicio,
+                    moneda = (string?)cabecera.Moneda,
+                    cotizacion = (decimal?)cabecera.Cotizacion ?? 0m,
+                    porcentajeGarantia = (decimal?)cabecera.PorcentajeGarantia ?? 0.04m,
+                    porcentajeDetraccion = (decimal?)cabecera.PorcentajeDetraccion ?? 0.04m,
+                    observacion = (string?)cabecera.Observacion
+                },
+                detalle,
+                resumen = resumen == null ? null : new
+                {
+                    cotizacion = (decimal?)resumen.Cotizacion ?? 0m,
+                    garantia = (decimal?)resumen.GarantiaRetenida ?? 0m,
+                    facturado = (decimal?)resumen.Facturado ?? 0m,
+                    transferido = (decimal?)resumen.Transferido ?? 0m,
+                    resta = (decimal?)resumen.Resta ?? 0m,
+                    liquidar = (decimal?)resumen.Liquidar ?? 0m
+                }
+            };
         }
 
         public async Task<object> UpsertAsync(ValorizacionUpsertDto dto)
         {
             using var db = Open();
-
             var config = await db.QueryFirstOrDefaultAsync(
                 @"SELECT
                     pec.IdProveedorEspecialidadCotizacion,
                     pec.IdProyecto,
                     pec.IdProveedor,
                     pec.IdEspecialidad,
+                    pec.Empresa,
                     pec.Servicio,
                     pec.Moneda,
                     pec.MontoCotizacion,
-                    ISNULL(r.PorcentajeGarantia, 0.05) AS PorcentajeGarantia,
+                    ISNULL(r.PorcentajeGarantia, 0.04) AS PorcentajeGarantia,
                     ISNULL(r.PorcentajeDetraccion, 0.04) AS PorcentajeDetraccion
                   FROM maestra.ProveedorEspecialidadCotizacion pec
                   LEFT JOIN maestra.ProveedorReglaValorizacion r
-                    ON r.IdProveedor = pec.IdProveedor
-                   AND r.Activo = 1
+                    ON r.IdProveedor = pec.IdProveedor AND r.Activo = 1
                   WHERE pec.IdProveedorEspecialidadCotizacion = @IdConfiguracion
-                    AND pec.Activo = 1",
-                new { dto.IdConfiguracion });
+                    AND pec.Activo = 1", new { dto.IdConfiguracion });
 
             if (config == null)
                 throw new InvalidOperationException("No se encontró la configuración seleccionada para la valorización.");
@@ -221,9 +199,9 @@ namespace Cobranzas_Vittoria.Repositories
                 IdProveedor = (int)config.IdProveedor,
                 IdEspecialidad = (int)config.IdEspecialidad,
                 IdProveedorEspecialidadCotizacion = (int?)config.IdProveedorEspecialidadCotizacion,
-                Empresa = (string?)null,
+                Empresa = string.IsNullOrWhiteSpace(dto.Empresa) ? (string?)config.Empresa : dto.Empresa,
                 Servicio = (string?)config.Servicio,
-                Moneda = (string?)config.Moneda ?? "Soles",
+                Moneda = (string?)config.Moneda ?? "PEN",
                 Cotizacion = (decimal)config.MontoCotizacion,
                 PorcentajeGarantia = (decimal)config.PorcentajeGarantia,
                 PorcentajeDetraccion = (decimal)config.PorcentajeDetraccion,
@@ -264,11 +242,7 @@ namespace Cobranzas_Vittoria.Repositories
         public async Task<object> DeleteDetalleAsync(int idDetalle, string usuario)
         {
             using var db = Open();
-            await db.QueryFirstAsync("contable.usp_ValorizacionDetalle_Delete", new
-            {
-                IdValorizacionDetalle = idDetalle
-            }, commandType: CommandType.StoredProcedure);
-
+            await db.QueryFirstAsync("contable.usp_ValorizacionDetalle_Delete", new { IdValorizacionDetalle = idDetalle }, commandType: CommandType.StoredProcedure);
             return new { ok = true };
         }
     }
