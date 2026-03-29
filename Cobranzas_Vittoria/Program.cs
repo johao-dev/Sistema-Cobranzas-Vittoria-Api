@@ -22,6 +22,7 @@ builder.Services.AddTransient<ApiExceptionMiddleware>();
 builder.Services.AddScoped<IRolRepository, RolRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IUsuarioRolRepository, UsuarioRolRepository>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();
 builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();
@@ -32,12 +33,15 @@ builder.Services.AddScoped<ICompraRepository, CompraRepository>();
 builder.Services.AddScoped<IKardexRepository, KardexRepository>();
 builder.Services.AddScoped<IUnidadMedidaRepository, UnidadMedidaRepository>();
 builder.Services.AddScoped<IValorizacionRepository, ValorizacionRepository>();
-
+builder.Services.AddScoped<ICategoriaGastoRepository, CategoriaGastoRepository>();
+builder.Services.AddScoped<IProveedorGastoAdministrativoRepository, ProveedorGastoAdministrativoRepository>();
+builder.Services.AddScoped<IGastoAdministrativoRepository, GastoAdministrativoRepository>();
 
 // Services
 builder.Services.AddScoped<IRolService, RolService>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<IUsuarioRolService, UsuarioRolService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEspecialidadService, EspecialidadService>();
 builder.Services.AddScoped<IProyectoService, ProyectoService>();
 builder.Services.AddScoped<IProveedorService, ProveedorService>();
@@ -48,6 +52,9 @@ builder.Services.AddScoped<ICompraService, CompraService>();
 builder.Services.AddScoped<IKardexService, KardexService>();
 builder.Services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
 builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
+builder.Services.AddScoped<ICategoriaGastoService, CategoriaGastoService>();
+builder.Services.AddScoped<IProveedorGastoAdministrativoService, ProveedorGastoAdministrativoService>();
+builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoService>();
 
 var app = builder.Build();
 
@@ -55,5 +62,6 @@ app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseCors("AngularCors");
+app.UseStaticFiles();
 app.MapControllers();
 app.Run();

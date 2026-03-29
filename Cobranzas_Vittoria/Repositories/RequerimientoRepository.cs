@@ -148,6 +148,9 @@ ORDER BY FechaValidacion DESC;";
         {
             using var db = Open();
 
+            var numeroRequerimiento = await EnsureNumeroRequerimientoAsync(db, (dto.NumeroRequerimiento ?? string.Empty).Trim());
+            var fechaRequerimiento = dto.FechaRequerimiento == default ? DateTime.Today : dto.FechaRequerimiento.Date;
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
@@ -157,8 +160,8 @@ ORDER BY FechaValidacion DESC;";
                 tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value);
 
             var p = new DynamicParameters();
-            p.Add("NumeroRequerimiento", dto.NumeroRequerimiento);
-            p.Add("FechaRequerimiento", dto.FechaRequerimiento);
+            p.Add("NumeroRequerimiento", numeroRequerimiento);
+            p.Add("FechaRequerimiento", fechaRequerimiento);
             p.Add("IdEspecialidad", dto.IdEspecialidad);
             p.Add("IdProyecto", dto.IdProyecto);
             p.Add("Descripcion", dto.Descripcion);
@@ -232,6 +235,26 @@ END";
             );
         }
 
+
+
+        private async Task<string> EnsureNumeroRequerimientoAsync(IDbConnection db, string numeroSolicitado)
+        {
+            if (!string.IsNullOrWhiteSpace(numeroSolicitado))
+            {
+                var existe = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM compras.Requerimiento WHERE NumeroRequerimiento = @NumeroRequerimiento",
+                    new { NumeroRequerimiento = numeroSolicitado });
+
+                if (existe == 0)
+                    return numeroSolicitado;
+            }
+
+            var siguiente = await db.QuerySingleAsync<int>(@"
+SELECT ISNULL(MAX(TRY_CONVERT(INT, NumeroRequerimiento)), 0) + 1
+FROM compras.Requerimiento;");
+
+            return siguiente.ToString();
+        }
         public async Task UpdateEstadoAsync(int idRequerimiento, string estado, string? observacion)
         {
             using var db = Open();
