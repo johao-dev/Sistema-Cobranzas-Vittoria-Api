@@ -3,10 +3,45 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <DefaultItemExcludes>
+      $(DefaultItemExcludes);
+      .vs\**;
+      bin\**;
+      obj\**;
+      wwwroot\uploads\**;
+      **\.vs\**;
+      **\bin\**;
+      **\obj\**;
+      **\wwwroot\uploads\**
+    </DefaultItemExcludes>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove=".vs\**" />
+    <Content Remove="bin\**" />
+    <Content Remove="obj\**" />
+    <Content Remove="wwwroot\uploads\**" />
+
+    <None Remove=".vs\**" />
+    <None Remove="bin\**" />
+    <None Remove="obj\**" />
+    <None Remove="wwwroot\uploads\**" />
+
+    <EmbeddedResource Remove=".vs\**" />
+    <EmbeddedResource Remove="bin\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <EmbeddedResource Remove="wwwroot\uploads\**" />
+
+    <Compile Remove=".vs\**" />
+    <Compile Remove="bin\**" />
+    <Compile Remove="obj\**" />
+    <Compile Remove="wwwroot\uploads\**" />
   </ItemGroup>
 </Project>
