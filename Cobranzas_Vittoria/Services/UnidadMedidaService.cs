@@ -1,4 +1,4 @@
-﻿using Cobranzas_Vittoria.Dtos.Maestra;
+using Cobranzas_Vittoria.Dtos.Maestra;
 using Cobranzas_Vittoria.Interfaces;
 
 namespace Cobranzas_Vittoria.Services
@@ -14,5 +14,8 @@ namespace Cobranzas_Vittoria.Services
 
         public Task<IEnumerable<UnidadMedidaDto>> ListAsync(bool? activo)
             => _repo.ListAsync(activo);
+
+        public Task<int> UpsertAsync(UnidadMedidaUpsertDto dto)
+            => _repo.UpsertAsync(dto);
     }
 }
