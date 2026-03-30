@@ -1,12 +1,37 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\repositories\\proveedorgastoadministrativorepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:repositories\\proveedorgastoadministrativorepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ProveedorGastoAdministrativoRepository.cs",
+              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Repositories\\ProveedorGastoAdministrativoRepository.cs",
+              "RelativeDocumentMoniker": "Repositories\\ProveedorGastoAdministrativoRepository.cs",
+              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Repositories\\ProveedorGastoAdministrativoRepository.cs",
+              "RelativeToolTip": "Repositories\\ProveedorGastoAdministrativoRepository.cs",
+              "ViewState": "AgIAADgAAAAAAAAAAAAtwEkAAAAPAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-03-28T19:50:38.715Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

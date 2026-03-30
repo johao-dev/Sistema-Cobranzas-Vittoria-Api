@@ -64,16 +64,8 @@ ORDER BY c.IdCompra DESC;";
             using var db = Open();
             using var tx = db.BeginTransaction();
 
-            var numeroCompra = (dto.NumeroCompra ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(numeroCompra))
-                throw new InvalidOperationException("Debes ingresar el número de compra.");
-
-            var existe = await db.ExecuteScalarAsync<int>(
-                "SELECT COUNT(1) FROM compras.Compra WHERE NumeroCompra = @NumeroCompra",
-                new { NumeroCompra = numeroCompra }, tx);
-
-            if (existe > 0)
-                throw new InvalidOperationException($"Ya existe una compra con el número {numeroCompra}. Usa otro número.");
+            var numeroCompra = await EnsureNumeroCompraAsync(db, tx, (dto.NumeroCompra ?? string.Empty).Trim());
+            var fechaCompra = dto.FechaCompra == default ? DateTime.Today : dto.FechaCompra.Date;
 
             var montoBaseConIgv = (dto.Items ?? new List<CompraDetalleCreateDto>())
                 .Sum(x => x.Cantidad * x.PrecioUnitario);
@@ -90,7 +82,7 @@ ORDER BY c.IdCompra DESC;";
             }
             else
             {
-                subtotalSinIgv = Math.Round(montoBaseConIgv / 1.18m, 2);
+                subtotalSinIgv = Math.Round(montoBaseConIgv, 2);
                 montoIgv = 0;
                 montoTotal = subtotalSinIgv;
             }
@@ -131,7 +123,7 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
                 NumeroCompra = numeroCompra,
                 dto.IdOrdenCompra,
                 dto.IdProveedor,
-                FechaCompra = dto.FechaCompra.Date,
+                FechaCompra = fechaCompra,
                 IncluyeIGV = dto.IncluyeIGV,
                 SubtotalSinIGV = subtotalSinIgv,
                 MontoIGV = montoIgv,
@@ -285,12 +277,33 @@ SELECT
     IdCompra,
     NombreArchivo,
     RutaArchivo,
-    Extension
+    Extension,
+    FechaCreacion
 FROM compras.CompraDocumento
 WHERE IdCompra = @IdCompra
 ORDER BY IdCompraDocumento DESC;", new { IdCompra = idCompra });
         }
 
+
+
+        private async Task<string> EnsureNumeroCompraAsync(IDbConnection db, IDbTransaction tx, string numeroSolicitado)
+        {
+            if (!string.IsNullOrWhiteSpace(numeroSolicitado))
+            {
+                var existe = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM compras.Compra WHERE NumeroCompra = @NumeroCompra",
+                    new { NumeroCompra = numeroSolicitado }, tx);
+
+                if (existe == 0)
+                    return numeroSolicitado;
+            }
+
+            var siguiente = await db.QuerySingleAsync<int>(new CommandDefinition(@"
+SELECT ISNULL(MAX(TRY_CONVERT(INT, NumeroCompra)), 0) + 1
+FROM compras.Compra;", transaction: tx));
+
+            return siguiente.ToString();
+        }
         public async Task SaveDocumentosAsync(int idCompra, IEnumerable<(string NombreArchivo, string RutaArchivo, string? Extension)> docs)
         {
             using var db = Open();
