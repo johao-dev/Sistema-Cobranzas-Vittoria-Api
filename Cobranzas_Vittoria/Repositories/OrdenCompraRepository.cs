@@ -41,6 +41,9 @@ namespace Cobranzas_Vittoria.Repositories
         {
             using var db = Open();
 
+            var numeroOrdenCompra = await EnsureNumeroOrdenCompraAsync(db, (dto.NumeroOrdenCompra ?? string.Empty).Trim());
+            var fechaOrdenCompra = dto.FechaOrdenCompra == default ? DateTime.Today : dto.FechaOrdenCompra.Date;
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
@@ -51,11 +54,11 @@ namespace Cobranzas_Vittoria.Repositories
                 tvp.Rows.Add(it.IdMaterial, it.Cantidad, it.IdProveedor, it.PrecioUnitario);
 
             var p = new DynamicParameters();
-            p.Add("NumeroOrdenCompra", dto.NumeroOrdenCompra);
+            p.Add("NumeroOrdenCompra", numeroOrdenCompra);
             p.Add("IdRequerimiento", dto.IdRequerimiento);
             p.Add("IdProveedor", dto.IdProveedor > 0 ? dto.IdProveedor : dto.Items.FirstOrDefault()?.IdProveedor);
             p.Add("IdProyecto", dto.IdProyecto);
-            p.Add("FechaOrdenCompra", dto.FechaOrdenCompra);
+            p.Add("FechaOrdenCompra", fechaOrdenCompra);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("IdUsuarioCreacion", dto.IdUsuarioCreacion);
             p.Add("RutaPdf", dto.RutaPdf);
@@ -74,6 +77,11 @@ namespace Cobranzas_Vittoria.Repositories
         {
             using var db = Open();
 
+            var numeroOrdenCompra = string.IsNullOrWhiteSpace(dto.NumeroOrdenCompra)
+                ? await EnsureNumeroOrdenCompraAsync(db, string.Empty)
+                : dto.NumeroOrdenCompra.Trim();
+            var fechaOrdenCompra = dto.FechaOrdenCompra == default ? DateTime.Today : dto.FechaOrdenCompra.Date;
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
@@ -85,11 +93,11 @@ namespace Cobranzas_Vittoria.Repositories
 
             var p = new DynamicParameters();
             p.Add("IdOrdenCompra", idOrdenCompra);
-            p.Add("NumeroOrdenCompra", dto.NumeroOrdenCompra);
+            p.Add("NumeroOrdenCompra", numeroOrdenCompra);
             p.Add("IdRequerimiento", dto.IdRequerimiento);
             p.Add("IdProveedor", dto.IdProveedor > 0 ? dto.IdProveedor : dto.Items.FirstOrDefault()?.IdProveedor);
             p.Add("IdProyecto", dto.IdProyecto);
-            p.Add("FechaOrdenCompra", dto.FechaOrdenCompra);
+            p.Add("FechaOrdenCompra", fechaOrdenCompra);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("IdUsuarioCreacion", dto.IdUsuarioCreacion);
             p.Add("RutaPdf", dto.RutaPdf);
@@ -102,6 +110,26 @@ namespace Cobranzas_Vittoria.Repositories
             );
         }
 
+
+
+        private async Task<string> EnsureNumeroOrdenCompraAsync(IDbConnection db, string numeroSolicitado)
+        {
+            if (!string.IsNullOrWhiteSpace(numeroSolicitado))
+            {
+                var existe = await db.ExecuteScalarAsync<int>(
+                    "SELECT COUNT(1) FROM compras.OrdenCompra WHERE NumeroOrdenCompra = @NumeroOrdenCompra",
+                    new { NumeroOrdenCompra = numeroSolicitado });
+
+                if (existe == 0)
+                    return numeroSolicitado;
+            }
+
+            var siguiente = await db.QuerySingleAsync<int>(@"
+SELECT ISNULL(MAX(TRY_CONVERT(INT, NumeroOrdenCompra)), 0) + 1
+FROM compras.OrdenCompra;");
+
+            return siguiente.ToString();
+        }
         public async Task UpdateEstadoAsync(int idOrdenCompra, string estadoNuevo, int? idUsuario, string? observacion)
         {
             using var db = Open();
