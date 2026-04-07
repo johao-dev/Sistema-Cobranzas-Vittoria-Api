@@ -48,8 +48,8 @@ namespace Cobranzas_Vittoria.Repositories
                 proveedor = (string?)x.Proveedor,
                 idEspecialidad = (int?)x.IdEspecialidad,
                 especialidad = (string?)x.Especialidad,
-                empresa = (string?)x.Empresa,
-                servicio = (string?)x.Servicio,
+                empresa = (string?)x.Proveedor,
+                servicio = (string?)x.Especialidad,
                 moneda = (string?)x.Moneda,
                 montoCotizacion = (decimal?)x.MontoCotizacion ?? 0m,
                 porcentajeGarantia = (decimal?)x.PorcentajeGarantia ?? 0.05m,
@@ -60,14 +60,26 @@ namespace Cobranzas_Vittoria.Repositories
         public async Task<object> UpsertConfiguracionAsync(ProveedorEspecialidadCotizacionUpsertDto dto)
         {
             using var db = Open();
+
+            var catalogo = await db.QueryFirstOrDefaultAsync(@"
+SELECT
+    pr.RazonSocial AS Empresa,
+    e.Nombre AS Servicio
+FROM maestra.Proveedor pr
+INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = @IdEspecialidad
+WHERE pr.IdProveedor = @IdProveedor;", new { dto.IdProveedor, dto.IdEspecialidad });
+
+            if (catalogo == null)
+                throw new InvalidOperationException("No se pudo resolver proveedor y especialidad para la configuración.");
+
             var result = await db.QueryFirstAsync("maestra.usp_ProveedorEspecialidadCotizacion_Upsert", new
             {
                 IdProveedorEspecialidadCotizacion = dto.IdConfiguracion,
                 dto.IdProyecto,
                 dto.IdProveedor,
                 dto.IdEspecialidad,
-                dto.Empresa,
-                dto.Servicio,
+                Empresa = (string?)catalogo.Empresa,
+                Servicio = (string?)catalogo.Servicio,
                 dto.Moneda,
                 dto.MontoCotizacion,
                 Activo = 1
@@ -105,8 +117,8 @@ namespace Cobranzas_Vittoria.Repositories
                 proyecto = (string?)x.NombreProyecto,
                 proveedor = (string?)x.Proveedor,
                 especialidad = (string?)x.Especialidad,
-                empresa = (string?)x.Empresa,
-                servicio = (string?)x.Servicio,
+                empresa = (string?)x.Proveedor,
+                servicio = (string?)x.Especialidad,
                 moneda = (string?)x.Moneda,
                 cotizacion = (decimal?)x.Cotizacion ?? 0m,
                 facturado = (decimal?)x.Facturado ?? 0m,
@@ -124,18 +136,17 @@ namespace Cobranzas_Vittoria.Repositories
             using var multi = await db.QueryMultipleAsync("contable.usp_Valorizacion_Get", new { IdValorizacion = idValorizacion }, commandType: CommandType.StoredProcedure);
 
             var cabeceraRaw = await multi.ReadFirstOrDefaultAsync();
-            await multi.ReadAsync(); // Detalle del SP original, se reemplaza por histórico filtrado
-            await multi.ReadAsync(); // Resumen del SP original, se recalcula
-            await multi.ReadAsync(); // Archivos del SP original, se reemplazan por histórico filtrado
+            await multi.ReadAsync();
+            await multi.ReadAsync();
+            await multi.ReadAsync();
 
             if (cabeceraRaw == null)
             {
                 return new { cabecera = (object?)null, detalle = Array.Empty<object>(), resumen = (object?)null };
             }
 
-            var idProveedor = (int?)cabeceraRaw.IdProveedor;
-            var idEspecialidad = (int?)cabeceraRaw.IdEspecialidad;
             var cotizacion = (decimal?)cabeceraRaw.Cotizacion ?? 0m;
+            var hasTipoDetraccion = await HasTipoDetraccionColumnAsync(db);
 
             var cabecera = new
             {
@@ -145,8 +156,8 @@ namespace Cobranzas_Vittoria.Repositories
                 proyecto = (string?)cabeceraRaw.NombreProyecto,
                 proveedor = (string?)cabeceraRaw.Proveedor,
                 especialidad = (string?)cabeceraRaw.Especialidad,
-                empresa = (string?)cabeceraRaw.Empresa,
-                servicio = (string?)cabeceraRaw.Servicio,
+                empresa = (string?)cabeceraRaw.Proveedor,
+                servicio = (string?)cabeceraRaw.Especialidad,
                 moneda = (string?)cabeceraRaw.Moneda,
                 cotizacion,
                 porcentajeGarantia = (decimal?)cabeceraRaw.PorcentajeGarantia ?? 0.05m,
@@ -154,63 +165,34 @@ namespace Cobranzas_Vittoria.Repositories
                 observacion = (string?)cabeceraRaw.Observacion
             };
 
-            if (!idProveedor.HasValue || !idEspecialidad.HasValue)
-            {
-                return new
-                {
-                    cabecera,
-                    detalle = Array.Empty<object>(),
-                    resumen = new
-                    {
-                        cotizacion,
-                        garantia = 0m,
-                        facturado = 0m,
-                        transferido = 0m,
-                        resta = 0m,
-                        liquidar = 0m
-                    }
-                };
-            }
+            var detalleSql = $@"
+SELECT
+    vd.IdValorizacionDetalle,
+    vd.IdValorizacion,
+    vd.FechaFactura,
+    vd.NumeroFactura,
+    vd.MontoFactura,
+    vd.Descripcion,
+    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeDetraccionAplicado, 0), 2) AS DECIMAL(18,2)) AS Detraccion,
+    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeGarantiaAplicado, 0), 2) AS DECIMAL(18,2)) AS Garantia,
+    vd.MontoAbonar,
+    vd.MontoDeuda,
+    vd.MontoTransferido,
+    vd.FechaTransferencia,
+    pr.RazonSocial AS Proveedor,
+    e.Nombre AS Especialidad,
+    v.NumeroValorizacion,
+    {(hasTipoDetraccion ? "vd.TipoDetraccion" : "CAST(NULL AS NVARCHAR(50)) AS TipoDetraccion")}
+FROM contable.ValorizacionDetalle vd
+INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
+INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = v.IdProveedor
+INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = v.IdEspecialidad
+WHERE v.Activo = 1
+  AND vd.Activo = 1
+  AND v.IdValorizacion = @IdValorizacion
+ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC;";
 
-            var detalleResumenRaw = (await db.QueryAsync(@"SELECT
-                    vd.MontoFactura,
-                    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeGarantiaAplicado, 0), 2) AS DECIMAL(18,2)) AS Garantia,
-                    vd.MontoAbonar,
-                    vd.MontoDeuda,
-                    vd.MontoTransferido
-                FROM contable.ValorizacionDetalle vd
-                INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
-                WHERE v.Activo = 1
-                  AND vd.Activo = 1
-                  AND v.IdProveedor = @IdProveedor
-                  AND v.IdEspecialidad = @IdEspecialidad;",
-                new { IdProveedor = idProveedor, IdEspecialidad = idEspecialidad })).ToList();
-
-            var detalleRaw = (await db.QueryAsync(@"SELECT
-                    vd.IdValorizacionDetalle,
-                    vd.IdValorizacion,
-                    vd.FechaFactura,
-                    vd.NumeroFactura,
-                    vd.MontoFactura,
-                    vd.Descripcion,
-                    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeDetraccionAplicado, 0), 0) AS DECIMAL(18,2)) AS Detraccion,
-                    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeGarantiaAplicado, 0), 2) AS DECIMAL(18,2)) AS Garantia,
-                    vd.MontoAbonar,
-                    vd.MontoDeuda,
-                    vd.MontoTransferido,
-                    vd.FechaTransferencia,
-                    pr.RazonSocial AS Proveedor,
-                    e.Nombre AS Especialidad,
-                    v.NumeroValorizacion
-                FROM contable.ValorizacionDetalle vd
-                INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
-                INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = v.IdProveedor
-                INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = v.IdEspecialidad
-                WHERE v.Activo = 1
-                  AND vd.Activo = 1
-                  AND v.IdProveedor = @IdProveedor
-                ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC;",
-                new { IdProveedor = idProveedor })).ToList();
+            var detalleRaw = (await db.QueryAsync(detalleSql, new { IdValorizacion = idValorizacion })).ToList();
 
             var archivosRaw = (await db.QueryAsync(@"SELECT
                     a.IdValorizacionDetalleArchivo,
@@ -223,9 +205,9 @@ namespace Cobranzas_Vittoria.Repositories
                 INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
                 WHERE v.Activo = 1
                   AND vd.Activo = 1
-                  AND v.IdProveedor = @IdProveedor
+                  AND v.IdValorizacion = @IdValorizacion
                 ORDER BY a.IdValorizacionDetalle, a.IdValorizacionDetalleArchivo;",
-                new { IdProveedor = idProveedor })).ToList();
+                new { IdValorizacion = idValorizacion })).ToList();
 
             var archivos = archivosRaw.Select(a => new
             {
@@ -247,6 +229,7 @@ namespace Cobranzas_Vittoria.Repositories
                 numeroFactura = (string?)d.NumeroFactura,
                 montoFactura = (decimal?)d.MontoFactura ?? 0m,
                 descripcion = (string?)d.Descripcion,
+                tipoDetraccion = (string?)d.TipoDetraccion,
                 detraccion = (decimal?)d.Detraccion ?? 0m,
                 garantia = (decimal?)d.Garantia ?? 0m,
                 montoAbonar = (decimal?)d.MontoAbonar ?? 0m,
@@ -256,11 +239,16 @@ namespace Cobranzas_Vittoria.Repositories
                 archivos = archivos.Where(a => a.idDetalle == (int?)d.IdValorizacionDetalle).ToList()
             }).ToList();
 
-            var facturado = detalleResumenRaw.Sum(x => (decimal?)x.MontoFactura ?? 0m);
-            var garantia = detalleResumenRaw.Sum(x => (decimal?)x.Garantia ?? 0m);
-            var transferido = detalleResumenRaw.Sum(x => (decimal?)x.MontoTransferido ?? 0m);
-            var resta = detalleResumenRaw.Sum(x => (decimal?)x.MontoDeuda ?? 0m);
-            var liquidar = detalleResumenRaw.Sum(x => (decimal?)x.MontoAbonar ?? 0m);
+            var resumenFacturas = detalle.Select(d => new
+            {
+                numeroFactura = d.numeroFactura,
+                descripcion = d.descripcion,
+                facturado = d.montoFactura,
+                transferido = d.montoTransferido,
+                garantia = d.garantia,
+                detraccion = d.detraccion,
+                resta = Math.Round(cotizacion - d.montoFactura, 2)
+            }).ToList();
 
             return new
             {
@@ -269,11 +257,7 @@ namespace Cobranzas_Vittoria.Repositories
                 resumen = new
                 {
                     cotizacion,
-                    garantia,
-                    facturado,
-                    transferido,
-                    resta,
-                    liquidar
+                    facturas = resumenFacturas
                 }
             };
         }
@@ -287,13 +271,15 @@ namespace Cobranzas_Vittoria.Repositories
                     pec.IdProyecto,
                     pec.IdProveedor,
                     pec.IdEspecialidad,
-                    pec.Empresa,
-                    pec.Servicio,
+                    pr.RazonSocial AS Empresa,
+                    e.Nombre AS Servicio,
                     pec.Moneda,
                     pec.MontoCotizacion,
                     ISNULL(r.PorcentajeGarantia, 0.05) AS PorcentajeGarantia,
                     ISNULL(r.PorcentajeDetraccion, 0.04) AS PorcentajeDetraccion
                   FROM maestra.ProveedorEspecialidadCotizacion pec
+                  INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = pec.IdProveedor
+                  INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = pec.IdEspecialidad
                   LEFT JOIN maestra.ProveedorReglaValorizacion r
                     ON r.IdProveedor = pec.IdProveedor AND r.Activo = 1
                   WHERE pec.IdProveedorEspecialidadCotizacion = @IdConfiguracion
@@ -314,7 +300,7 @@ namespace Cobranzas_Vittoria.Repositories
                 IdProveedor = (int)config.IdProveedor,
                 IdEspecialidad = (int)config.IdEspecialidad,
                 IdProveedorEspecialidadCotizacion = (int?)config.IdProveedorEspecialidadCotizacion,
-                Empresa = string.IsNullOrWhiteSpace(dto.Empresa) ? (string?)config.Empresa : dto.Empresa,
+                Empresa = (string?)config.Empresa,
                 Servicio = (string?)config.Servicio,
                 Moneda = (string?)config.Moneda ?? "PEN",
                 Cotizacion = (decimal)config.MontoCotizacion,
@@ -351,14 +337,38 @@ namespace Cobranzas_Vittoria.Repositories
                 dto.PorcentajeGarantiaAplicado
             }, commandType: CommandType.StoredProcedure);
 
-            return new { idDetalle = (int?)result.IdValorizacionDetalle };
+            var idDetalle = (int?)result.IdValorizacionDetalle;
+
+            if (idDetalle.HasValue && await HasTipoDetraccionColumnAsync(db))
+            {
+                await db.ExecuteAsync(@"
+UPDATE contable.ValorizacionDetalle
+SET TipoDetraccion = @TipoDetraccion
+WHERE IdValorizacionDetalle = @IdValorizacionDetalle;", new
+                {
+                    IdValorizacionDetalle = idDetalle.Value,
+                    TipoDetraccion = string.IsNullOrWhiteSpace(dto.TipoDetraccion) ? "SinDetraccion" : dto.TipoDetraccion.Trim()
+                });
+            }
+
+            return new { idDetalle };
         }
 
         public async Task<object> DeleteDetalleAsync(int idDetalle, string usuario)
         {
             using var db = Open();
-            await db.QueryFirstAsync("contable.usp_ValorizacionDetalle_Delete", new { IdValorizacionDetalle = idDetalle }, commandType: CommandType.StoredProcedure);
+            await db.ExecuteAsync(@"
+DELETE FROM contable.ValorizacionDetalleArchivo
+WHERE IdValorizacionDetalle = @IdValorizacionDetalle;", new { IdValorizacionDetalle = idDetalle });
+
+            await db.ExecuteAsync(@"
+DELETE FROM contable.ValorizacionDetalle
+WHERE IdValorizacionDetalle = @IdValorizacionDetalle;", new { IdValorizacionDetalle = idDetalle });
+
             return new { ok = true };
         }
+
+        private async Task<bool> HasTipoDetraccionColumnAsync(IDbConnection db)
+            => (await db.ExecuteScalarAsync<int>("SELECT CASE WHEN COL_LENGTH('contable.ValorizacionDetalle', 'TipoDetraccion') IS NULL THEN 0 ELSE 1 END;")) == 1;
     }
 }

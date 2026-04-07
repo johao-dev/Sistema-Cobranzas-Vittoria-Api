@@ -14,6 +14,7 @@ namespace Cobranzas_Vittoria.Dtos.Valorizaciones
         public string BancoTransferencia { get; set; } = string.Empty;
         public string BancoDestino { get; set; } = string.Empty;
         public decimal MontoTransferido { get; set; }
+        public string? TipoDetraccion { get; set; }
         public decimal? PorcentajeDetraccionAplicado { get; set; }
         public decimal? PorcentajeGarantiaAplicado { get; set; }
         public string Usuario { get; set; } = "system";

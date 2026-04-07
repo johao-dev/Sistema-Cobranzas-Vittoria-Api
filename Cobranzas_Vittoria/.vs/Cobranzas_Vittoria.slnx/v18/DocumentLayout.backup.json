@@ -3,12 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\dtos\\gastosadministrativos\\proveedorgastoadministrativoupsertdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:dtos\\gastosadministrativos\\proveedorgastoadministrativoupsertdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -23,27 +19,15 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\appsettings.json",
-              "RelativeDocumentMoniker": "appsettings.json",
-              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\appsettings.json",
-              "RelativeToolTip": "appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAfAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-03-30T14:38:32.813Z",
+              "Title": "ProveedorGastoAdministrativoUpsertDto.cs",
+              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
+              "RelativeDocumentMoniker": "Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
+              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
+              "RelativeToolTip": "Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-01T17:45:54.311Z",
               "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "appsettings.Development.json",
-              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\appsettings.Development.json",
-              "RelativeDocumentMoniker": "appsettings.Development.json",
-              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\appsettings.Development.json",
-              "RelativeToolTip": "appsettings.Development.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-03-30T14:13:22.975Z"
             }
           ]
         }

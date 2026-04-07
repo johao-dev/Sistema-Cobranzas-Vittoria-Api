@@ -5,7 +5,7 @@ namespace Cobranzas_Vittoria.Dtos.Valorizaciones
         public int? IdValorizacion { get; set; }
         public int IdConfiguracion { get; set; }
         public string Periodo { get; set; } = string.Empty;
-        public string Empresa { get; set; } = string.Empty;
+        public string? Empresa { get; set; }
         public string Observacion { get; set; } = string.Empty;
         public string Usuario { get; set; } = "system";
     }

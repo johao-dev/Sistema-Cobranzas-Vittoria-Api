@@ -55,8 +55,6 @@ namespace Cobranzas_Vittoria.Controllers
             foreach (var file in files)
             {
                 var ext = Path.GetExtension(file.FileName);
-                if (!string.Equals(ext, ".pdf", StringComparison.OrdinalIgnoreCase))
-                    return BadRequest(new { message = "Solo se permiten archivos PDF." });
 
                 var safeName = $"{Guid.NewGuid():N}_{Path.GetFileName(file.FileName)}";
                 var fullPath = Path.Combine(root, safeName);
@@ -82,7 +80,7 @@ namespace Cobranzas_Vittoria.Controllers
             if (doc == null)
                 return NotFound(new { message = "No se encontró el documento solicitado." });
 
-            var nombreArchivo = (string?)((object?)doc.NombreArchivo ?? (object?)doc.nombreArchivo) ?? $"compra_{id}_{docId}.pdf";
+            var nombreArchivo = (string?)((object?)doc.NombreArchivo ?? (object?)doc.nombreArchivo) ?? $"compra_{id}_{docId}";
             var rutaRelativa = (string?)((object?)doc.RutaArchivo ?? (object?)doc.rutaArchivo);
 
             if (string.IsNullOrWhiteSpace(rutaRelativa))
@@ -94,7 +92,7 @@ namespace Cobranzas_Vittoria.Controllers
             if (!System.IO.File.Exists(rutaFisica))
                 return NotFound(new { message = "No se encontró el archivo físico del documento." });
 
-            return PhysicalFile(rutaFisica, "application/pdf", nombreArchivo);
+            return PhysicalFile(rutaFisica, "application/octet-stream", nombreArchivo);
         }
     }
 }
