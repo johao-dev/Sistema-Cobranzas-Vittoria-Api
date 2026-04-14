@@ -9,7 +9,13 @@ namespace Cobranzas_Vittoria.Controllers
     public class ProveedoresController : ControllerBase
     {
         private readonly IProveedorService _service;
-        public ProveedoresController(IProveedorService service) => _service = service;
+        private readonly ISunatService _sunatService;
+
+        public ProveedoresController(IProveedorService service, ISunatService sunatService)
+        {
+            _service = service;
+            _sunatService = sunatService;
+        }
 
         [HttpGet]
         public async Task<IActionResult> List([FromQuery] bool? activo, [FromQuery] int? idEspecialidad)
@@ -20,6 +26,20 @@ namespace Cobranzas_Vittoria.Controllers
         {
             var res = await _service.GetAsync(id);
             return res is null ? NotFound() : Ok(res);
+        }
+
+        [HttpGet("consulta-ruc/{ruc}")]
+        public async Task<IActionResult> GetPorRuc(string ruc)
+        {
+            if (string.IsNullOrWhiteSpace(ruc) || ruc.Length != 11)
+                return BadRequest("El RUC debe tener 11 digitos.");
+
+            var datosSunat = await _sunatService.ConsultarRucAsync(ruc);
+
+            if (datosSunat == null)
+                return NotFound("No se encontraron datos para el RUC ingresado.");
+
+            return Ok(datosSunat);
         }
 
         [HttpPost]

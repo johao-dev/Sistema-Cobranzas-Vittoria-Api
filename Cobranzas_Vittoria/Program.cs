@@ -16,6 +16,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
+builder.Services.AddHttpClient<ISunatService, SunatService>();
 builder.Services.AddTransient<ApiExceptionMiddleware>();
 
 // Repositories
@@ -55,6 +56,7 @@ builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
 builder.Services.AddScoped<ICategoriaGastoService, CategoriaGastoService>();
 builder.Services.AddScoped<IProveedorGastoAdministrativoService, ProveedorGastoAdministrativoService>();
 builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoService>();
+builder.Services.AddScoped<ISunatService, SunatService>();
 
 var app = builder.Build();
 
