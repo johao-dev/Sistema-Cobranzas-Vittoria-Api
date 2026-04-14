@@ -1,37 +1,12 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\",
-  "Documents": [
-    {
-      "AbsoluteMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|c:\\users\\sebas\\desktop\\vittoria\\sistemawebvittoria_api\\sistema-cobranzas-vittoria-api\\cobranzas_vittoria\\dtos\\gastosadministrativos\\proveedorgastoadministrativoupsertdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{610128D8-2083-07D0-51C3-EE6A12A150BD}|Cobranzas_Vittoria.csproj|solutionrelative:dtos\\gastosadministrativos\\proveedorgastoadministrativoupsertdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    }
-  ],
+  "Documents": [],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": [
-        {
-          "DockedWidth": 200,
-          "SelectedChildIndex": 0,
-          "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "ProveedorGastoAdministrativoUpsertDto.cs",
-              "DocumentMoniker": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
-              "RelativeDocumentMoniker": "Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
-              "ToolTip": "C:\\Users\\sebas\\Desktop\\Vittoria\\SistemaWebVittoria_API\\Sistema-Cobranzas-Vittoria-Api\\Cobranzas_Vittoria\\Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
-              "RelativeToolTip": "Dtos\\GastosAdministrativos\\ProveedorGastoAdministrativoUpsertDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-04-01T17:45:54.311Z",
-              "EditorCaption": ""
-            }
-          ]
-        }
-      ]
+      "DocumentGroups": []
     }
   ]
 }
