@@ -41,13 +41,15 @@ GROUP BY p.IdPresupuestoProyecto, p.IdProyecto, pr.NombreProyecto;", new { IdPro
             var items = (await db.QueryAsync(@"
 SELECT
     d.IdPresupuestoProyectoDetalle,
+    d.Orden,
     d.Concepto,
     d.Soles,
+    ISNULL(d.Dolares, 0) AS Dolares,
     d.Incidencia
 FROM contable.PresupuestoProyectoDetalle d
 INNER JOIN contable.PresupuestoProyecto p ON p.IdPresupuestoProyecto = d.IdPresupuestoProyecto
 WHERE p.IdProyecto = @IdProyecto AND p.Activo = 1
-ORDER BY d.IdPresupuestoProyectoDetalle;", new { IdProyecto = idProyecto })).ToList();
+ORDER BY ISNULL(d.Orden, d.IdPresupuestoProyectoDetalle), d.IdPresupuestoProyectoDetalle;", new { IdProyecto = idProyecto })).ToList();
 
             var totalCompras = await db.ExecuteScalarAsync<decimal>(@"
 SELECT CAST(ISNULL(SUM(c.MontoTotal), 0) AS DECIMAL(18,2))
@@ -70,8 +72,10 @@ WHERE COALESCE(oc.IdProyecto, rq.IdProyecto) = @IdProyecto;", new { IdProyecto =
                 items = items.Select(x => new
                 {
                     idPresupuestoDetalle = (int?)x.IdPresupuestoProyectoDetalle,
+                    orden = (int?)x.Orden ?? 0,
                     concepto = (string?)x.Concepto ?? string.Empty,
                     soles = (decimal?)x.Soles ?? 0m,
+                    dolares = (decimal?)x.Dolares ?? 0m,
                     incidencia = (decimal?)x.Incidencia ?? 0m
                 })
             });
@@ -134,25 +138,41 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);", new { dto.IdProyecto }, tx);
 INSERT INTO contable.PresupuestoProyectoDetalle
 (
     IdPresupuestoProyecto,
+    Orden,
     Concepto,
     Soles,
+    Dolares,
     Incidencia
 )
 VALUES
 (
     @IdPresupuestoProyecto,
+    @Orden,
     @Concepto,
     @Soles,
+    @Dolares,
     @Incidencia
 );";
 
-            foreach (var item in dto.Items)
+            for (int i = 0; i < dto.Items.Count; i++)
             {
+                var item = dto.Items[i];
+                var concepto = (item.Concepto ?? string.Empty).Trim();
+                var dolares = item.Dolares;
+                var soles = item.Soles;
+
+                if (string.Equals(concepto, "TERRENO", StringComparison.OrdinalIgnoreCase) && dolares > 0)
+                {
+                    soles = decimal.Round(dolares * 3.41m, 2, MidpointRounding.AwayFromZero);
+                }
+
                 await db.ExecuteAsync(sqlInsertDetalle, new
                 {
                     IdPresupuestoProyecto = idPresupuesto.Value,
-                    Concepto = (item.Concepto ?? string.Empty).Trim(),
-                    Soles = item.Soles,
+                    Orden = i + 1,
+                    Concepto = concepto,
+                    Soles = soles,
+                    Dolares = dolares,
                     Incidencia = item.Incidencia
                 }, tx);
             }
@@ -189,14 +209,36 @@ BEGIN
     (
         IdPresupuestoProyectoDetalle INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         IdPresupuestoProyecto INT NOT NULL,
+        Orden INT NOT NULL,
         Concepto NVARCHAR(200) NOT NULL,
         Soles DECIMAL(18,2) NOT NULL,
+        Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares DEFAULT(0),
         Incidencia DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Incidencia DEFAULT(0)
     );
 
     ALTER TABLE contable.PresupuestoProyectoDetalle
     ADD CONSTRAINT FK_PresupuestoProyectoDetalle_PresupuestoProyecto
         FOREIGN KEY (IdPresupuestoProyecto) REFERENCES contable.PresupuestoProyecto(IdPresupuestoProyecto);
+END;
+
+IF COL_LENGTH('contable.PresupuestoProyectoDetalle', 'Orden') IS NULL
+BEGIN
+    ALTER TABLE contable.PresupuestoProyectoDetalle ADD Orden INT NULL;
+    WITH cte AS (
+        SELECT IdPresupuestoProyectoDetalle, ROW_NUMBER() OVER(PARTITION BY IdPresupuestoProyecto ORDER BY IdPresupuestoProyectoDetalle) AS rn
+        FROM contable.PresupuestoProyectoDetalle
+    )
+    UPDATE d
+    SET Orden = cte.rn
+    FROM contable.PresupuestoProyectoDetalle d
+    INNER JOIN cte ON cte.IdPresupuestoProyectoDetalle = d.IdPresupuestoProyectoDetalle;
+    ALTER TABLE contable.PresupuestoProyectoDetalle ALTER COLUMN Orden INT NOT NULL;
+END;
+
+IF COL_LENGTH('contable.PresupuestoProyectoDetalle', 'Dolares') IS NULL
+BEGIN
+    ALTER TABLE contable.PresupuestoProyectoDetalle
+    ADD Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares DEFAULT(0);
 END;
 
 IF COL_LENGTH('contable.PresupuestoProyecto', 'PresupuestoInicial') IS NOT NULL
