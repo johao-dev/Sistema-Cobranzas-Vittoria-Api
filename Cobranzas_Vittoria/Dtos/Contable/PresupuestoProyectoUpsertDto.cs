@@ -11,6 +11,5 @@ namespace Cobranzas_Vittoria.Dtos.Contable
         public string Concepto { get; set; } = string.Empty;
         public decimal Soles { get; set; }
         public decimal Dolares { get; set; }
-        public decimal Incidencia { get; set; }
     }
 }

@@ -11,6 +11,7 @@ namespace Cobranzas_Vittoria.Controllers
     public class PresupuestoController : ControllerBase
     {
         private readonly IDbConnectionFactory _factory;
+        private const decimal TipoCambio = 3.41m;
 
         public PresupuestoController(IDbConnectionFactory factory)
         {
@@ -32,7 +33,7 @@ SELECT
 FROM contable.PresupuestoProyecto p
 INNER JOIN maestra.Proyecto pr ON pr.IdProyecto = p.IdProyecto
 LEFT JOIN contable.PresupuestoProyectoDetalle d ON d.IdPresupuestoProyecto = p.IdPresupuestoProyecto
-WHERE p.IdProyecto = @IdProyecto AND p.Activo = 1
+WHERE p.IdProyecto = @IdProyecto AND ISNULL(p.Activo,1) = 1
 GROUP BY p.IdPresupuestoProyecto, p.IdProyecto, pr.NombreProyecto;", new { IdProyecto = idProyecto });
 
             if (header == null)
@@ -44,11 +45,10 @@ SELECT
     d.Orden,
     d.Concepto,
     d.Soles,
-    ISNULL(d.Dolares, 0) AS Dolares,
-    d.Incidencia
+    ISNULL(d.Dolares, 0) AS Dolares
 FROM contable.PresupuestoProyectoDetalle d
 INNER JOIN contable.PresupuestoProyecto p ON p.IdPresupuestoProyecto = d.IdPresupuestoProyecto
-WHERE p.IdProyecto = @IdProyecto AND p.Activo = 1
+WHERE p.IdProyecto = @IdProyecto AND ISNULL(p.Activo,1) = 1
 ORDER BY ISNULL(d.Orden, d.IdPresupuestoProyectoDetalle), d.IdPresupuestoProyectoDetalle;", new { IdProyecto = idProyecto })).ToList();
 
             var totalCompras = await db.ExecuteScalarAsync<decimal>(@"
@@ -75,8 +75,7 @@ WHERE COALESCE(oc.IdProyecto, rq.IdProyecto) = @IdProyecto;", new { IdProyecto =
                     orden = (int?)x.Orden ?? 0,
                     concepto = (string?)x.Concepto ?? string.Empty,
                     soles = (decimal?)x.Soles ?? 0m,
-                    dolares = (decimal?)x.Dolares ?? 0m,
-                    incidencia = (decimal?)x.Incidencia ?? 0m
+                    dolares = (decimal?)x.Dolares ?? 0m
                 })
             });
         }
@@ -141,8 +140,7 @@ INSERT INTO contable.PresupuestoProyectoDetalle
     Orden,
     Concepto,
     Soles,
-    Dolares,
-    Incidencia
+    Dolares
 )
 VALUES
 (
@@ -150,30 +148,44 @@ VALUES
     @Orden,
     @Concepto,
     @Soles,
-    @Dolares,
-    @Incidencia
+    @Dolares
 );";
 
-            for (int i = 0; i < dto.Items.Count; i++)
+            var normalized = dto.Items.Select((item, index) => new
             {
-                var item = dto.Items[i];
-                var concepto = (item.Concepto ?? string.Empty).Trim();
-                var dolares = item.Dolares;
-                var soles = item.Soles;
+                Orden = index + 1,
+                Concepto = (item.Concepto ?? string.Empty).Trim().ToUpperInvariant(),
+                Soles = item.Soles,
+                Dolares = item.Dolares
+            }).ToList();
 
-                if (string.Equals(concepto, "TERRENO", StringComparison.OrdinalIgnoreCase) && dolares > 0)
+            var terreno = normalized.FirstOrDefault(x => x.Concepto == "TERRENO");
+            var terrenoSoles = terreno != null
+                ? decimal.Round((terreno.Dolares > 0 ? terreno.Dolares * TipoCambio : terreno.Soles), 2, MidpointRounding.AwayFromZero)
+                : 0m;
+
+            foreach (var item in normalized)
+            {
+                var soles = item.Soles;
+                var dolares = 0m;
+
+                if (item.Concepto == "TERRENO")
                 {
-                    soles = decimal.Round(dolares * 3.41m, 2, MidpointRounding.AwayFromZero);
+                    dolares = item.Dolares;
+                    soles = decimal.Round((dolares > 0 ? dolares * TipoCambio : item.Soles), 2, MidpointRounding.AwayFromZero);
+                }
+                else if (item.Concepto == "ALCABALA")
+                {
+                    soles = decimal.Round(terrenoSoles * 0.03m, 2, MidpointRounding.AwayFromZero);
                 }
 
                 await db.ExecuteAsync(sqlInsertDetalle, new
                 {
-                    IdPresupuestoProyecto = idPresupuesto.Value,
-                    Orden = i + 1,
-                    Concepto = concepto,
+                    IdPresupuestoProyecto = idPresupuesto!.Value,
+                    item.Orden,
+                    item.Concepto,
                     Soles = soles,
-                    Dolares = dolares,
-                    Incidencia = item.Incidencia
+                    Dolares = dolares
                 }, tx);
             }
 
@@ -194,13 +206,9 @@ BEGIN
         FechaCreacion DATETIME NOT NULL CONSTRAINT DF_PresupuestoProyecto_FechaCreacion DEFAULT(GETDATE()),
         FechaActualizacion DATETIME NOT NULL CONSTRAINT DF_PresupuestoProyecto_FechaActualizacion DEFAULT(GETDATE())
     );
-
     ALTER TABLE contable.PresupuestoProyecto
-    ADD CONSTRAINT FK_PresupuestoProyecto_Proyecto
-        FOREIGN KEY (IdProyecto) REFERENCES maestra.Proyecto(IdProyecto);
-
-    CREATE UNIQUE INDEX UX_PresupuestoProyecto_IdProyecto
-        ON contable.PresupuestoProyecto(IdProyecto);
+    ADD CONSTRAINT FK_PresupuestoProyecto_Proyecto FOREIGN KEY (IdProyecto) REFERENCES maestra.Proyecto(IdProyecto);
+    CREATE UNIQUE INDEX UX_PresupuestoProyecto_IdProyecto ON contable.PresupuestoProyecto(IdProyecto);
 END;
 
 IF OBJECT_ID('contable.PresupuestoProyectoDetalle', 'U') IS NULL
@@ -212,13 +220,10 @@ BEGIN
         Orden INT NOT NULL,
         Concepto NVARCHAR(200) NOT NULL,
         Soles DECIMAL(18,2) NOT NULL,
-        Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares DEFAULT(0),
-        Incidencia DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Incidencia DEFAULT(0)
+        Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares DEFAULT(0)
     );
-
     ALTER TABLE contable.PresupuestoProyectoDetalle
-    ADD CONSTRAINT FK_PresupuestoProyectoDetalle_PresupuestoProyecto
-        FOREIGN KEY (IdPresupuestoProyecto) REFERENCES contable.PresupuestoProyecto(IdPresupuestoProyecto);
+    ADD CONSTRAINT FK_PresupuestoProyectoDetalle_PresupuestoProyecto FOREIGN KEY (IdPresupuestoProyecto) REFERENCES contable.PresupuestoProyecto(IdPresupuestoProyecto);
 END;
 
 IF COL_LENGTH('contable.PresupuestoProyectoDetalle', 'Orden') IS NULL
@@ -238,13 +243,14 @@ END;
 IF COL_LENGTH('contable.PresupuestoProyectoDetalle', 'Dolares') IS NULL
 BEGIN
     ALTER TABLE contable.PresupuestoProyectoDetalle
-    ADD Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares DEFAULT(0);
+    ADD Dolares DECIMAL(18,2) NOT NULL CONSTRAINT DF_PresupuestoProyectoDetalle_Dolares_MIG DEFAULT(0);
 END;
 
-IF COL_LENGTH('contable.PresupuestoProyecto', 'PresupuestoInicial') IS NOT NULL
+IF COL_LENGTH('contable.PresupuestoProyectoDetalle', 'Incidencia') IS NOT NULL
 BEGIN
-    ALTER TABLE contable.PresupuestoProyecto DROP COLUMN PresupuestoInicial;
-END;");
+    ALTER TABLE contable.PresupuestoProyectoDetalle DROP COLUMN Incidencia;
+END;
+");
         }
     }
 }
