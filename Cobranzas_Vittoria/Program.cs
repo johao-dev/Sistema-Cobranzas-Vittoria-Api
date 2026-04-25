@@ -17,6 +17,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddHttpClient<ISunatService, SunatService>();
+builder.Services.AddMemoryCache(); // soporte para caché
 builder.Services.AddTransient<ApiExceptionMiddleware>();
 
 // Repositories
