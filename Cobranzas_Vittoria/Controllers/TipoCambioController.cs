@@ -12,9 +12,9 @@ namespace Cobranzas_Vittoria.Controllers
         public TipoCambioController(ISunatService sunatService) => _sunatService = sunatService;
 
         [HttpGet]
-        public async Task<IActionResult> GetTipoCambio()
+        public async Task<IActionResult> GetTipoCambio([FromQuery] string? fecha)
         {
-            var tipoCambio = await _sunatService.ConsultarTipoCambio();
+            var tipoCambio = await _sunatService.ConsultarTipoCambio(fecha);
             if (tipoCambio == null) return NotFound();
             return Ok(tipoCambio);
         }

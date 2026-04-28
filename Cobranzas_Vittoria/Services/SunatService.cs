@@ -2,6 +2,7 @@
 using Cobranzas_Vittoria.Dtos.Sunat;
 using Cobranzas_Vittoria.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
+using System.Net.WebSockets;
 using System.Text.Json;
 
 namespace Cobranzas_Vittoria.Services
@@ -36,14 +37,18 @@ namespace Cobranzas_Vittoria.Services
             return JsonSerializer.Deserialize<ProveedorConsultaSunatDto>(json);
         }
 
-        public async Task<TipoCambioResponseDto> ConsultarTipoCambio()
+        public async Task<TipoCambioResponseDto> ConsultarTipoCambio(string? fechaSolicitada)
         {
-            if (_cache.TryGetValue(_cacheKey, out TipoCambioResponseDto cachedRate))
-            {
-                return cachedRate;
-            }
+            var peruZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+            var fechaActualPeru = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, peruZone);
 
-            var url = $"{_baseUrl}/tipo-cambio/sbs/average?currency=USD";
+            string fechaFinal = string.IsNullOrEmpty(fechaSolicitada)
+                ? fechaActualPeru.ToString("yyyy-MM-dd")
+                : fechaSolicitada;
+
+            string cacheKey = $"{_cacheKey}_{fechaFinal}";
+
+            var url = $"{_baseUrl}/tipo-cambio/sbs/average?currency=USD&date={fechaFinal}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Authorization", $"Bearer {_token}");
@@ -56,11 +61,16 @@ namespace Cobranzas_Vittoria.Services
 
             if (resultado != null)
             {
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetAbsoluteExpiration(TimeSpan.FromHours(6)) // Se actualiza cada 6 horas
-                    .SetSlidingExpiration(TimeSpan.FromHours(2)); // Si nadie consulta en 2h, se borra
+                if (string.IsNullOrEmpty(fechaSolicitada))
+                {
+                    resultado.Fecha = fechaFinal;
+                }
 
-                _cache.Set(_cacheKey, resultado, cacheOptions);
+                var cacheOptions = new MemoryCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromHours(6))
+                .SetSlidingExpiration(TimeSpan.FromHours(2));
+
+                _cache.Set(cacheKey, resultado, cacheOptions);
             }
 
             return resultado;
