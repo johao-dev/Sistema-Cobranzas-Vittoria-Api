@@ -35,6 +35,7 @@ namespace Cobranzas_Vittoria.Repositories
                     dto.IdProyecto,
                     dto.NombreProyecto,
                     dto.Descripcion,
+                    dto.CotizacionGeneral,
                     dto.Activo
                 },
                 commandType: CommandType.StoredProcedure
