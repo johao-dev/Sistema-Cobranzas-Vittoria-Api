@@ -7,6 +7,6 @@ namespace Cobranzas_Vittoria.Interfaces
     {
         Task<ProveedorConsultaSunatDto> ConsultarRucAsync(string ruc);
 
-        Task<TipoCambioResponseDto> ConsultarTipoCambio();
+        Task<TipoCambioResponseDto> ConsultarTipoCambio(string? fechaSolicitada);
     }
 }
