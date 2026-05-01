@@ -3,6 +3,7 @@ namespace Cobranzas_Vittoria.Dtos.GastosAdministrativos;
 public class GastoAdministrativoUpsertDto
 {
     public int? IdGastoAdministrativo { get; set; }
+    public int IdProyecto { get; set; }
     public int IdCategoriaGasto { get; set; }
     public int IdProveedorGastoAdministrativo { get; set; }
 

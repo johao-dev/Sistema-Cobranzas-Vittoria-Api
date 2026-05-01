@@ -18,8 +18,8 @@ public class GastosAdministrativosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] int? idCategoriaGasto, [FromQuery] int? idProveedorGastoAdministrativo, [FromQuery] bool? activo)
-        => Ok(await _service.ListAsync(idCategoriaGasto, idProveedorGastoAdministrativo, activo));
+    public async Task<IActionResult> List([FromQuery] int? idProyecto, [FromQuery] int? idCategoriaGasto, [FromQuery] int? idProveedorGastoAdministrativo, [FromQuery] bool? activo)
+        => Ok(await _service.ListAsync(idProyecto, idCategoriaGasto, idProveedorGastoAdministrativo, activo));
 
     [HttpGet("{gastoId:int}")]
     public async Task<IActionResult> Get(int gastoId)

@@ -3,6 +3,8 @@ namespace Cobranzas_Vittoria.Entities;
 public class GastoAdministrativo
 {
     public int IdGastoAdministrativo { get; set; }
+    public int? IdProyecto { get; set; }
+    public string? Proyecto { get; set; }
     public int IdCategoriaGasto { get; set; }
     public string? Categoria { get; set; }
     public int IdProveedorGastoAdministrativo { get; set; }

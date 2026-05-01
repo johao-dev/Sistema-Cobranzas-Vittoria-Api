@@ -5,7 +5,7 @@ namespace Cobranzas_Vittoria.Interfaces;
 
 public interface IGastoAdministrativoRepository
 {
-    Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo);
+    Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idProyecto, int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo);
     Task<(GastoAdministrativo? gasto, IEnumerable<GastoAdministrativoDocumento> documentos)> GetAsync(int idGastoAdministrativo);
     Task<int> UpsertAsync(GastoAdministrativoUpsertDto dto);
     Task DeleteAsync(int idGastoAdministrativo);

@@ -9,8 +9,8 @@ public class GastoAdministrativoService : IGastoAdministrativoService
     private readonly IGastoAdministrativoRepository _repository;
     public GastoAdministrativoService(IGastoAdministrativoRepository repository) => _repository = repository;
 
-    public Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo)
-        => _repository.ListAsync(idCategoriaGasto, idProveedorGastoAdministrativo, activo);
+    public Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idProyecto, int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo)
+        => _repository.ListAsync(idProyecto, idCategoriaGasto, idProveedorGastoAdministrativo, activo);
 
     public async Task<object?> GetAsync(int idGastoAdministrativo)
     {

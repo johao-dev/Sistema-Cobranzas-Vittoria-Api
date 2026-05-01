@@ -11,7 +11,7 @@ public class GastoAdministrativoRepository : RepositoryBase, IGastoAdministrativ
 {
     public GastoAdministrativoRepository(IDbConnectionFactory factory) : base(factory) { }
 
-    public async Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo)
+    public async Task<IEnumerable<GastoAdministrativo>> ListAsync(int? idProyecto, int? idCategoriaGasto, int? idProveedorGastoAdministrativo, bool? activo)
     {
         using var db = Open();
         var legacyProveedorColumn = await HasLegacyProveedorColumnAsync(db);
@@ -20,6 +20,8 @@ public class GastoAdministrativoRepository : RepositoryBase, IGastoAdministrativ
             ? @"
 SELECT
     ga.IdGastoAdministrativo,
+    ga.IdProyecto,
+    pr.NombreProyecto AS Proyecto,
     ga.IdCategoriaGasto,
     cg.Nombre AS Categoria,
     ga.IdProveedorGastoAdministrativo,
@@ -33,6 +35,7 @@ SELECT
     ISNULL(docs.TotalFacturas, 0) AS TotalFacturas,
     ISNULL(docs.TotalPagos, 0) AS TotalPagos
 FROM contable.GastoAdministrativo ga
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ga.IdProyecto
 INNER JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = ga.IdCategoriaGasto
 LEFT JOIN maestra.ProveedorGastoAdministrativo pga ON pga.IdProveedorGastoAdministrativo = ga.IdProveedorGastoAdministrativo
 LEFT JOIN maestra.Proveedor p ON p.IdProveedor = ga.IdProveedor
@@ -44,13 +47,16 @@ OUTER APPLY
     FROM contable.GastoAdministrativoDocumento gd
     WHERE gd.IdGastoAdministrativo = ga.IdGastoAdministrativo
 ) docs
-WHERE (@IdCategoriaGasto IS NULL OR ga.IdCategoriaGasto = @IdCategoriaGasto)
+WHERE (@IdProyecto IS NULL OR ga.IdProyecto = @IdProyecto)
+  AND (@IdCategoriaGasto IS NULL OR ga.IdCategoriaGasto = @IdCategoriaGasto)
   AND (@IdProveedorGastoAdministrativo IS NULL OR ga.IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo)
   AND (@Activo IS NULL OR ga.Activo = @Activo)
 ORDER BY ga.Fecha DESC, ga.IdGastoAdministrativo DESC;"
             : @"
 SELECT
     ga.IdGastoAdministrativo,
+    ga.IdProyecto,
+    pr.NombreProyecto AS Proyecto,
     ga.IdCategoriaGasto,
     cg.Nombre AS Categoria,
     ga.IdProveedorGastoAdministrativo,
@@ -64,6 +70,7 @@ SELECT
     ISNULL(docs.TotalFacturas, 0) AS TotalFacturas,
     ISNULL(docs.TotalPagos, 0) AS TotalPagos
 FROM contable.GastoAdministrativo ga
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ga.IdProyecto
 INNER JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = ga.IdCategoriaGasto
 INNER JOIN maestra.ProveedorGastoAdministrativo pga ON pga.IdProveedorGastoAdministrativo = ga.IdProveedorGastoAdministrativo
 OUTER APPLY
@@ -74,12 +81,13 @@ OUTER APPLY
     FROM contable.GastoAdministrativoDocumento gd
     WHERE gd.IdGastoAdministrativo = ga.IdGastoAdministrativo
 ) docs
-WHERE (@IdCategoriaGasto IS NULL OR ga.IdCategoriaGasto = @IdCategoriaGasto)
+WHERE (@IdProyecto IS NULL OR ga.IdProyecto = @IdProyecto)
+  AND (@IdCategoriaGasto IS NULL OR ga.IdCategoriaGasto = @IdCategoriaGasto)
   AND (@IdProveedorGastoAdministrativo IS NULL OR ga.IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo)
   AND (@Activo IS NULL OR ga.Activo = @Activo)
 ORDER BY ga.Fecha DESC, ga.IdGastoAdministrativo DESC;";
 
-        return await db.QueryAsync<GastoAdministrativo>(sql, new { IdCategoriaGasto = idCategoriaGasto, IdProveedorGastoAdministrativo = idProveedorGastoAdministrativo, Activo = activo });
+        return await db.QueryAsync<GastoAdministrativo>(sql, new { IdProyecto = idProyecto, IdCategoriaGasto = idCategoriaGasto, IdProveedorGastoAdministrativo = idProveedorGastoAdministrativo, Activo = activo });
     }
 
     public async Task<(GastoAdministrativo? gasto, IEnumerable<GastoAdministrativoDocumento> documentos)> GetAsync(int idGastoAdministrativo)
@@ -91,6 +99,8 @@ ORDER BY ga.Fecha DESC, ga.IdGastoAdministrativo DESC;";
             ? @"
 SELECT
     ga.IdGastoAdministrativo,
+    ga.IdProyecto,
+    pr.NombreProyecto AS Proyecto,
     ga.IdCategoriaGasto,
     cg.Nombre AS Categoria,
     ga.IdProveedorGastoAdministrativo,
@@ -104,6 +114,7 @@ SELECT
     CAST(0 AS INT) AS TotalFacturas,
     CAST(0 AS INT) AS TotalPagos
 FROM contable.GastoAdministrativo ga
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ga.IdProyecto
 INNER JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = ga.IdCategoriaGasto
 LEFT JOIN maestra.ProveedorGastoAdministrativo pga ON pga.IdProveedorGastoAdministrativo = ga.IdProveedorGastoAdministrativo
 LEFT JOIN maestra.Proveedor p ON p.IdProveedor = ga.IdProveedor
@@ -111,6 +122,8 @@ WHERE ga.IdGastoAdministrativo = @IdGastoAdministrativo;"
             : @"
 SELECT
     ga.IdGastoAdministrativo,
+    ga.IdProyecto,
+    pr.NombreProyecto AS Proyecto,
     ga.IdCategoriaGasto,
     cg.Nombre AS Categoria,
     ga.IdProveedorGastoAdministrativo,
@@ -124,6 +137,7 @@ SELECT
     CAST(0 AS INT) AS TotalFacturas,
     CAST(0 AS INT) AS TotalPagos
 FROM contable.GastoAdministrativo ga
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ga.IdProyecto
 INNER JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = ga.IdCategoriaGasto
 INNER JOIN maestra.ProveedorGastoAdministrativo pga ON pga.IdProveedorGastoAdministrativo = ga.IdProveedorGastoAdministrativo
 WHERE ga.IdGastoAdministrativo = @IdGastoAdministrativo;";
@@ -142,6 +156,8 @@ WHERE ga.IdGastoAdministrativo = @IdGastoAdministrativo;";
         var descripcion = string.IsNullOrWhiteSpace(dto.Descripcion) ? null : dto.Descripcion.Trim();
         var moneda = string.IsNullOrWhiteSpace(dto.Moneda) ? "PEN" : dto.Moneda.Trim().ToUpperInvariant();
 
+        if (dto.IdProyecto <= 0)
+            throw new InvalidOperationException("Debes seleccionar un proyecto.");
         if (dto.IdCategoriaGasto <= 0)
             throw new InvalidOperationException("Debes seleccionar una categoría.");
         if (dto.Monto <= 0)
@@ -159,7 +175,8 @@ WHERE ga.IdGastoAdministrativo = @IdGastoAdministrativo;";
             var updateSql = legacyProveedorColumn
                 ? @"
 UPDATE contable.GastoAdministrativo
-SET IdCategoriaGasto = @IdCategoriaGasto,
+SET IdProyecto = @IdProyecto,
+    IdCategoriaGasto = @IdCategoriaGasto,
     IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo,
     IdProveedor = @IdProveedorCompat,
     Fecha = @Fecha,
@@ -171,7 +188,8 @@ WHERE IdGastoAdministrativo = @IdGastoAdministrativo;
 SELECT @IdGastoAdministrativo;"
                 : @"
 UPDATE contable.GastoAdministrativo
-SET IdCategoriaGasto = @IdCategoriaGasto,
+SET IdProyecto = @IdProyecto,
+    IdCategoriaGasto = @IdCategoriaGasto,
     IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo,
     Fecha = @Fecha,
     Monto = @Monto,
@@ -184,6 +202,7 @@ SELECT @IdGastoAdministrativo;";
             return await db.ExecuteScalarAsync<int>(updateSql, new
             {
                 dto.IdGastoAdministrativo,
+                dto.IdProyecto,
                 dto.IdCategoriaGasto,
                 IdProveedorGastoAdministrativo = proveedorGastoId,
                 IdProveedorCompat = idProveedorCompat,
@@ -199,6 +218,7 @@ SELECT @IdGastoAdministrativo;";
             ? @"
 INSERT INTO contable.GastoAdministrativo
 (
+    IdProyecto,
     IdCategoriaGasto,
     IdProveedorGastoAdministrativo,
     IdProveedor,
@@ -211,6 +231,7 @@ INSERT INTO contable.GastoAdministrativo
 )
 VALUES
 (
+    @IdProyecto,
     @IdCategoriaGasto,
     @IdProveedorGastoAdministrativo,
     @IdProveedorCompat,
@@ -225,6 +246,7 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);"
             : @"
 INSERT INTO contable.GastoAdministrativo
 (
+    IdProyecto,
     IdCategoriaGasto,
     IdProveedorGastoAdministrativo,
     Fecha,
@@ -236,6 +258,7 @@ INSERT INTO contable.GastoAdministrativo
 )
 VALUES
 (
+    @IdProyecto,
     @IdCategoriaGasto,
     @IdProveedorGastoAdministrativo,
     @Fecha,
@@ -249,6 +272,7 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
         return await db.ExecuteScalarAsync<int>(insertSql, new
         {
+            dto.IdProyecto,
             dto.IdCategoriaGasto,
             IdProveedorGastoAdministrativo = proveedorGastoId,
             IdProveedorCompat = idProveedorCompat,
