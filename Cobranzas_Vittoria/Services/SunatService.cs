@@ -2,7 +2,7 @@
 using Cobranzas_Vittoria.Dtos.Sunat;
 using Cobranzas_Vittoria.Interfaces;
 using Microsoft.Extensions.Caching.Memory;
-using System.Net.WebSockets;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -15,11 +15,11 @@ namespace Cobranzas_Vittoria.Services
         private readonly ILogger<SunatService> _logger;
         private readonly string _cacheKey = "TipoCambio_SBS";
 
-        // Decolecta API token y URL : Servicio de terceros para consultar RUC de una empresa.
+        // Decolecta Config
         private readonly string _token = "sk_14184.4iWGKjQKNfRrFjXKAcwfhmltXUQRswmB";
         private readonly string _decolectaApiUrl = "https://api.decolecta.com/v1";
 
-        // PeruAPI Api-Key y URL : Servicio de terceros para consultar el tipo de cambio del día.
+        // PeruAPI Config
         private readonly string _apiKeyTipoCambio = "aa2fb86750af69bbfb4747ee551bd85f";
         private readonly string _peruApiUrl = "https://peruapi.com/api";
 
@@ -33,15 +33,13 @@ namespace Cobranzas_Vittoria.Services
         public async Task<ProveedorConsultaSunatDto> ConsultarRucAsync(string ruc)
         {
             var url = $"{_decolectaApiUrl}/sunat/ruc?numero={ruc}";
-
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Authorization", $"Bearer {_token}");
 
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync();
-
             return JsonSerializer.Deserialize<ProveedorConsultaSunatDto>(json);
         }
 
@@ -50,56 +48,115 @@ namespace Cobranzas_Vittoria.Services
             string fechaFinal = GetFechaFinal(fechaSolicitada);
             string cacheKey = $"{_cacheKey}_{fechaFinal}";
 
-            _logger.LogInformation("Consultando tipo de cambio para fecha: {Fecha}. CacheKey: {CacheKey}", fechaFinal, cacheKey);
+            // 1. Intentar obtener de Caché
             if (_cache.TryGetValue(cacheKey, out TipoCambioResponseDto cachedRate))
             {
-                _logger.LogInformation("Tipo de cambio encontrado en caché para fecha: {Fecha}. CacheKey: {CacheKey}", fechaFinal, cacheKey);
+                _logger.LogInformation("Tipo de cambio recuperado de Caché para: {Fecha}", fechaFinal);
                 return cachedRate;
             }
 
-            string url = $"{_peruApiUrl}/tipo_cambio?fecha={fechaFinal}";
-            _logger.LogInformation("Consultando PeruAPI: {url}", url);
+            // 2. INTENTO 1: PeruAPI (Principal para históricos)
+            _logger.LogInformation("Iniciando consulta de tipo de cambio en PeruAPI para: {Fecha}", fechaFinal);
+            var resultado = await IntentarPeruApi(fechaFinal);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            _logger.LogInformation("Agregando header X-API-KEY para PeruAPI");
-            request.Headers.Add("X-API-KEY", _apiKeyTipoCambio);
-            
-            _logger.LogInformation("Enviando solicitud a PeruAPI para fecha: {Fecha}", fechaFinal);
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
+            // 3. INTENTO 2: Fallback con Decolecta (Si el primero falló)
+            if (resultado == null)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Error en PeruAPI. Status: {Status}. Body: {Body}",
-                    response.StatusCode, errorBody);
-                throw new Exception($"ERROR_API_EXTERNA: {response.StatusCode} - {errorBody}");
+                _logger.LogWarning("PeruAPI falló o no está disponible. Iniciando FALLBACK con Decolecta para: {Fecha}", fechaFinal);
+                resultado = await IntentarDecolecta(fechaFinal);
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            _logger.LogInformation("Respuesta de PeruAPI recibida para fecha: {Fecha}. JSON: {Json}", fechaFinal, json);
-
-            var data = JsonSerializer.Deserialize<PeruApiResponse>(json);
-            if (data == null || data.Code != "200")
+            // 4. Si ambos fallan, lanza excepción para logging
+            if (resultado == null)
             {
-                _logger.LogWarning("Respuesta de PeruAPI inválida o Code != 200. JSON: {Json}", json);
-                throw new Exception($"ERROR_INTERNO_PERUAPI: {json}");
+                _logger.LogCritical("FALLO TOTAL: Ningún proveedor de tipo de cambio pudo procesar la solicitud para: {Fecha}", fechaFinal);
+                throw new Exception($"ERROR_PROVEEDORES_TIPO_CAMBIO: No se pudo obtener datos de PeruAPI ni de Decolecta para la fecha {fechaFinal}. Revise los logs para ver detalles de la IP.");
             }
 
-            var resultado = new TipoCambioResponseDto
-            {
-                PrecioCompra = data.Compra,
-                PrecioVenta = data.Venta,
-                MonedaBase = data.Moneda,
-                CotizacionDeDivisa = "PEN",
-                Fecha = fechaFinal
-            };
-
-            _logger.LogInformation("Tipo de cambio obtenido de PeruAPI para fecha: {Fecha}. Resultado: {@Resultado}. Añadido a caché", fechaFinal, resultado);
+            // 5. Guardar en Caché y retornar
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(TimeSpan.FromHours(6))
                 .SetSlidingExpiration(TimeSpan.FromHours(2));
 
             _cache.Set(cacheKey, resultado, cacheOptions);
             return resultado;
+        }
+
+        private async Task<TipoCambioResponseDto?> IntentarPeruApi(string fecha)
+        {
+            try
+            {
+                string url = $"{_peruApiUrl}/tipo_cambio?fecha={fecha}";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("X-API-KEY", _apiKeyTipoCambio);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Fallo en PeruAPI. Status: {Status}. Detalle: {Body}", response.StatusCode, errorBody);
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<PeruApiResponse>(json);
+
+                if (data == null || data.Code != "200")
+                {
+                    _logger.LogWarning("PeruAPI respondió pero con código interno inválido: {Json}", json);
+                    return null;
+                }
+
+                return new TipoCambioResponseDto
+                {
+                    PrecioCompra = data.Compra,
+                    PrecioVenta = data.Venta,
+                    MonedaBase = data.Moneda,
+                    CotizacionDeDivisa = "PEN",
+                    Fecha = fecha
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error de conexión al intentar consultar PeruAPI.");
+                return null;
+            }
+        }
+
+        private async Task<TipoCambioResponseDto?> IntentarDecolecta(string fecha)
+        {
+            try
+            {
+                string url = $"{_decolectaApiUrl}/tipo-cambio/sbs/average?currency=USD&date={fecha}";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Authorization", $"Bearer {_token}");
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Fallo en Decolecta. Status: {Status}. Detalle: {Body}", response.StatusCode, errorBody);
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var resultado = JsonSerializer.Deserialize<TipoCambioResponseDto>(json);
+
+                if (resultado != null)
+                {
+                    // Fuerza la fecha para mantener consistencia visual
+                    resultado.Fecha = fecha;
+                }
+
+                return resultado;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error de conexión al intentar consultar Decolecta.");
+                return null;
+            }
         }
 
         private string GetFechaFinal(string? fechaSolicitada)
@@ -109,12 +166,12 @@ namespace Cobranzas_Vittoria.Services
                 TimeZoneInfo peruZone;
                 try
                 {
-                    // Windows
+                    // Windows ID
                     peruZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
                 }
                 catch
                 {
-                    // Linux
+                    // Linux ID
                     peruZone = TimeZoneInfo.FindSystemTimeZoneById("America/Lima");
                 }
 
@@ -124,7 +181,7 @@ namespace Cobranzas_Vittoria.Services
             return fechaSolicitada;
         }
 
-        // Clase interna para deserializar la respuesta de PeruAPI
+        // Clase interna para mapear la respuesta de PeruAPI
         private class PeruApiResponse
         {
             [JsonPropertyName("fecha")] public string Fecha { get; set; } = string.Empty;
