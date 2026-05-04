@@ -71,7 +71,7 @@ namespace Cobranzas_Vittoria.Services
                 var errorBody = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Error en PeruAPI. Status: {Status}. Body: {Body}",
                     response.StatusCode, errorBody);
-                return null;
+                throw new Exception($"ERROR_API_EXTERNA: {response.StatusCode} - {errorBody}");
             }
 
             var json = await response.Content.ReadAsStringAsync();
@@ -81,7 +81,7 @@ namespace Cobranzas_Vittoria.Services
             if (data == null || data.Code != "200")
             {
                 _logger.LogWarning("Respuesta de PeruAPI inválida o Code != 200. JSON: {Json}", json);
-                return null;
+                throw new Exception($"ERROR_INTERNO_PERUAPI: {json}");
             }
 
             var resultado = new TipoCambioResponseDto
@@ -106,7 +106,18 @@ namespace Cobranzas_Vittoria.Services
         {
             if (string.IsNullOrEmpty(fechaSolicitada))
             {
-                var peruZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+                TimeZoneInfo peruZone;
+                try
+                {
+                    // Windows
+                    peruZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+                }
+                catch
+                {
+                    // Linux
+                    peruZone = TimeZoneInfo.FindSystemTimeZoneById("America/Lima");
+                }
+
                 var fechaActualPeru = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, peruZone);
                 return fechaActualPeru.ToString("yyyy-MM-dd");
             }
