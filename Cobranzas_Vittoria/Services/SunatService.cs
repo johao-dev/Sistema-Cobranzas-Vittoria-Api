@@ -12,6 +12,7 @@ namespace Cobranzas_Vittoria.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _cache;
+        private readonly ILogger<SunatService> _logger;
         private readonly string _cacheKey = "TipoCambio_SBS";
 
         // Decolecta API token y URL : Servicio de terceros para consultar RUC de una empresa.
@@ -22,10 +23,11 @@ namespace Cobranzas_Vittoria.Services
         private readonly string _apiKeyTipoCambio = "aa2fb86750af69bbfb4747ee551bd85f";
         private readonly string _peruApiUrl = "https://peruapi.com/api";
 
-        public SunatService(HttpClient httpClient, IMemoryCache cache)
+        public SunatService(HttpClient httpClient, IMemoryCache cache, ILogger<SunatService> logger)
         {
             _httpClient = httpClient;
             _cache = cache;
+            _logger = logger;
         }
 
         public async Task<ProveedorConsultaSunatDto> ConsultarRucAsync(string ruc)
@@ -48,21 +50,39 @@ namespace Cobranzas_Vittoria.Services
             string fechaFinal = GetFechaFinal(fechaSolicitada);
             string cacheKey = $"{_cacheKey}_{fechaFinal}";
 
+            _logger.LogInformation("Consultando tipo de cambio para fecha: {Fecha}. CacheKey: {CacheKey}", fechaFinal, cacheKey);
             if (_cache.TryGetValue(cacheKey, out TipoCambioResponseDto cachedRate))
             {
+                _logger.LogInformation("Tipo de cambio encontrado en caché para fecha: {Fecha}. CacheKey: {CacheKey}", fechaFinal, cacheKey);
                 return cachedRate;
             }
 
             string url = $"{_peruApiUrl}/tipo_cambio?fecha={fechaFinal}";
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("X-API-KEY", _apiKeyTipoCambio);
+            _logger.LogInformation("Consultando PeruAPI: {url}", url);
 
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            _logger.LogInformation("Agregando header X-API-KEY para PeruAPI");
+            request.Headers.Add("X-API-KEY", _apiKeyTipoCambio);
+            
+            _logger.LogInformation("Enviando solicitud a PeruAPI para fecha: {Fecha}", fechaFinal);
             var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode) return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Error en PeruAPI. Status: {Status}. Body: {Body}",
+                    response.StatusCode, errorBody);
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("Respuesta de PeruAPI recibida para fecha: {Fecha}. JSON: {Json}", fechaFinal, json);
+
             var data = JsonSerializer.Deserialize<PeruApiResponse>(json);
-            if (data == null || data.Code != "200") return null;
+            if (data == null || data.Code != "200")
+            {
+                _logger.LogWarning("Respuesta de PeruAPI inválida o Code != 200. JSON: {Json}", json);
+                return null;
+            }
 
             var resultado = new TipoCambioResponseDto
             {
@@ -73,6 +93,7 @@ namespace Cobranzas_Vittoria.Services
                 Fecha = fechaFinal
             };
 
+            _logger.LogInformation("Tipo de cambio obtenido de PeruAPI para fecha: {Fecha}. Resultado: {@Resultado}. Añadido a caché", fechaFinal, resultado);
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetAbsoluteExpiration(TimeSpan.FromHours(6))
                 .SetSlidingExpiration(TimeSpan.FromHours(2));
