@@ -38,6 +38,8 @@ builder.Services.AddScoped<IValorizacionRepository, ValorizacionRepository>();
 builder.Services.AddScoped<ICategoriaGastoRepository, CategoriaGastoRepository>();
 builder.Services.AddScoped<IProveedorGastoAdministrativoRepository, ProveedorGastoAdministrativoRepository>();
 builder.Services.AddScoped<IGastoAdministrativoRepository, GastoAdministrativoRepository>();
+builder.Services.AddScoped<IProveedorTerrenoRepository, ProveedorTerrenoRepository>();
+builder.Services.AddScoped<IGastoProyectoRepository, GastoProyectoRepository>();
 
 // Services
 builder.Services.AddScoped<IRolService, RolService>();
@@ -57,6 +59,8 @@ builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
 builder.Services.AddScoped<ICategoriaGastoService, CategoriaGastoService>();
 builder.Services.AddScoped<IProveedorGastoAdministrativoService, ProveedorGastoAdministrativoService>();
 builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoService>();
+builder.Services.AddScoped<IProveedorTerrenoService, ProveedorTerrenoService>();
+builder.Services.AddScoped<IGastoProyectoService, GastoProyectoService>();
 builder.Services.AddScoped<ISunatService, SunatService>();
 
 var app = builder.Build();
