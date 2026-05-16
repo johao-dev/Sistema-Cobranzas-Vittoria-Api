@@ -10,7 +10,7 @@ namespace Cobranzas_Vittoria.Repositories
     {
         public KardexRepository(IDbConnectionFactory factory) : base(factory) { }
 
-        public async Task<IEnumerable<dynamic>> ListMovimientosAsync(int? idMaterial, int? idEspecialidad, string? fechaDesde, string? fechaHasta)
+        public async Task<IEnumerable<dynamic>> ListMovimientosAsync(int? idCompra, int? idMaterial, int? idEspecialidad, string? fechaDesde, string? fechaHasta)
         {
             using var db = Open();
 
@@ -20,6 +20,7 @@ WITH EntradasCompra AS
     SELECT
         c.IdCompra,
         c.NumeroCompra,
+        COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
         cd.IdMaterial,
         m.Descripcion AS Material,
         m.IdEspecialidad,
@@ -27,12 +28,15 @@ WITH EntradasCompra AS
         CAST(c.FechaCompra AS date) AS FechaMovimiento,
         CAST(ISNULL(cd.Cantidad, 0) AS DECIMAL(18,2)) AS Entrada,
         CAST(0 AS DECIMAL(18,2)) AS Salida,
-        ISNULL(NULLIF(LTRIM(RTRIM(c.Observacion)), ''), CONCAT('Ingreso por compra ', c.NumeroCompra)) AS Observacion
+        CONCAT('Ingresado por Requerimiento ', COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-')) AS Observacion
     FROM compras.Compra c
     INNER JOIN compras.CompraDetalle cd ON cd.IdCompra = c.IdCompra
+    INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
+    LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
     INNER JOIN maestra.Material m ON m.IdMaterial = cd.IdMaterial
     LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
-    WHERE (@IdMaterial IS NULL OR cd.IdMaterial = @IdMaterial)
+    WHERE (@IdCompra IS NULL OR c.IdCompra = @IdCompra)
+      AND (@IdMaterial IS NULL OR cd.IdMaterial = @IdMaterial)
       AND (@IdEspecialidad IS NULL OR m.IdEspecialidad = @IdEspecialidad)
       AND (@FechaDesde IS NULL OR c.FechaCompra >= CONVERT(date, @FechaDesde))
       AND (@FechaHasta IS NULL OR c.FechaCompra <= CONVERT(date, @FechaHasta))
@@ -42,6 +46,7 @@ SalidasManual AS
     SELECT
         km.IdCompra,
         c.NumeroCompra,
+        COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
         km.IdMaterial,
         m.Descripcion AS Material,
         km.IdEspecialidad,
@@ -54,7 +59,10 @@ SalidasManual AS
     INNER JOIN maestra.Material m ON m.IdMaterial = km.IdMaterial
     LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = km.IdEspecialidad
     LEFT JOIN compras.Compra c ON c.IdCompra = km.IdCompra
+    LEFT JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
+    LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
     WHERE km.TipoMovimiento = 'SALIDA'
+      AND (@IdCompra IS NULL OR km.IdCompra = @IdCompra)
       AND (@IdMaterial IS NULL OR km.IdMaterial = @IdMaterial)
       AND (@IdEspecialidad IS NULL OR km.IdEspecialidad = @IdEspecialidad)
       AND (@FechaDesde IS NULL OR km.FechaMovimiento >= CONVERT(date, @FechaDesde))
@@ -71,6 +79,7 @@ Agrupado AS
     SELECT
         IdCompra,
         NumeroCompra,
+        NumeroRequerimiento,
         IdMaterial,
         IdEspecialidad,
         Especialidad,
@@ -81,11 +90,12 @@ Agrupado AS
         SUM(Entrada - Salida) AS Stock,
         MAX(Observacion) AS Observacion
     FROM Movs
-    GROUP BY IdCompra, NumeroCompra, IdMaterial, IdEspecialidad, Especialidad
+    GROUP BY IdCompra, NumeroCompra, NumeroRequerimiento, IdMaterial, IdEspecialidad, Especialidad
 )
 SELECT
     IdCompra,
     NumeroCompra,
+    NumeroRequerimiento,
     IdMaterial,
     IdEspecialidad,
     Especialidad,
@@ -100,6 +110,7 @@ ORDER BY FechaMovimiento DESC, NumeroCompra DESC, Material ASC;";
 
             return await db.QueryAsync(sql, new
             {
+                IdCompra = idCompra,
                 IdMaterial = idMaterial,
                 IdEspecialidad = idEspecialidad,
                 FechaDesde = fechaDesde,

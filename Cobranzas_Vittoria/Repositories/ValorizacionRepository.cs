@@ -173,7 +173,7 @@ SELECT
     vd.NumeroFactura,
     vd.MontoFactura,
     vd.Descripcion,
-    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeDetraccionAplicado, 0), 2) AS DECIMAL(18,2)) AS Detraccion,
+    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeDetraccionAplicado, 0), 0) AS DECIMAL(18,2)) AS Detraccion,
     CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeGarantiaAplicado, 0), 2) AS DECIMAL(18,2)) AS Garantia,
     vd.MontoAbonar,
     vd.MontoDeuda,

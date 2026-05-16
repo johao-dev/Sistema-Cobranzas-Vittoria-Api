@@ -17,12 +17,13 @@ namespace Cobranzas_Vittoria.Controllers
 
         [HttpGet("movimientos")]
         public async Task<IActionResult> Movimientos(
+            [FromQuery] int? idCompra,
             [FromQuery] int? idMaterial,
             [FromQuery] int? idEspecialidad,
             [FromQuery] string? fechaDesde,
             [FromQuery] string? fechaHasta)
         {
-            var data = await _service.ListMovimientosAsync(idMaterial, idEspecialidad, fechaDesde, fechaHasta);
+            var data = await _service.ListMovimientosAsync(idCompra, idMaterial, idEspecialidad, fechaDesde, fechaHasta);
             return Ok(data);
         }
 

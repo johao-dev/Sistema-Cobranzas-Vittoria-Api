@@ -7,6 +7,8 @@ public class OrdenCompra
     public string? NumeroRequerimiento { get; set; }
     public int IdProveedor { get; set; }
     public string? Proveedor { get; set; }
+    public string? Especialidad { get; set; }
+    public string? Especialidades { get; set; }
     public int IdProyecto { get; set; }
     public string? NombreProyecto { get; set; }
     public DateTime FechaOrdenCompra { get; set; }

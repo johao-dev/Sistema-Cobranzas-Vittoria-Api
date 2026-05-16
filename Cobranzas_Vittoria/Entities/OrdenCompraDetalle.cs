@@ -7,6 +7,7 @@ public class OrdenCompraDetalle
     public int IdProveedor { get; set; }
     public string? Proveedor { get; set; }
     public string? Material { get; set; }
+    public string? Especialidad { get; set; }
     public string? UnidadMedida { get; set; }
     public decimal Cantidad { get; set; }
     public decimal PrecioUnitario { get; set; }

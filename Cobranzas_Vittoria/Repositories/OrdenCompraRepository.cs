@@ -14,11 +14,49 @@ namespace Cobranzas_Vittoria.Repositories
         public async Task<IEnumerable<OrdenCompra>> ListAsync(string? estado, int? idProveedor, int? idProyecto)
         {
             using var db = Open();
-            return await db.QueryAsync<OrdenCompra>(
-                "compras.usp_OrdenCompra_List",
-                new { Estado = estado, IdProveedor = idProveedor, IdProyecto = idProyecto },
-                commandType: CommandType.StoredProcedure
-            );
+
+            const string sql = @"
+SELECT
+    oc.IdOrdenCompra,
+    oc.NumeroOrdenCompra,
+    oc.IdRequerimiento,
+    r.NumeroRequerimiento,
+    oc.IdProveedor,
+    p.RazonSocial AS Proveedor,
+    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
+    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidades,
+    COALESCE(oc.IdProyecto, r.IdProyecto) AS IdProyecto,
+    pr.NombreProyecto,
+    oc.FechaOrdenCompra,
+    oc.Descripcion,
+    oc.Estado,
+    oc.Total,
+    oc.RutaPdf,
+    oc.FechaCreacion,
+    oc.IdUsuarioCreacion
+FROM compras.OrdenCompra oc
+LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+LEFT JOIN maestra.Proveedor p ON p.IdProveedor = oc.IdProveedor
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
+LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
+OUTER APPLY
+(
+    SELECT STRING_AGG(x.Nombre, ', ') AS Especialidades
+    FROM
+    (
+        SELECT DISTINCT e2.Nombre
+        FROM compras.OrdenCompraDetalle od
+        INNER JOIN maestra.Material m2 ON m2.IdMaterial = od.IdMaterial
+        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
+        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
+    ) x
+) espAgg
+WHERE (@Estado IS NULL OR @Estado = '' OR oc.Estado = @Estado)
+  AND (@IdProveedor IS NULL OR oc.IdProveedor = @IdProveedor)
+  AND (@IdProyecto IS NULL OR COALESCE(oc.IdProyecto, r.IdProyecto) = @IdProyecto)
+ORDER BY oc.IdOrdenCompra DESC;";
+
+            return await db.QueryAsync<OrdenCompra>(sql, new { Estado = estado, IdProveedor = idProveedor, IdProyecto = idProyecto });
         }
 
         public async Task<(OrdenCompra? head, List<OrdenCompraDetalle> items, List<OrdenCompraHistorial> historial)> GetAsync(int idOrdenCompra)
@@ -33,6 +71,52 @@ namespace Cobranzas_Vittoria.Repositories
             var head = await multi.ReadFirstOrDefaultAsync<OrdenCompra>();
             var items = (await multi.ReadAsync<OrdenCompraDetalle>()).AsList();
             var historial = (await multi.ReadAsync<OrdenCompraHistorial>()).AsList();
+
+            if (head != null)
+            {
+                var meta = await db.QueryFirstOrDefaultAsync<dynamic>(@"
+SELECT
+    COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
+    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidades
+FROM compras.OrdenCompra oc
+LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
+OUTER APPLY
+(
+    SELECT STRING_AGG(x.Nombre, ', ') AS Especialidades
+    FROM
+    (
+        SELECT DISTINCT e2.Nombre
+        FROM compras.OrdenCompraDetalle od
+        INNER JOIN maestra.Material m2 ON m2.IdMaterial = od.IdMaterial
+        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
+        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
+    ) x
+) espAgg
+WHERE oc.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra });
+
+                if (meta != null)
+                {
+                    head.NumeroRequerimiento = (string?)meta.NumeroRequerimiento;
+                    head.Especialidades = (string?)meta.Especialidades;
+                    head.Especialidad = (string?)meta.Especialidades;
+                }
+
+                var especialidadesDetalle = (await db.QueryAsync<dynamic>(@"
+SELECT
+    d.IdOrdenCompraDetalle,
+    COALESCE(NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad
+FROM compras.OrdenCompraDetalle d
+INNER JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })).ToDictionary(x => (int)x.IdOrdenCompraDetalle, x => (string?)x.Especialidad);
+
+                foreach (var item in items)
+                {
+                    if (especialidadesDetalle.TryGetValue(item.IdOrdenCompraDetalle, out var esp))
+                        item.Especialidad = esp;
+                }
+            }
 
             return (head, items, historial);
         }
