@@ -169,6 +169,7 @@ WHERE pr.IdProveedor = @IdProveedor;", new { dto.IdProveedor, dto.IdEspecialidad
 SELECT
     vd.IdValorizacionDetalle,
     vd.IdValorizacion,
+    vd.IdProveedorEspecialidadCotizacion,
     vd.FechaFactura,
     vd.NumeroFactura,
     vd.MontoFactura,
@@ -222,6 +223,188 @@ ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC
             {
                 idDetalle = (int?)d.IdValorizacionDetalle,
                 idValorizacion = (int?)d.IdValorizacion,
+                idConfiguracion = (int?)d.IdProveedorEspecialidadCotizacion,
+                periodo = (string?)d.NumeroValorizacion,
+                proveedor = (string?)d.Proveedor,
+                especialidad = (string?)d.Especialidad,
+                fechaFactura = (DateTime?)d.FechaFactura,
+                numeroFactura = (string?)d.NumeroFactura,
+                montoFactura = (decimal?)d.MontoFactura ?? 0m,
+                descripcion = (string?)d.Descripcion,
+                tipoDetraccion = (string?)d.TipoDetraccion,
+                detraccion = (decimal?)d.Detraccion ?? 0m,
+                garantia = (decimal?)d.Garantia ?? 0m,
+                montoAbonar = (decimal?)d.MontoAbonar ?? 0m,
+                montoDeuda = (decimal?)d.MontoDeuda ?? 0m,
+                montoTransferido = (decimal?)d.MontoTransferido ?? 0m,
+                fechaTransferencia = (DateTime?)d.FechaTransferencia,
+                archivos = archivos.Where(a => a.idDetalle == (int?)d.IdValorizacionDetalle).ToList()
+            }).ToList();
+
+            var resumenFacturas = detalle.Select(d => new
+            {
+                numeroFactura = d.numeroFactura,
+                descripcion = d.descripcion,
+                facturado = d.montoFactura,
+                transferido = d.montoTransferido,
+                garantia = d.garantia,
+                detraccion = d.detraccion,
+                resta = Math.Round(cotizacion - d.montoFactura, 2)
+            }).ToList();
+
+            return new
+            {
+                cabecera,
+                detalle,
+                resumen = new
+                {
+                    cotizacion,
+                    facturas = resumenFacturas
+                }
+            };
+        }
+
+
+        public async Task<object> GetByConfiguracionAsync(int idConfiguracion)
+        {
+            using var db = Open();
+
+            var configRaw = await db.QueryFirstOrDefaultAsync(@"
+SELECT TOP 1
+    pec.IdProveedorEspecialidadCotizacion,
+    pec.IdProyecto,
+    p.NombreProyecto,
+    pec.IdProveedor,
+    pr.RazonSocial AS Proveedor,
+    pec.IdEspecialidad,
+    e.Nombre AS Especialidad,
+    pec.Moneda,
+    pec.MontoCotizacion,
+    ISNULL(rv.PorcentajeGarantia, 0.05) AS PorcentajeGarantia,
+    ISNULL(rv.PorcentajeDetraccion, 0.04) AS PorcentajeDetraccion
+FROM maestra.ProveedorEspecialidadCotizacion pec
+INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = pec.IdProveedor
+INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = pec.IdEspecialidad
+LEFT JOIN maestra.Proyecto p ON p.IdProyecto = pec.IdProyecto
+LEFT JOIN maestra.ProveedorReglaValorizacion rv ON rv.IdProveedor = pec.IdProveedor AND rv.Activo = 1
+WHERE pec.IdProveedorEspecialidadCotizacion = @IdConfiguracion
+  AND pec.Activo = 1;", new { IdConfiguracion = idConfiguracion });
+
+            if (configRaw == null)
+            {
+                return new { cabecera = (object?)null, detalle = Array.Empty<object>(), resumen = (object?)null };
+            }
+
+            var cabeceraRaw = await db.QueryFirstOrDefaultAsync(@"
+SELECT TOP 1
+    v.IdValorizacion,
+    v.IdProveedorEspecialidadCotizacion,
+    v.NumeroValorizacion,
+    v.IdProyecto,
+    p.NombreProyecto,
+    v.IdProveedor,
+    pr.RazonSocial AS Proveedor,
+    v.IdEspecialidad,
+    e.Nombre AS Especialidad,
+    v.Moneda,
+    v.Cotizacion,
+    v.PorcentajeGarantia,
+    v.PorcentajeDetraccion,
+    v.Observacion
+FROM contable.Valorizacion v
+INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = v.IdProveedor
+INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = v.IdEspecialidad
+LEFT JOIN maestra.Proyecto p ON p.IdProyecto = v.IdProyecto
+WHERE v.Activo = 1
+  AND v.IdProveedorEspecialidadCotizacion = @IdConfiguracion
+ORDER BY v.IdValorizacion DESC;", new { IdConfiguracion = idConfiguracion });
+
+            var idValorizacionActual = (int?)(cabeceraRaw?.IdValorizacion);
+            var cotizacion = (decimal?)(cabeceraRaw?.Cotizacion) ?? (decimal?)configRaw.MontoCotizacion ?? 0m;
+            var moneda = (string?)(cabeceraRaw?.Moneda) ?? (string?)configRaw.Moneda ?? "PEN";
+            var porcentajeGarantia = (decimal?)(cabeceraRaw?.PorcentajeGarantia) ?? (decimal?)configRaw.PorcentajeGarantia ?? 0.05m;
+            var porcentajeDetraccion = (decimal?)(cabeceraRaw?.PorcentajeDetraccion) ?? (decimal?)configRaw.PorcentajeDetraccion ?? 0.04m;
+
+            var cabecera = new
+            {
+                idValorizacion = idValorizacionActual,
+                idConfiguracion = (int?)configRaw.IdProveedorEspecialidadCotizacion,
+                periodo = (string?)(cabeceraRaw?.NumeroValorizacion),
+                proyecto = (string?)configRaw.NombreProyecto,
+                proveedor = (string?)configRaw.Proveedor,
+                especialidad = (string?)configRaw.Especialidad,
+                empresa = (string?)configRaw.Proveedor,
+                servicio = (string?)configRaw.Especialidad,
+                moneda,
+                cotizacion,
+                montoCotizacion = cotizacion,
+                porcentajeGarantia,
+                porcentajeDetraccion,
+                observacion = (string?)(cabeceraRaw?.Observacion)
+            };
+
+            var hasTipoDetraccion = await HasTipoDetraccionColumnAsync(db);
+
+            var detalleSql = $@"
+SELECT
+    vd.IdValorizacionDetalle,
+    vd.IdValorizacion,
+    vd.IdProveedorEspecialidadCotizacion,
+    vd.FechaFactura,
+    vd.NumeroFactura,
+    vd.MontoFactura,
+    vd.Descripcion,
+    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeDetraccionAplicado, 0), 0) AS DECIMAL(18,2)) AS Detraccion,
+    CAST(ROUND(vd.MontoFactura * ISNULL(vd.PorcentajeGarantiaAplicado, 0), 2) AS DECIMAL(18,2)) AS Garantia,
+    vd.MontoAbonar,
+    vd.MontoDeuda,
+    vd.MontoTransferido,
+    vd.FechaTransferencia,
+    pr.RazonSocial AS Proveedor,
+    e.Nombre AS Especialidad,
+    v.NumeroValorizacion,
+    {(hasTipoDetraccion ? "vd.TipoDetraccion" : "CAST(NULL AS NVARCHAR(50)) AS TipoDetraccion")}
+FROM contable.ValorizacionDetalle vd
+INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
+INNER JOIN maestra.Proveedor pr ON pr.IdProveedor = v.IdProveedor
+INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = v.IdEspecialidad
+WHERE v.Activo = 1
+  AND vd.Activo = 1
+  AND vd.IdProveedorEspecialidadCotizacion = @IdConfiguracion
+ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC;";
+
+
+            var detalleRaw = (await db.QueryAsync(detalleSql, new { IdConfiguracion = idConfiguracion })).ToList();
+
+            var archivosRaw = (await db.QueryAsync(@"
+SELECT
+    a.IdValorizacionDetalleArchivo,
+    a.IdValorizacionDetalle,
+    a.NombreArchivo,
+    a.RutaArchivo,
+    a.Extension
+FROM contable.ValorizacionDetalleArchivo a
+INNER JOIN contable.ValorizacionDetalle vd ON vd.IdValorizacionDetalle = a.IdValorizacionDetalle
+INNER JOIN contable.Valorizacion v ON v.IdValorizacion = vd.IdValorizacion
+WHERE v.Activo = 1
+  AND vd.Activo = 1
+  AND vd.IdProveedorEspecialidadCotizacion = @IdConfiguracion
+ORDER BY a.IdValorizacionDetalle, a.IdValorizacionDetalleArchivo;", new { IdConfiguracion = idConfiguracion })).ToList();
+
+            var archivos = archivosRaw.Select(a => new
+            {
+                idArchivo = (int?)a.IdValorizacionDetalleArchivo,
+                idDetalle = (int?)a.IdValorizacionDetalle,
+                nombreArchivo = (string?)a.NombreArchivo,
+                rutaArchivo = (string?)a.RutaArchivo,
+                extension = (string?)a.Extension
+            }).ToList();
+
+            var detalle = detalleRaw.Select(d => new
+            {
+                idDetalle = (int?)d.IdValorizacionDetalle,
+                idValorizacion = (int?)d.IdValorizacion,
+                idConfiguracion = (int?)d.IdProveedorEspecialidadCotizacion,
                 periodo = (string?)d.NumeroValorizacion,
                 proveedor = (string?)d.Proveedor,
                 especialidad = (string?)d.Especialidad,
@@ -288,13 +471,24 @@ ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC
             if (config == null)
                 throw new InvalidOperationException("No se encontró la configuración seleccionada para la valorización.");
 
+            var idValorizacionParaGuardar = dto.IdValorizacion;
+            if (!idValorizacionParaGuardar.HasValue || idValorizacionParaGuardar.Value <= 0)
+            {
+                idValorizacionParaGuardar = await db.QueryFirstOrDefaultAsync<int?>(@"
+SELECT TOP 1 IdValorizacion
+FROM contable.Valorizacion
+WHERE Activo = 1
+  AND IdProveedorEspecialidadCotizacion = @IdConfiguracion
+ORDER BY IdValorizacion DESC;", new { dto.IdConfiguracion });
+            }
+
             var numeroValorizacion = string.IsNullOrWhiteSpace(dto.Periodo)
                 ? $"VAL-{dto.IdConfiguracion}-{DateTime.Now:yyyyMMddHHmmss}"
                 : dto.Periodo.Trim();
 
             var result = await db.QueryFirstAsync("contable.usp_Valorizacion_Upsert", new
             {
-                dto.IdValorizacion,
+                IdValorizacion = idValorizacionParaGuardar,
                 NumeroValorizacion = numeroValorizacion,
                 IdProyecto = (int?)config.IdProyecto,
                 IdProveedor = (int)config.IdProveedor,
@@ -309,9 +503,23 @@ ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC
                 dto.Observacion
             }, commandType: CommandType.StoredProcedure);
 
+            var idValorizacionResultado = (int?)result.IdValorizacion;
+
+            if (idValorizacionResultado.HasValue)
+            {
+                await db.ExecuteAsync(@"
+UPDATE contable.Valorizacion
+SET IdProveedorEspecialidadCotizacion = @IdConfiguracion
+WHERE IdValorizacion = @IdValorizacion;", new
+                {
+                    IdValorizacion = idValorizacionResultado.Value,
+                    IdConfiguracion = (int)config.IdProveedorEspecialidadCotizacion
+                });
+            }
+
             return new
             {
-                idValorizacion = (int?)result.IdValorizacion,
+                idValorizacion = idValorizacionResultado,
                 numeroValorizacion = (string?)result.NumeroValorizacion
             };
         }
@@ -319,6 +527,39 @@ ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC
         public async Task<object> UpsertDetalleAsync(ValorizacionDetalleUpsertDto dto)
         {
             using var db = Open();
+
+            var idConfiguracionDetalle = dto.IdConfiguracion;
+            if (!idConfiguracionDetalle.HasValue || idConfiguracionDetalle.Value <= 0)
+            {
+                idConfiguracionDetalle = await db.QueryFirstOrDefaultAsync<int?>(@"
+SELECT IdProveedorEspecialidadCotizacion
+FROM contable.Valorizacion
+WHERE IdValorizacion = @IdValorizacion;", new { dto.IdValorizacion });
+            }
+
+            if (!idConfiguracionDetalle.HasValue || idConfiguracionDetalle.Value <= 0)
+                throw new InvalidOperationException("La factura debe estar asociada a una configuración de valorización.");
+
+            var idConfiguracionCabecera = await db.QueryFirstOrDefaultAsync<int?>(@"
+SELECT IdProveedorEspecialidadCotizacion
+FROM contable.Valorizacion
+WHERE IdValorizacion = @IdValorizacion;", new { dto.IdValorizacion });
+
+            if (idConfiguracionCabecera.HasValue && idConfiguracionCabecera.Value > 0 && idConfiguracionCabecera.Value != idConfiguracionDetalle.Value)
+                throw new InvalidOperationException("La valorización seleccionada pertenece a otra configuración. Vuelve a usar la configuración correcta antes de registrar la factura.");
+
+            if (!idConfiguracionCabecera.HasValue || idConfiguracionCabecera.Value <= 0)
+            {
+                await db.ExecuteAsync(@"
+UPDATE contable.Valorizacion
+SET IdProveedorEspecialidadCotizacion = @IdConfiguracion
+WHERE IdValorizacion = @IdValorizacion;", new
+                {
+                    dto.IdValorizacion,
+                    IdConfiguracion = idConfiguracionDetalle.Value
+                });
+            }
+
             var result = await db.QueryFirstAsync("contable.usp_ValorizacionDetalle_Upsert", new
             {
                 IdValorizacionDetalle = dto.IdDetalle,
@@ -338,6 +579,18 @@ ORDER BY ISNULL(vd.FechaFactura, '19000101') DESC, vd.IdValorizacionDetalle DESC
             }, commandType: CommandType.StoredProcedure);
 
             var idDetalle = (int?)result.IdValorizacionDetalle;
+
+            if (idDetalle.HasValue)
+            {
+                await db.ExecuteAsync(@"
+UPDATE contable.ValorizacionDetalle
+SET IdProveedorEspecialidadCotizacion = @IdConfiguracion
+WHERE IdValorizacionDetalle = @IdValorizacionDetalle;", new
+                {
+                    IdValorizacionDetalle = idDetalle.Value,
+                    IdConfiguracion = idConfiguracionDetalle.Value
+                });
+            }
 
             if (idDetalle.HasValue && await HasTipoDetraccionColumnAsync(db))
             {

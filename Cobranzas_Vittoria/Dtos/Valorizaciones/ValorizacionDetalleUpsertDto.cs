@@ -4,6 +4,7 @@ namespace Cobranzas_Vittoria.Dtos.Valorizaciones
     {
         public int? IdDetalle { get; set; }
         public int IdValorizacion { get; set; }
+        public int? IdConfiguracion { get; set; }
         public DateTime? FechaFactura { get; set; }
         public string NumeroFactura { get; set; } = string.Empty;
         public decimal MontoFactura { get; set; }

@@ -102,19 +102,28 @@ WHERE oc.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra }
                     head.Especialidad = (string?)meta.Especialidades;
                 }
 
-                var especialidadesDetalle = (await db.QueryAsync<dynamic>(@"
+                var detalleMeta = (await db.QueryAsync<dynamic>(@"
 SELECT
     d.IdOrdenCompraDetalle,
-    COALESCE(NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad
+    COALESCE(NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
+    COALESCE(d.IdProveedor, oc.IdProveedor) AS IdProveedor,
+    COALESCE(NULLIF(LTRIM(RTRIM(p.RazonSocial)), ''), NULLIF(LTRIM(RTRIM(pOc.RazonSocial)), ''), '-') AS Proveedor
 FROM compras.OrdenCompraDetalle d
+INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = d.IdOrdenCompra
 INNER JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
 LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
-WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })).ToDictionary(x => (int)x.IdOrdenCompraDetalle, x => (string?)x.Especialidad);
+LEFT JOIN maestra.Proveedor p ON p.IdProveedor = d.IdProveedor
+LEFT JOIN maestra.Proveedor pOc ON pOc.IdProveedor = oc.IdProveedor
+WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })).ToDictionary(x => (int)x.IdOrdenCompraDetalle);
 
                 foreach (var item in items)
                 {
-                    if (especialidadesDetalle.TryGetValue(item.IdOrdenCompraDetalle, out var esp))
-                        item.Especialidad = esp;
+                    if (detalleMeta.TryGetValue(item.IdOrdenCompraDetalle, out var metaItem))
+                    {
+                        item.Especialidad = (string?)metaItem.Especialidad;
+                        item.IdProveedor = metaItem.IdProveedor == null ? item.IdProveedor : (int)metaItem.IdProveedor;
+                        item.Proveedor = (string?)metaItem.Proveedor;
+                    }
                 }
             }
 

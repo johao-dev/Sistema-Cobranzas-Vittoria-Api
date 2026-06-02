@@ -17,6 +17,7 @@ namespace Cobranzas_Vittoria.Services
         public Task<object> UpsertReglaProveedorAsync(ProveedorReglaValorizacionUpsertDto dto) => _repo.UpsertReglaProveedorAsync(dto);
         public Task<object> ListAsync(int? idProyecto, int? idProveedor, int? idEspecialidad) => _repo.ListAsync(idProyecto, idProveedor, idEspecialidad);
         public Task<object> GetByIdAsync(int idValorizacion) => _repo.GetByIdAsync(idValorizacion);
+        public Task<object> GetByConfiguracionAsync(int idConfiguracion) => _repo.GetByConfiguracionAsync(idConfiguracion);
         public Task<object> UpsertAsync(ValorizacionUpsertDto dto) => _repo.UpsertAsync(dto);
         public Task<object> UpsertDetalleAsync(ValorizacionDetalleUpsertDto dto) => _repo.UpsertDetalleAsync(dto);
         public Task<object> DeleteDetalleAsync(int idDetalle, string usuario) => _repo.DeleteDetalleAsync(idDetalle, usuario);
