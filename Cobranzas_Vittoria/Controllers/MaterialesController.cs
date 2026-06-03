@@ -15,6 +15,10 @@ namespace Cobranzas_Vittoria.Controllers
         public async Task<IActionResult> List([FromQuery] bool? activo, [FromQuery] int? idEspecialidad)
             => Ok(await _service.ListAsync(activo, idEspecialidad));
 
+        [HttpGet("siguiente-codigo")]
+        public async Task<IActionResult> SiguienteCodigo()
+            => Ok(new { Codigo = await _service.GetSiguienteCodigoAsync() });
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Get(int id)
         {
