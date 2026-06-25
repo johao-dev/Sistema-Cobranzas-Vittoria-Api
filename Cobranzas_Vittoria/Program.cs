@@ -66,8 +66,13 @@ builder.Services.AddScoped<ISunatService, SunatService>();
 var app = builder.Build();
 
 app.UseMiddleware<ApiExceptionMiddleware>();
-app.UseSwagger();
-app.UseSwaggerUI();
+
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.UseCors("AngularCors");
 app.UseStaticFiles();
 app.MapControllers();
