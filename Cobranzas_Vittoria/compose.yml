@@ -1,0 +1,17 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    container_name: sql2025
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=AdminPassword12# # contra solo para dev local
+      - MSSQL_PID=Evaluation
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+volumes:
+  sqlserver_data:
+    name: sqlserver_data_vittoria
