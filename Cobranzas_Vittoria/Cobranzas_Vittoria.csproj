@@ -44,4 +44,8 @@
     <Compile Remove="obj\**" />
     <Compile Remove="wwwroot\uploads\**" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations\**\*.sql" />
+  </ItemGroup>
 </Project>
