@@ -1,0 +1,14 @@
+CREATE SCHEMA seguridad;
+GO
+
+CREATE SCHEMA maestra;
+GO
+
+CREATE SCHEMA contable;
+GO
+
+CREATE SCHEMA compras;
+GO
+
+CREATE SCHEMA almacen;
+GO

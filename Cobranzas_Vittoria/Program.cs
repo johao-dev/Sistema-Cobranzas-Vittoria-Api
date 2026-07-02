@@ -1,8 +1,11 @@
+using System.Reflection;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Services;
+using DbUp;
+using DbUp.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +65,51 @@ builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoServi
 builder.Services.AddScoped<IProveedorTerrenoService, ProveedorTerrenoService>();
 builder.Services.AddScoped<IGastoProyectoService, GastoProyectoService>();
 builder.Services.AddScoped<ISunatService, SunatService>();
+
+var connectionString = builder.Configuration.GetConnectionString("Default");
+
+// Migraciones versionadas: Tablas y estructura
+
+var versionedUpgradeEngine = DeployChanges.To
+    .SqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(
+        Assembly.GetExecutingAssembly(),
+        filter => filter.Contains(".Migrations.Versioned."))
+    .LogToConsole()
+    .Build();
+
+if (versionedUpgradeEngine.IsUpgradeRequired())
+{
+    Console.WriteLine("Nuevas migraciones versionadas detectadas. Aplicando...");
+    var resultVersioned =versionedUpgradeEngine.PerformUpgrade();
+    if (!resultVersioned.Successful)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Error en migraciones versionadas: {resultVersioned.Error}");
+        Console.ResetColor();
+        throw resultVersioned.Error; // Detiene el arranque si falla
+    }
+}
+
+// Migraciones repetibles: Stored Procedures, Views, Typos.
+var repeatableUpgradeEngine = DeployChanges.To
+    .SqlDatabase(connectionString)
+    .WithScriptsEmbeddedInAssembly(
+        Assembly.GetExecutingAssembly(), 
+        filter => filter.Contains(".Migrations.Repeatable."))
+    .JournalTo(new NullJournal()) // NO usa bitácora, se ejecutan SIEMPRE
+    .LogToConsole()
+    .Build();
+
+Console.WriteLine("Sincronizando objetos repetibles (CREATE OR ALTER)...");
+var resultRepeatable = repeatableUpgradeEngine.PerformUpgrade();
+if (!resultRepeatable.Successful)
+{
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.WriteLine($"Error en objetos repetibles: {resultRepeatable.Error}");
+    Console.ResetColor();
+    throw resultRepeatable.Error;
+}
 
 var app = builder.Build();
 
