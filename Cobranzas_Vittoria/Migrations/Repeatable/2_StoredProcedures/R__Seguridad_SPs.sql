@@ -1,4 +1,4 @@
-CREATE PROCEDURE [seguridad].[usp_Rol_List]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_Rol_List]
     @Activo BIT = NULL
 AS
 BEGIN
@@ -19,7 +19,7 @@ ORDER BY
     NombreRol;
 END;
 
-CREATE PROCEDURE [seguridad].[usp_Rol_Upsert]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_Rol_Upsert]
     @IdRol INT = NULL,
     @NombreRol NVARCHAR(100),
     @Activo BIT
@@ -80,7 +80,7 @@ SELECT
     @IdRol;
 END;
 
-CREATE PROCEDURE [seguridad].[usp_Usuario_Get]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_Usuario_Get]
     @IdUsuario INT
 AS
 BEGIN
@@ -116,7 +116,7 @@ ORDER BY
     r.NombreRol;
 END;
 
-CREATE PROCEDURE [seguridad].[usp_Usuario_List]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_Usuario_List]
     @Activo BIT = NULL
 AS
 BEGIN
@@ -141,7 +141,7 @@ ORDER BY
     u.Apellidos;
 END;
 
-CREATE PROCEDURE [seguridad].[usp_Usuario_Upsert]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_Usuario_Upsert]
     @IdUsuario INT = NULL,
     @Nombres NVARCHAR(100),
     @Apellidos NVARCHAR(100) = NULL,
@@ -238,7 +238,7 @@ SELECT
 END
 END;
 
-CREATE PROCEDURE [seguridad].[usp_UsuarioRol_Asignar]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_UsuarioRol_Asignar]
     @IdUsuario INT,
     @IdRol INT
 AS
@@ -289,7 +289,7 @@ END
     1 AS Ok;
 END;
 
-CREATE PROCEDURE [seguridad].[usp_UsuarioRol_Quitar]
+CREATE OR ALTER PROCEDURE [seguridad].[usp_UsuarioRol_Quitar]
     @IdUsuario INT,
     @IdRol INT
 AS

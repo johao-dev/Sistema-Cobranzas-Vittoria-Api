@@ -360,7 +360,7 @@ SELECT
             @IncluyeIGV AS IncluyeIGV;
 END;
 
-CREATE PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
+CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
 (
     @IdOrdenCompra INT,
     @NumeroOrdenCompra NVARCHAR(50),
@@ -557,7 +557,7 @@ SELECT
     1 AS Ok;
 END;
 
-CREATE PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
+CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
 (
     @NumeroOrdenCompra NVARCHAR(50),
     @IdRequerimiento INT,
@@ -735,7 +735,7 @@ THROW;
 END CATCH
 END;
 
-CREATE PROCEDURE [compras].[usp_OrdenCompra_Get]
+CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Get]
 (
     @IdOrdenCompra INT
 )
@@ -826,7 +826,7 @@ WHERE
 END
 END;
 
-CREATE PROCEDURE [compras].[usp_OrdenCompra_List]
+CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_List]
 (
     @Estado NVARCHAR(20) = NULL,
     @IdProveedor INT = NULL,
@@ -893,7 +893,7 @@ ORDER BY
     oc.IdOrdenCompra DESC;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_Actualizar]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Actualizar]
 (
     @IdRequerimiento INT,
     @NumeroRequerimiento NVARCHAR(50),
@@ -975,7 +975,7 @@ FROM
     @Items i;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_ActualizarEstado]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_ActualizarEstado]
 (
     @IdRequerimiento INT,
     @Estado NVARCHAR(50),
@@ -1034,7 +1034,7 @@ WHERE
     IdRequerimiento = @IdRequerimiento;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_Crear]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Crear]
     @NumeroRequerimiento NVARCHAR(30),
     @FechaRequerimiento DATE,
     @IdEspecialidad INT,
@@ -1164,7 +1164,7 @@ SELECT
     @IdRequerimiento AS IdRequerimiento;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_Get]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Get]
     @IdRequerimiento INT
 AS
 BEGIN
@@ -1229,7 +1229,7 @@ ORDER BY
     rv.IdRequerimientoValidacion DESC;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_List]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_List]
     @Estado NVARCHAR(30) = NULL,
     @IdEspecialidad INT = NULL,
     @IdProyecto INT = NULL
@@ -1269,7 +1269,7 @@ ORDER BY
     r.IdRequerimiento DESC;
 END;
 
-CREATE PROCEDURE [compras].[usp_Requerimiento_ValidarAlmacen]
+CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_ValidarAlmacen]
     @IdRequerimiento INT,
     @IdUsuario INT,
     @Resultado NVARCHAR(20),

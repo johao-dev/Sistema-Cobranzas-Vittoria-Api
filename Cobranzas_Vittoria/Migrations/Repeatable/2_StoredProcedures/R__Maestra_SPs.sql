@@ -1,4 +1,4 @@
-CREATE PROCEDURE [maestra].[usp_Especialidad_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Especialidad_List]
     @Activo BIT = NULL
 AS
 BEGIN
@@ -20,7 +20,7 @@ ORDER BY
     Nombre;
 END;
 
-CREATE PROCEDURE [maestra].[usp_Especialidad_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Especialidad_Upsert]
     @IdEspecialidad INT = NULL,
     @Nombre NVARCHAR(100),
     @Descripcion NVARCHAR(250) = NULL,
@@ -91,7 +91,7 @@ SELECT
 END
 END;
 
-CREATE PROCEDURE maestra.usp_Material_Get
+CREATE OR ALTER PROCEDURE maestra.usp_Material_Get
     @IdMaterial INT
 AS
 BEGIN
@@ -117,7 +117,7 @@ WHERE
     m.IdMaterial = @IdMaterial;
 END;
 
-CREATE PROCEDURE maestra.usp_Material_List
+CREATE OR ALTER PROCEDURE maestra.usp_Material_List
     @Activo BIT = NULL,
     @IdEspecialidad INT = NULL
 AS
@@ -150,7 +150,7 @@ ORDER BY
     m.Descripcion;
 END;
 
-CREATE PROCEDURE maestra.usp_Material_Upsert
+CREATE OR ALTER PROCEDURE maestra.usp_Material_Upsert
     @IdMaterial INT = NULL,
     @IdEspecialidad INT,
     @Codigo VARCHAR(50) = NULL,
@@ -231,7 +231,7 @@ SELECT
     @IdMaterial AS IdMaterial;
 END;
 
-CREATE PROCEDURE [maestra].[usp_Proveedor_Get]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_Get]
     @IdProveedor INT
 AS
 BEGIN
@@ -276,7 +276,7 @@ ORDER BY
     e.Nombre;
 END;
 
-CREATE PROCEDURE [maestra].[usp_Proveedor_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_List]
     @Activo BIT = NULL,
     @IdEspecialidad INT = NULL
 AS
@@ -316,7 +316,7 @@ ORDER BY
     p.RazonSocial;
 END;
 
-CREATE PROCEDURE [maestra].[usp_Proveedor_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_Upsert]
     @IdProveedor INT = NULL,
     @RazonSocial NVARCHAR(200),
     @Ruc NVARCHAR(20),
@@ -442,7 +442,7 @@ SELECT
 END
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorEspecialidad_Set]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidad_Set]
     @IdProveedor INT,
     @IdEspecialidad INT,
     @Activo BIT = 1
@@ -506,7 +506,7 @@ END
     1 AS Ok;
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_List]
     @IdProyecto INT = NULL,
     @IdProveedor INT = NULL,
     @IdEspecialidad INT = NULL
@@ -552,7 +552,7 @@ ORDER BY
     pec.IdProveedorEspecialidadCotizacion DESC;
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_Upsert]
     @IdProveedorEspecialidadCotizacion INT = NULL,
     @IdProyecto INT,
     @IdProveedor INT,
@@ -621,7 +621,7 @@ SELECT
 END
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Delete]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Delete]
     @IdProveedorGastoAdministrativo INT
 AS
 BEGIN
@@ -636,7 +636,7 @@ WHERE
     IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo;
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_List]
     @Activo BIT = NULL,
     @IdCategoriaGasto INT = NULL
 AS
@@ -671,7 +671,7 @@ ORDER BY
     pga.RazonSocial;
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Upsert]
     @IdProveedorGastoAdministrativo INT = NULL,
     @IdCategoriaGasto INT,
     @RazonSocial NVARCHAR(200),
@@ -781,7 +781,7 @@ SELECT
     CAST(SCOPE_IDENTITY() AS INT) AS IdProveedorGastoAdministrativo;
 END;
 
-CREATE PROCEDURE [maestra].[usp_ProveedorReglaValorizacion_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorReglaValorizacion_Upsert]
     @IdProveedor INT,
     @PorcentajeGarantia DECIMAL(9, 6) = 0.050000,
     @PorcentajeDetraccion DECIMAL(9, 6) = 0.040000
@@ -826,7 +826,7 @@ VALUES
 END
 END;
 
-CREATE PROCEDURE [maestra].[usp_Proyecto_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Proyecto_List]
     @Activo BIT = NULL
 AS
 BEGIN
@@ -849,7 +849,7 @@ ORDER BY
     NombreProyecto;
 END;
 
-CREATE PROCEDURE [maestra].[usp_Proyecto_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_Proyecto_Upsert]
     @IdProyecto INT = NULL,
     @NombreProyecto NVARCHAR(200),
     @Descripcion NVARCHAR(500) = NULL,
@@ -902,7 +902,7 @@ SELECT
     @IdProyecto;
 END;
 
-CREATE PROCEDURE [maestra].[usp_UnidadMedida_List]
+CREATE OR ALTER PROCEDURE [maestra].[usp_UnidadMedida_List]
     @Activo BIT = NULL
 AS
 BEGIN
@@ -923,7 +923,7 @@ ORDER BY
     Nombre;
 END;
 
-CREATE PROCEDURE [maestra].[usp_UnidadMedida_Upsert]
+CREATE OR ALTER PROCEDURE [maestra].[usp_UnidadMedida_Upsert]
     @IdUnidadMedida INT = NULL,
     @Codigo NVARCHAR(20),
     @Nombre NVARCHAR(100),

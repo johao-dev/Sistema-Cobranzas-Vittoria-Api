@@ -1,4 +1,4 @@
-CREATE PROCEDURE contable.usp_CotizacionMaterialesResumen_Listar
+CREATE OR ALTER PROCEDURE contable.usp_CotizacionMaterialesResumen_Listar
     @IdProyecto INT = NULL
 AS
 BEGIN
@@ -23,7 +23,7 @@ ORDER BY
     Especialidad;
 END;
 
-CREATE PROCEDURE contable.usp_CotizacionMaterialesTotalPorProyecto_Listar
+CREATE OR ALTER PROCEDURE contable.usp_CotizacionMaterialesTotalPorProyecto_Listar
     @IdProyecto INT = NULL
 AS
 BEGIN
@@ -43,7 +43,7 @@ ORDER BY
     Proyecto;
 END;
 
-CREATE PROCEDURE [contable].[usp_PresupuestoProyecto_Delete]
+CREATE OR ALTER PROCEDURE [contable].[usp_PresupuestoProyecto_Delete]
     @IdPresupuestoProyecto INT
 AS
 BEGIN
@@ -66,7 +66,7 @@ WHERE
     IdPresupuestoProyecto = @IdPresupuestoProyecto;
 END;
 
-CREATE PROCEDURE [contable].[usp_PresupuestoProyecto_Get]
+CREATE OR ALTER PROCEDURE [contable].[usp_PresupuestoProyecto_Get]
     @IdPresupuestoProyecto INT = NULL,
     @IdProyecto INT = NULL
 AS
@@ -115,7 +115,7 @@ ORDER BY
     d.IdPresupuestoProyectoDetalle;
 END;
 
-CREATE PROCEDURE [contable].[usp_PresupuestoProyecto_List]
+CREATE OR ALTER PROCEDURE [contable].[usp_PresupuestoProyecto_List]
     @IdProyecto INT = NULL
 AS
 BEGIN
@@ -138,7 +138,7 @@ ORDER BY
     r.NombreProyecto;
 END;
 
-CREATE PROCEDURE [contable].[usp_PresupuestoProyecto_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_PresupuestoProyecto_Upsert]
     @IdPresupuestoProyecto INT = NULL,
     @IdProyecto INT,
     @Detalles [contable].[TVP_PresupuestoProyectoDetalle] READONLY
@@ -239,7 +239,7 @@ FROM
 EXEC [contable].[usp_PresupuestoProyecto_Get] @IdPresupuestoProyecto = @IdCabecera;
 END;
 
-CREATE PROCEDURE [contable].[usp_ProveedorReglaValorizacion_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_ProveedorReglaValorizacion_Upsert]
     @IdProveedor INT,
     @PorcentajeGarantia DECIMAL(9, 6),
     @PorcentajeDetraccion DECIMAL(9, 6),
@@ -256,7 +256,7 @@ EXEC maestra.usp_ProveedorReglaValorizacion_Upsert
         @Usuario = @Usuario;
 END;
 
-CREATE PROCEDURE [contable].[usp_Terreno_Delete]
+CREATE OR ALTER PROCEDURE [contable].[usp_Terreno_Delete]
     @IdTerreno INT
 AS
 BEGIN
@@ -272,7 +272,7 @@ WHERE
     IdTerreno = @IdTerreno;
 END;
 
-CREATE PROCEDURE [contable].[usp_Terreno_Get]
+CREATE OR ALTER PROCEDURE [contable].[usp_Terreno_Get]
     @IdTerreno INT
 AS
 BEGIN
@@ -298,7 +298,7 @@ WHERE
     t.IdTerreno = @IdTerreno;
 END;
 
-CREATE PROCEDURE [contable].[usp_Terreno_List]
+CREATE OR ALTER PROCEDURE [contable].[usp_Terreno_List]
     @IdProyecto INT = NULL,
     @Estado NVARCHAR(20) = NULL
 AS
@@ -331,7 +331,7 @@ ORDER BY
     t.IdTerreno DESC;
 END;
 
-CREATE PROCEDURE [contable].[usp_Terreno_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_Terreno_Upsert]
     @IdTerreno INT = NULL,
     @Fecha DATE = NULL,
     @IdProyecto INT,
@@ -394,7 +394,7 @@ END
     EXEC [contable].[usp_Terreno_Get] @IdTerreno = @IdTerreno;
 END;
 
-CREATE PROCEDURE [contable].[usp_Valorizacion_Get]
+CREATE OR ALTER PROCEDURE [contable].[usp_Valorizacion_Get]
     @IdValorizacion INT
 AS
 BEGIN
@@ -480,7 +480,7 @@ ORDER BY
     a.IdValorizacionDetalleArchivo;
 END;
 
-CREATE PROCEDURE [contable].[usp_Valorizacion_GetById]
+CREATE OR ALTER PROCEDURE [contable].[usp_Valorizacion_GetById]
     @IdValorizacion INT
 AS
 BEGIN
@@ -491,7 +491,7 @@ EXEC contable.usp_Valorizacion_Get
         @IdValorizacion = @IdValorizacion;
 END;
 
-CREATE PROCEDURE [contable].[usp_Valorizacion_List]
+CREATE OR ALTER PROCEDURE [contable].[usp_Valorizacion_List]
     @IdProyecto INT = NULL,
     @IdProveedor INT = NULL,
     @IdEspecialidad INT = NULL
@@ -539,7 +539,7 @@ ORDER BY
     IdValorizacion DESC;
 END;
 
-CREATE PROCEDURE [contable].[usp_Valorizacion_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_Valorizacion_Upsert]
     @IdValorizacion INT = NULL,
     @NumeroValorizacion NVARCHAR(30),
     @IdProyecto INT = NULL,
@@ -697,7 +697,7 @@ SELECT
 END
 END;
 
-CREATE PROCEDURE [contable].[usp_ValorizacionConfiguracion_List]
+CREATE OR ALTER PROCEDURE [contable].[usp_ValorizacionConfiguracion_List]
     @IdProyecto INT = NULL,
     @IdProveedor INT = NULL,
     @IdEspecialidad INT = NULL
@@ -712,7 +712,7 @@ EXEC maestra.usp_ProveedorEspecialidadCotizacion_List
         @IdEspecialidad = @IdEspecialidad;
 END;
 
-CREATE PROCEDURE [contable].[usp_ValorizacionConfiguracion_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_ValorizacionConfiguracion_Upsert]
     @IdConfiguracion INT = NULL,
     @IdProyecto INT = NULL,
     @IdProveedor INT,
@@ -737,7 +737,7 @@ EXEC maestra.usp_ProveedorEspecialidadCotizacion_Upsert
         @Activo = 1;
 END;
 
-CREATE PROCEDURE [contable].[usp_ValorizacionDetalle_Delete]
+CREATE OR ALTER PROCEDURE [contable].[usp_ValorizacionDetalle_Delete]
     @IdValorizacionDetalle INT
 AS
 BEGIN
@@ -757,7 +757,7 @@ WHERE
     IdValorizacionDetalle = @IdValorizacionDetalle;
 END;
 
-CREATE PROCEDURE [contable].[usp_ValorizacionDetalle_Upsert]
+CREATE OR ALTER PROCEDURE [contable].[usp_ValorizacionDetalle_Upsert]
     @IdValorizacionDetalle INT = NULL,
     @IdValorizacion INT,
     @FechaFactura DATE = NULL,
