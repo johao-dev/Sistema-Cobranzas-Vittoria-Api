@@ -1,4 +1,4 @@
-ALTER VIEW [almacen].[vw_Kardex_DesdeComprasYMovimientos]
+CREATE OR ALTER VIEW [almacen].[vw_Kardex_DesdeComprasYMovimientos]
 AS
 WITH BaseCompras AS
 (
@@ -57,7 +57,7 @@ SELECT
 FROM
     Enriquecido;
 
-ALTER VIEW [almacen].[vw_Kardex_PorEspecialidad]
+CREATE OR ALTER VIEW [almacen].[vw_Kardex_PorEspecialidad]
 AS
 SELECT
     km.IdKardexMovimiento,

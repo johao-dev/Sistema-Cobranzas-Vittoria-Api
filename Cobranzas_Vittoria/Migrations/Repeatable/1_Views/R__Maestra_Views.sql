@@ -1,4 +1,4 @@
-ALTER VIEW [maestra].[vw_ProveedorEspecialidadCotizacionResumen]
+CREATE OR ALTER VIEW [maestra].[vw_ProveedorEspecialidadCotizacionResumen]
 AS
 SELECT
     pec.IdProveedorEspecialidadCotizacion,

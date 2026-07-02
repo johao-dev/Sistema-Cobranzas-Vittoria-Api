@@ -1,4 +1,4 @@
-ALTER VIEW contable.vw_CotizacionMaterialesPorProyecto
+CREATE OR ALTER VIEW contable.vw_CotizacionMaterialesPorProyecto
 AS
 SELECT
     p.IdProyecto,
@@ -16,7 +16,7 @@ GROUP BY
     p.IdProyecto,
     p.NombreProyecto;
 
-ALTER VIEW contable.vw_CotizacionMaterialesResumenTodosProyectos
+CREATE OR ALTER VIEW contable.vw_CotizacionMaterialesResumenTodosProyectos
 AS
 WITH Cotizaciones AS
 (
@@ -181,7 +181,7 @@ SELECT
 FROM
     CotizacionesSinFacturado;
 
-ALTER VIEW [contable].[vw_PresupuestoProyectoResumen]
+CREATE OR ALTER VIEW [contable].[vw_PresupuestoProyectoResumen]
 AS
 WITH Presupuesto AS
 (
@@ -231,7 +231,7 @@ LEFT JOIN ComprasProyecto cp
     ON
     cp.IdProyecto = pr.IdProyecto;
 
-ALTER VIEW [contable].[vw_ValorizacionDetalleCalculado]
+CREATE OR ALTER VIEW [contable].[vw_ValorizacionDetalleCalculado]
 AS
 WITH Base AS
 (
@@ -310,7 +310,7 @@ SELECT
 FROM
     Base b;
 
-ALTER VIEW [contable].[vw_ValorizacionResumen]
+CREATE OR ALTER VIEW [contable].[vw_ValorizacionResumen]
 AS
 SELECT
     v.IdValorizacion,

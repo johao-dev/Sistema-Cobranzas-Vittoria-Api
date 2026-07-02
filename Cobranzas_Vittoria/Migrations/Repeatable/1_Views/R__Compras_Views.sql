@@ -1,4 +1,4 @@
-ALTER VIEW [compras].[vw_Compra_ListadoConEspecialidad]
+CREATE OR ALTER VIEW [compras].[vw_Compra_ListadoConEspecialidad]
 AS
 SELECT
     c.IdCompra,
