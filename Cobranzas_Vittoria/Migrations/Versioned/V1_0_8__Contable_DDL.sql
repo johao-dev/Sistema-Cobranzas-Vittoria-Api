@@ -59,6 +59,7 @@ CREATE TABLE contable.GastoProyecto (
 	Moneda nvarchar(10) COLLATE SQL_Latin1_General_CP1_CI_AS DEFAULT 'PEN' NOT NULL,
 	MontoSoles decimal(18,2) DEFAULT 0 NOT NULL,
 	MontoDolares decimal(18,2) DEFAULT 0 NOT NULL,
+	Incidencia decimal(9,2) NULL,
 	FechaTipoCambio date NULL,
 	TipoCambio decimal(18,4) DEFAULT 3.4100 NOT NULL,
 	Descripcion nvarchar(500) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
@@ -110,6 +111,7 @@ CREATE TABLE contable.PresupuestoProyectoDetalle (
 	Activo bit DEFAULT 1 NOT NULL,
 	FechaCreacion datetime2(0) DEFAULT sysdatetime() NOT NULL,
 	Dolares decimal(18,2) DEFAULT 0 NOT NULL,
+	Incidencia decimal(9,2) NULL,
 	CONSTRAINT PK_PresupuestoProyectoDetalle PRIMARY KEY (IdPresupuestoProyectoDetalle)
 );
  CREATE NONCLUSTERED INDEX IX_PresupuestoProyectoDetalle_IdPresupuestoProyecto ON contable.PresupuestoProyectoDetalle (  IdPresupuestoProyecto ASC  , Orden ASC  )  
