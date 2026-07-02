@@ -15,6 +15,7 @@ WHERE
 GROUP BY
     p.IdProyecto,
     p.NombreProyecto;
+GO
 
 CREATE OR ALTER VIEW contable.vw_CotizacionMaterialesResumenTodosProyectos
 AS
@@ -180,6 +181,7 @@ SELECT
     Cotizacion - Facturado AS Saldo
 FROM
     CotizacionesSinFacturado;
+GO
 
 CREATE OR ALTER VIEW [contable].[vw_PresupuestoProyectoResumen]
 AS
@@ -230,6 +232,7 @@ FROM
 LEFT JOIN ComprasProyecto cp
     ON
     cp.IdProyecto = pr.IdProyecto;
+GO
 
 CREATE OR ALTER VIEW [contable].[vw_ValorizacionDetalleCalculado]
 AS
@@ -309,6 +312,7 @@ SELECT
     , 6) AS DECIMAL(18, 6)) AS PorcentajeFinal
 FROM
     Base b;
+GO
 
 CREATE OR ALTER VIEW [contable].[vw_ValorizacionResumen]
 AS

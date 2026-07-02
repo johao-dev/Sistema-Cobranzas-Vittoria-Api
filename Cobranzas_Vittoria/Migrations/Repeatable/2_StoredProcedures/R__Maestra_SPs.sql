@@ -19,6 +19,7 @@ WHERE
 ORDER BY
     Nombre;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Especialidad_Upsert]
     @IdEspecialidad INT = NULL,
@@ -90,6 +91,7 @@ SELECT
     @IdEspecialidad AS IdEspecialidad;
 END
 END;
+GO
 
 CREATE OR ALTER PROCEDURE maestra.usp_Material_Get
     @IdMaterial INT
@@ -116,6 +118,7 @@ INNER JOIN maestra.Especialidad e ON
 WHERE
     m.IdMaterial = @IdMaterial;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE maestra.usp_Material_List
     @Activo BIT = NULL,
@@ -149,6 +152,7 @@ ORDER BY
     e.Nombre,
     m.Descripcion;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE maestra.usp_Material_Upsert
     @IdMaterial INT = NULL,
@@ -230,6 +234,7 @@ WHERE
 SELECT
     @IdMaterial AS IdMaterial;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_Get]
     @IdProveedor INT
@@ -275,6 +280,7 @@ WHERE
 ORDER BY
     e.Nombre;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_List]
     @Activo BIT = NULL,
@@ -315,6 +321,7 @@ WHERE
 ORDER BY
     p.RazonSocial;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_Upsert]
     @IdProveedor INT = NULL,
@@ -441,6 +448,7 @@ SELECT
     @IdProveedor AS IdProveedor;
 END
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidad_Set]
     @IdProveedor INT,
@@ -505,6 +513,7 @@ END
     SELECT
     1 AS Ok;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_List]
     @IdProyecto INT = NULL,
@@ -551,6 +560,7 @@ WHERE
 ORDER BY
     pec.IdProveedorEspecialidadCotizacion DESC;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorEspecialidadCotizacion_Upsert]
     @IdProveedorEspecialidadCotizacion INT = NULL,
@@ -620,6 +630,7 @@ SELECT
     @IdProveedorEspecialidadCotizacion AS IdProveedorEspecialidadCotizacion;
 END
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Delete]
     @IdProveedorGastoAdministrativo INT
@@ -635,6 +646,7 @@ SET
 WHERE
     IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_List]
     @Activo BIT = NULL,
@@ -670,6 +682,7 @@ ORDER BY
     cg.Nombre,
     pga.RazonSocial;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Upsert]
     @IdProveedorGastoAdministrativo INT = NULL,
@@ -780,6 +793,7 @@ VALUES
 SELECT
     CAST(SCOPE_IDENTITY() AS INT) AS IdProveedorGastoAdministrativo;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorReglaValorizacion_Upsert]
     @IdProveedor INT,
@@ -825,6 +839,7 @@ VALUES
         );
 END
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proyecto_List]
     @Activo BIT = NULL
@@ -848,6 +863,7 @@ WHERE
 ORDER BY
     NombreProyecto;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proyecto_Upsert]
     @IdProyecto INT = NULL,
@@ -901,6 +917,7 @@ WHERE
 SELECT
     @IdProyecto;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_UnidadMedida_List]
     @Activo BIT = NULL
@@ -922,6 +939,7 @@ WHERE
 ORDER BY
     Nombre;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_UnidadMedida_Upsert]
     @IdUnidadMedida INT = NULL,

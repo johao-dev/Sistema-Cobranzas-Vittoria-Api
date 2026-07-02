@@ -36,7 +36,7 @@ BEGIN
         km.FechaMovimiento DESC,
         km.IdKardexMovimiento DESC;
 END;
-
+GO
 
 CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_RegistrarSalida]
     @IdCompra INT,
@@ -157,7 +157,7 @@ BEGIN
         CAST(@StockActual - @CantidadSalida AS DECIMAL(18, 2)) AS StockActual,
         N'Salida registrada correctamente.' AS Mensaje;
 END;
-
+GO
 
 CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_ResumenMaterial]
     @IdMaterial INT = NULL,

@@ -56,6 +56,7 @@ SELECT
     *
 FROM
     Enriquecido;
+GO
 
 CREATE OR ALTER VIEW [almacen].[vw_Kardex_PorEspecialidad]
 AS

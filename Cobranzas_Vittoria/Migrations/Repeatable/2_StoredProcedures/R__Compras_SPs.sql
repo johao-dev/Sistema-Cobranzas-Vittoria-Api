@@ -95,6 +95,7 @@ BEGIN
         1 AS Ok,
         N'Compra aceptada y kardex actualizado.' AS Mensaje;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Compra_Get]
     @IdCompra INT
@@ -155,6 +156,7 @@ BEGIN
     WHERE IdCompra = @IdCompra
     ORDER BY IdCompraDocumento;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Compra_List]
     @Aceptada BIT = NULL,
@@ -187,6 +189,7 @@ BEGIN
     AND (@IdProveedor IS NULL OR c.IdProveedor = @IdProveedor)
     ORDER BY c.IdCompra DESC;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Compra_Registrar]
     @NumeroCompra NVARCHAR(30),
@@ -359,6 +362,7 @@ SELECT
             @MontoTotal AS MontoTotal,
             @IncluyeIGV AS IncluyeIGV;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
 (
@@ -493,7 +497,7 @@ END TRY
 THROW;
 END CATCH
 END;
-
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_ActualizarEstado]
     @IdOrdenCompra INT,
@@ -556,6 +560,7 @@ VALUES
 SELECT
     1 AS Ok;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
 (
@@ -734,6 +739,7 @@ END TRY
 THROW;
 END CATCH
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Get]
 (
@@ -825,6 +831,7 @@ WHERE
     1 = 0;
 END
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_List]
 (
@@ -892,6 +899,7 @@ WHERE
 ORDER BY
     oc.IdOrdenCompra DESC;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Actualizar]
 (
@@ -974,6 +982,7 @@ INSERT
 FROM
     @Items i;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_ActualizarEstado]
 (
@@ -1033,6 +1042,7 @@ SET
 WHERE
     IdRequerimiento = @IdRequerimiento;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Crear]
     @NumeroRequerimiento NVARCHAR(30),
@@ -1163,6 +1173,7 @@ COMMIT;
 SELECT
     @IdRequerimiento AS IdRequerimiento;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Get]
     @IdRequerimiento INT
@@ -1228,6 +1239,7 @@ WHERE
 ORDER BY
     rv.IdRequerimientoValidacion DESC;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_List]
     @Estado NVARCHAR(30) = NULL,
@@ -1268,6 +1280,7 @@ WHERE
 ORDER BY
     r.IdRequerimiento DESC;
 END;
+GO
 
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_ValidarAlmacen]
     @IdRequerimiento INT,
