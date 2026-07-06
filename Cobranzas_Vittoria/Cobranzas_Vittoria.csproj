@@ -13,7 +13,8 @@
       **\.vs\**;
       **\bin\**;
       **\obj\**;
-      **\wwwroot\uploads\**
+      **\wwwroot\uploads\**;
+      Cobranzas_Vittoria.Tests\**
     </DefaultItemExcludes>
   </PropertyGroup>
 
@@ -45,6 +46,7 @@
     <Compile Remove="bin\**" />
     <Compile Remove="obj\**" />
     <Compile Remove="wwwroot\uploads\**" />
+    <Compile Remove="Cobranzas_Vittoria.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>
