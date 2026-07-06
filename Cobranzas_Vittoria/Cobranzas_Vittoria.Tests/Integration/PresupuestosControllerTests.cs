@@ -1,5 +1,4 @@
 using Cobranzas_Vittoria.Tests.Setup;
-using FluentAssertions;
 using System.Net;
 
 namespace Cobranzas_Vittoria.Tests.Integration;
@@ -25,12 +24,10 @@ public class PresupuestosControllerTests : IDisposable
         var response = await _client.GetAsync($"/api/contable/presupuesto/{idProyecto}");
 
         // Assert
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
-        if (response.StatusCode == HttpStatusCode.OK)
-        {
-            response.Content.Headers.ContentType?.ToString().Should().Contain("application/json");
-        }
+        var contentType = response.Content.Headers.ContentType?.ToString();
+        Assert.That(contentType, Does.Contain("application/json"));
     }
 
     public void Dispose()
