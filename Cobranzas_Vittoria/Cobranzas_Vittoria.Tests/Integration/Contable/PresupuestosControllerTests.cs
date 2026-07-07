@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Cobranzas_Vittoria.Tests.Integration;
+namespace Cobranzas_Vittoria.Tests.Integration.Contable;
 
 public class PresupuestosControllerTests : IntegrationTestBase
 {
