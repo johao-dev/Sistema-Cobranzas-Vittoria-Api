@@ -34,46 +34,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
     private const int IdMaterialAlbanileria = 2;
     private const int IdMaterialCasco = 6;
 
-    // Especialidad del REQUERIMIENTO (cabecera), separada de la especialidad del material.
-    private const int IdEspecialidadReq = SeedIds.EspecialidadAlbanileria;
-
-    private const int IdUsuarioSolicitante = SeedIds.IngenieroId;
     private const int IdUsuarioAlmacen = SeedIds.AlmacenId;
-
-    private static string NumeroUnico() => Guid.NewGuid().ToString("N").Substring(0, 8);
-
-    private static RequerimientoCreateDto BuildCreateDto(
-        string? numero = null,
-        int idEspecialidad = IdEspecialidadReq,
-        int idProyecto = SeedIds.ProyectoMaytaCapacII,
-        List<RequerimientoDetalleCreateDto>? items = null)
-    {
-        return new RequerimientoCreateDto
-        {
-            NumeroRequerimiento = numero ?? NumeroUnico(),
-            FechaRequerimiento = DateTime.Today,
-            IdEspecialidad = idEspecialidad,
-            IdProyecto = idProyecto,
-            Descripcion = "Requerimiento de prueba de integración",
-            FechaEntrega = DateTime.Today.AddDays(7),
-            IdUsuarioSolicitante = IdUsuarioSolicitante,
-            Observacion = "Observación inicial",
-            Items = items ?? new List<RequerimientoDetalleCreateDto>
-            {
-                new() { IdMaterial = IdMaterialAlbanileria, Cantidad = 10m, Observacion = "Item 1" }
-            }
-        };
-    }
-
-    private async Task<int> CrearRequerimientoAsync(RequerimientoCreateDto? dto = null)
-    {
-        dto ??= BuildCreateDto();
-        var response = await _client.PostAsJsonAsync("/api/compras/requerimientos", dto);
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
-            $"Setup falló: POST Crear debe retornar 200. Body: {await response.Content.ReadAsStringAsync()}");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("idRequerimiento").GetInt32();
-    }
 
     [Test]
     public async Task List_SinFiltros_RetornaArrayVacio()
@@ -105,8 +66,8 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task List_FiltradoPorIdProyecto_RetornaRequerimientosCoincidentes()
     {
         // Arrange - crear 2 requerimientos del mismo proyecto
-        await CrearRequerimientoAsync();
-        await CrearRequerimientoAsync();
+        await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await RequerimientoBuilder.Nuevo().CrearAsync(_client);
 
         // Act
         var response = await _client.GetAsync(
@@ -123,11 +84,9 @@ public class RequerimientosControllerTests : IntegrationTestBase
     {
         // Arrange - el filtro por idEspecialidad mira la especialidad de los MATERIALES
         // (no la del requerimiento). Material 2 -> Especialidad 2 (Albañilería).
-        var dto = BuildCreateDto(items: new List<RequerimientoDetalleCreateDto>
-        {
-            new() { IdMaterial = IdMaterialAlbanileria, Cantidad = 5m, Observacion = "Mortero" }
-        });
-        await CrearRequerimientoAsync(dto);
+        await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterialAlbanileria, 5m, "Mortero")
+            .CrearAsync(_client);
 
         // Act - filtrar por IdEspecialidad=2 (Albañilería)
         var response = await _client.GetAsync(
@@ -143,7 +102,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task Get_ConIdExistente_RetornaRequerimientoConItemsYValidacionesYPuedeEditar()
     {
         // Arrange
-        var id = await CrearRequerimientoAsync();
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
 
         // Act
         var response = await _client.GetAsync($"/api/compras/requerimientos/{id}");
@@ -187,10 +146,12 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task Crear_ConDatosValidos_RetornaOkEPersisteCabeceraYDetalle()
     {
         // Arrange
-        var dto = BuildCreateDto();
+        var builder = RequerimientoBuilder.Nuevo()
+            .ConDescripcion("Requerimiento de prueba explícito")
+            .ConObservacion("Observación explícita");
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/compras/requerimientos", dto);
+        var response = await _client.PostAsJsonAsync("/api/compras/requerimientos", builder.Build());
 
         // Assert - 1: HTTP
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -199,11 +160,15 @@ public class RequerimientosControllerTests : IntegrationTestBase
         Assert.That(id, Is.GreaterThan(0));
 
         // Assert - 2: BD - cabecera persistida con el NumeroRequerimiento enviado
+        var dtoEnviado = builder.Build();
         var cabecera = (await DbHelpers.QueryAsync<ReqRow>(
-            "SELECT NumeroRequerimiento AS Numero, Estado FROM compras.Requerimiento WHERE IdRequerimiento = @id",
+            "SELECT NumeroRequerimiento AS Numero, Estado, Descripcion, Observacion " +
+            "FROM compras.Requerimiento WHERE IdRequerimiento = @id",
             new { id })).Single();
-        Assert.That(cabecera.Numero, Is.EqualTo(dto.NumeroRequerimiento));
+        Assert.That(cabecera.Numero, Is.EqualTo(dtoEnviado.NumeroRequerimiento));
         Assert.That(cabecera.Estado, Is.EqualTo("Registrado"));
+        Assert.That(cabecera.Descripcion, Is.EqualTo(dtoEnviado.Descripcion));
+        Assert.That(cabecera.Observacion, Is.EqualTo(dtoEnviado.Observacion));
 
         // Assert - 3: BD - detalle persistido vía TVP
         var totalDetalles = await DbHelpers.QueryScalarAsync<int>(
@@ -216,16 +181,16 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task Update_ConIdExistente_RetornaOkYSobreescribeItems()
     {
         // Arrange - crear con 1 item
-        var id = await CrearRequerimientoAsync();
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
 
         // Act - PUT con 2 items diferentes
         var updateDto = new RequerimientoUpdateDto
         {
-            NumeroRequerimiento = NumeroUnico(),
+            NumeroRequerimiento = Guid.NewGuid().ToString("N").Substring(0, 8),
             FechaRequerimiento = DateTime.Today,
-            IdEspecialidad = IdEspecialidadReq,
+            IdEspecialidad = SeedIds.EspecialidadAlbanileria,
             IdProyecto = SeedIds.ProyectoMaytaCapacII,
-            IdUsuarioSolicitante = IdUsuarioSolicitante,
+            IdUsuarioSolicitante = SeedIds.IngenieroId,
             Observacion = "Requerimiento actualizado",
             Items = new List<RequerimientoDetalleUpdateDto>
             {
@@ -248,7 +213,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task UpdateEstado_AValidadoAlmacen_RetornaOkYCambiaEstadoEnBD()
     {
         // Arrange
-        var id = await CrearRequerimientoAsync();
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
 
         // Act
         var estadoDto = new RequerimientoEstadoDto
@@ -272,7 +237,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
     public async Task ValidarAlmacen_ConResultadoConforme_RetornaOkYRegistraValidacion()
     {
         // Arrange
-        var id = await CrearRequerimientoAsync();
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
 
         // Act
         var validacionDto = new RequerimientoValidacionDto
@@ -306,11 +271,11 @@ public class RequerimientosControllerTests : IntegrationTestBase
         // Arrange - POST NO es idempotente: cada llamada crea un nuevo requerimiento.
         // Si el NumeroRequerimiento enviado ya existe, el repo calcula el siguiente
         // como MAX(TRY_CONVERT(INT, NumeroRequerimiento))+1.
-        var dto = BuildCreateDto(numero: "DUP-001");
+        var builder = RequerimientoBuilder.Nuevo().ConNumero("DUP-001");
 
         // Act
-        var r1 = await _client.PostAsJsonAsync("/api/compras/requerimientos", dto);
-        var r2 = await _client.PostAsJsonAsync("/api/compras/requerimientos", dto);
+        var r1 = await _client.PostAsJsonAsync("/api/compras/requerimientos", builder.Build());
+        var r2 = await _client.PostAsJsonAsync("/api/compras/requerimientos", builder.Build());
 
         // Assert - ambas son 200 y devuelven IDs distintos
         Assert.That(r1.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -333,14 +298,14 @@ public class RequerimientosControllerTests : IntegrationTestBase
     {
         // Arrange - PUT SÍ es idempotente: dos llamadas con el mismo body
         // deben producir el mismo estado final (mismo set de items, mismos valores).
-        var id = await CrearRequerimientoAsync();
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
         var updateDto = new RequerimientoUpdateDto
         {
-            NumeroRequerimiento = "REQ-IDEM-" + NumeroUnico(),
+            NumeroRequerimiento = "REQ-IDEM-" + Guid.NewGuid().ToString("N").Substring(0, 8),
             FechaRequerimiento = DateTime.Today,
-            IdEspecialidad = IdEspecialidadReq,
+            IdEspecialidad = SeedIds.EspecialidadAlbanileria,
             IdProyecto = SeedIds.ProyectoMaytaCapacII,
-            IdUsuarioSolicitante = IdUsuarioSolicitante,
+            IdUsuarioSolicitante = SeedIds.IngenieroId,
             Observacion = "Actualización idempotente",
             Items = new List<RequerimientoDetalleUpdateDto>
             {
@@ -368,7 +333,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
     }
 
     // --- Tipos de proyección para Dapper (records inmutables) ---
-    private record ReqRow(string Numero, string Estado);
+    private record ReqRow(string Numero, string Estado, string? Descripcion, string? Observacion);
     private record ValidacionRow(int IdRequerimiento, int IdUsuario, string Resultado);
     private record DetalleRow(int IdMaterial, decimal Cantidad);
 }
