@@ -8,7 +8,7 @@ public class PresupuestosControllerTests : IntegrationTestBase
     public async Task GetByProyecto_CuandoExista_RetornaOk()
     {
         // Arrange
-        int idProyecto = 1;
+        int idProyecto = 10;
 
         // Act
         var response = await _client.GetAsync($"/api/contable/presupuesto/{idProyecto}");
