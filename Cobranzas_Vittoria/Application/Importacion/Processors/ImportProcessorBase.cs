@@ -44,14 +44,8 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// </typeparam>
 public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : class
 {
-    /// <summary>
-    /// Limite maximo de filas que puede contener un archivo de importacion.
-    /// Coincide con el diseno original: max 100 filas por archivo.
-    /// </summary>
+    /// <summary>Limite maximo de filas que puede contener un archivo de importacion.</summary>
     public const int MaxFilasPorArchivo = 100;
-
-    /// <summary>Prefijo usado en los codigos de error cuando el SP rechaza una fila.</summary>
-    public const string CodigoErrorSpPrefijo = "ERROR_VALIDACION";
 
     protected readonly FileParserResolver ParserResolver;
     protected readonly IImportRepository Repository;
@@ -98,8 +92,14 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     ///
     /// Todas estas excepciones son capturadas por la base y traducidas a
     /// <see cref="DetalleErrorFila"/> con el numero de fila correspondiente.
+    ///
+    /// Se declara <c>internal</c> (no <c>protected</c>) para que el proyecto de
+    /// tests pueda invocarlo directamente sin reflection ni <c>dynamic</c>. La
+    /// visibilidad externa de la API no cambia porque sigue siendo accesible
+    /// solo desde el mismo assembly o, via <c>InternalsVisibleTo</c>, desde
+    /// el assembly de tests.
     /// </summary>
-    protected abstract TDto MapearFila(SpreadsheetRow fila);
+    internal abstract TDto MapearFila(SpreadsheetRow fila);
 
     // ============================================================================
     // Template Method
@@ -159,7 +159,7 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
                 $"El archivo contiene {filas.Count} filas, excede el maximo permitido de {MaxFilasPorArchivo}.",
                 new[]
                 {
-                    new DetalleErrorFila(0, string.Empty, "DEMASIADAS_FILAS",
+                    new DetalleErrorFila(0, string.Empty, CodigosError.Estructura.DemasiadasFilas,
                         $"El maximo es {MaxFilasPorArchivo} filas por archivo.")
                 });
         }
@@ -178,7 +178,7 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
         if (faltantes.Length > 0)
         {
             throw new EstructuraInvalidaException(
-                "ENCABEZADOS_INCORRECTOS",
+                CodigosError.Estructura.EncabezadosIncorrectos,
                 $"Faltan las siguientes columnas requeridas: {string.Join(", ", faltantes)}. " +
                 $"Encabezados recibidos: {string.Join(", ", headersArchivo)}.");
         }
@@ -210,17 +210,17 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             catch (KeyNotFoundException ex)
             {
                 errores.Add(new DetalleErrorFila(
-                    fila.NumeroFila, string.Empty, "CAMPO_REQUERIDO", ex.Message));
+                    fila.NumeroFila, string.Empty, CodigosError.Fila.CampoRequerido, ex.Message));
             }
             catch (FormatException ex)
             {
                 errores.Add(new DetalleErrorFila(
-                    fila.NumeroFila, string.Empty, "FORMATO_INVALIDO", ex.Message));
+                    fila.NumeroFila, string.Empty, CodigosError.Fila.FormatoInvalido, ex.Message));
             }
             catch (InvalidCastException ex)
             {
                 errores.Add(new DetalleErrorFila(
-                    fila.NumeroFila, string.Empty, "FORMATO_INVALIDO", ex.Message));
+                    fila.NumeroFila, string.Empty, CodigosError.Fila.FormatoInvalido, ex.Message));
             }
         }
     }
@@ -305,16 +305,74 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     /// Extraido de <see cref="TraducirSqlException"/> para poder testearlo
     /// sin necesidad de instanciar un <see cref="SqlException"/> (que es sealed
     /// y no tiene constructor publico).
+    /// Se declara <c>internal</c> (no <c>public</c>) para que solo lo consuma
+    /// el processor y el proyecto de tests.
     /// </summary>
-    public static string MapearCodigoSql(int numero)
+    internal static string MapearCodigoSql(int numero)
     {
         return numero switch
         {
-            50001 => "CAMPO_OBLIGATORIO",
-            50002 => "VALOR_DUPLICADO_EN_ARCHIVO",
-            50003 => "VALOR_YA_EXISTE_EN_BD",
-            50004 => "FK_NO_EXISTE",
-            _ => $"{CodigoErrorSpPrefijo}_{numero}"
+            50001 => CodigosError.Sp.CampoObligatorio,
+            50002 => CodigosError.Sp.ValorDuplicadoEnArchivo,
+            50003 => CodigosError.Sp.ValorYaExisteEnBd,
+            50004 => CodigosError.Sp.FkNoExiste,
+            _ => $"{CodigosError.Sp.ErrorValidacionPrefijo}_{numero}"
         };
+    }
+
+    // ============================================================================
+    // Helpers de mapeo reutilizables para las subclases.
+    //
+    // Centralizan la logica repetida de "columna opcional con default" que
+    // antes duplicaban los 7 processors: tres lineas de ContieneColumna +
+    // TryGetString + TryGetT para parsear un valor que puede estar ausente.
+    // Lanzan <see cref="FormatException"/> (mapeado por la base a
+    // CodigosError.Fila.FormatoInvalido) si la columna existe pero el valor
+    // no es parseable.
+    // ============================================================================
+
+    /// <summary>
+    /// Lee una columna booleana opcional. Si la columna no existe o esta vacia,
+    /// devuelve <paramref name="defaultValue"/>. Si existe pero el valor no
+    /// es booleano valido, lanza <see cref="FormatException"/>.
+    /// </summary>
+    protected static bool LeerBoolConDefault(SpreadsheetRow fila, string columna, bool defaultValue)
+    {
+        if (!fila.ContieneColumna(columna) || !fila.TryGetString(columna, out var raw) || raw is null)
+            return defaultValue;
+
+        if (!fila.TryGetBool(columna, out var value))
+            throw new FormatException($"La columna '{columna}' contiene un valor booleano invalido: '{raw}'.");
+        return value;
+    }
+
+    /// <summary>
+    /// Lee una columna entera opcional. Si la columna no existe o esta vacia,
+    /// devuelve <c>null</c>. Si existe pero el valor no es entero valido,
+    /// lanza <see cref="FormatException"/>.
+    /// </summary>
+    protected static int? LeerIntNullable(SpreadsheetRow fila, string columna)
+    {
+        if (!fila.ContieneColumna(columna) || !fila.TryGetString(columna, out var raw) || raw is null)
+            return null;
+
+        if (!fila.TryGetInt32(columna, out var value))
+            throw new FormatException($"La columna '{columna}' no es un entero valido: '{raw}'.");
+        return value;
+    }
+
+    /// <summary>
+    /// Lee una columna decimal opcional. Si la columna no existe o esta vacia,
+    /// devuelve <paramref name="defaultValue"/>. Si existe pero el valor no
+    /// es decimal valido, lanza <see cref="FormatException"/>.
+    /// </summary>
+    protected static decimal LeerDecimalConDefault(SpreadsheetRow fila, string columna, decimal defaultValue)
+    {
+        if (!fila.ContieneColumna(columna) || !fila.TryGetString(columna, out var raw) || raw is null)
+            return defaultValue;
+
+        if (!fila.TryGetDecimal(columna, out var value))
+            throw new FormatException($"La columna '{columna}' no es un decimal valido: '{raw}'.");
+        return value;
     }
 }

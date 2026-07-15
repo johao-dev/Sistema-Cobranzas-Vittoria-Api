@@ -43,7 +43,7 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto>
         "IdEspecialidad", "Descripcion", "UnidadMedida"
     };
 
-    protected override MaterialImportDto MapearFila(SpreadsheetRow fila)
+    internal override MaterialImportDto MapearFila(SpreadsheetRow fila)
     {
         // IdEspecialidad: requerido y debe ser entero. Si la columna no existe
         // o esta vacia, GetInt32 lanza KeyNotFoundException.
@@ -63,31 +63,9 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto>
         // detecte NULL con NULLIF y autogenere.
         var codigo = fila.GetString("Codigo");
 
-        // StockMinimo: opcional, default 0. Si la columna existe, intentamos
-        // parsear; si no existe, default 0.
-        decimal stockMinimo = 0m;
-        if (fila.ContieneColumna("StockMinimo") && fila.TryGetString("StockMinimo", out var stockStr) && stockStr is not null)
-        {
-            if (!fila.TryGetDecimal("StockMinimo", out stockMinimo))
-                throw new FormatException($"La columna 'StockMinimo' no es un decimal valido: '{stockStr}'.");
-        }
-
-        // Activo: opcional, default true.
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
-
-        // IdUnidadMedida: opcional, entero o vacio.
-        int? idUnidadMedida = null;
-        if (fila.ContieneColumna("IdUnidadMedida") && fila.TryGetString("IdUnidadMedida", out var idUMStr) && idUMStr is not null)
-        {
-            if (!fila.TryGetInt32("IdUnidadMedida", out var idUM))
-                throw new FormatException($"La columna 'IdUnidadMedida' no es un entero valido: '{idUMStr}'.");
-            idUnidadMedida = idUM;
-        }
+        var stockMinimo = LeerDecimalConDefault(fila, "StockMinimo", defaultValue: 0m);
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
+        var idUnidadMedida = LeerIntNullable(fila, "IdUnidadMedida");
 
         // CodigoProveedor: opcional, string libre.
         var codigoProveedor = fila.GetString("CodigoProveedor");

@@ -29,18 +29,13 @@ public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoI
 
     protected override string[] EncabezadosRequeridos => new[] { "Nombre" };
 
-    protected override CategoriaGastoImportDto MapearFila(SpreadsheetRow fila)
+    internal override CategoriaGastoImportDto MapearFila(SpreadsheetRow fila)
     {
         var nombre = fila.GetString("Nombre");
         if (string.IsNullOrWhiteSpace(nombre))
             throw new KeyNotFoundException("La columna 'Nombre' es requerida y no puede estar vacia.");
 
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
         return new CategoriaGastoImportDto
         {

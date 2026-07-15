@@ -29,18 +29,13 @@ public class ProveedorTerrenoImportProcessor : ImportProcessorBase<ProveedorTerr
 
     protected override string[] EncabezadosRequeridos => new[] { "RazonSocial" };
 
-    protected override ProveedorTerrenoImportDto MapearFila(SpreadsheetRow fila)
+    internal override ProveedorTerrenoImportDto MapearFila(SpreadsheetRow fila)
     {
         var razonSocial = fila.GetString("RazonSocial");
         if (string.IsNullOrWhiteSpace(razonSocial))
             throw new KeyNotFoundException("La columna 'RazonSocial' es requerida y no puede estar vacia.");
 
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
         return new ProveedorTerrenoImportDto
         {

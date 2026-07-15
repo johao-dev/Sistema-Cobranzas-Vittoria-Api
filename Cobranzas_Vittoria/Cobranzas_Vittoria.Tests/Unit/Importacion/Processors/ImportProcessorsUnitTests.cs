@@ -42,7 +42,7 @@ public class ImportProcessorsUnitTests
         var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kilogramo", "Activo", "true");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.Codigo, Is.EqualTo("UM-001"));
@@ -56,7 +56,7 @@ public class ImportProcessorsUnitTests
         var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kg");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto.Activo, Is.True);
     }
@@ -67,7 +67,7 @@ public class ImportProcessorsUnitTests
         var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Codigo", "  ", "Nombre", "Kg");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Codigo"));
     }
 
@@ -77,7 +77,7 @@ public class ImportProcessorsUnitTests
         var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Nombre"));
     }
 
@@ -87,7 +87,7 @@ public class ImportProcessorsUnitTests
         var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kg", "Activo", "yesyes");
 
-        Assert.Throws<FormatException>(() => InvocarMapear(processor, fila));
+        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
     }
 
     // =========================================================================
@@ -103,7 +103,7 @@ public class ImportProcessorsUnitTests
             "Descripcion", "Trabajos de obra",
             "Activo", "true");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.Nombre, Is.EqualTo("ALBAÑILERIA"));
@@ -117,7 +117,7 @@ public class ImportProcessorsUnitTests
         var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Nombre", "ELECTRICIDAD");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto.Descripcion, Is.Null);
         Assert.That(dto.Activo, Is.True);
@@ -129,7 +129,7 @@ public class ImportProcessorsUnitTests
         var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Nombre", "   ");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Nombre"));
     }
 
@@ -151,7 +151,7 @@ public class ImportProcessorsUnitTests
             "IdUnidadMedida", "1",
             "CodigoProveedor", "PROV-1");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.IdEspecialidad, Is.EqualTo(1));
@@ -172,7 +172,7 @@ public class ImportProcessorsUnitTests
             "Descripcion", "Arena",
             "UnidadMedida", "M3");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto.Codigo, Is.Null);
         Assert.That(dto.StockMinimo, Is.EqualTo(0m));
@@ -188,7 +188,7 @@ public class ImportProcessorsUnitTests
             "Descripcion", "X",
             "UnidadMedida", "UND");
 
-        Assert.Throws<FormatException>(() => InvocarMapear(processor, fila));
+        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
     }
 
     [Test]
@@ -201,7 +201,7 @@ public class ImportProcessorsUnitTests
             "UnidadMedida", "UND",
             "StockMinimo", "no-es-numero");
 
-        Assert.Throws<FormatException>(() => InvocarMapear(processor, fila));
+        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
     }
 
     [Test]
@@ -213,7 +213,7 @@ public class ImportProcessorsUnitTests
             "Descripcion", "",
             "UnidadMedida", "UND");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Descripcion"));
     }
 
@@ -235,7 +235,7 @@ public class ImportProcessorsUnitTests
             "TrabajamosConProveedor", "SI",
             "Activo", "true");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.RazonSocial, Is.EqualTo("ACG EDIFICACIONES"));
@@ -252,7 +252,7 @@ public class ImportProcessorsUnitTests
         var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "RazonSocial", "X S.A.C", "Ruc", "20123456789");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto.Contacto, Is.Null);
         Assert.That(dto.Banco, Is.Null);
@@ -265,7 +265,7 @@ public class ImportProcessorsUnitTests
         var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "RazonSocial", "  ", "Ruc", "20123456789");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("RazonSocial"));
     }
 
@@ -275,7 +275,7 @@ public class ImportProcessorsUnitTests
         var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "RazonSocial", "X", "Ruc", "");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Ruc"));
     }
 
@@ -293,7 +293,7 @@ public class ImportProcessorsUnitTests
             "IdCategoriaGasto", "1",
             "Activo", "false");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.RazonSocial, Is.EqualTo("PROVEEDOR X"));
@@ -310,7 +310,7 @@ public class ImportProcessorsUnitTests
             "RazonSocial", "X",
             "IdCategoriaGasto", "no-es-numero");
 
-        Assert.Throws<FormatException>(() => InvocarMapear(processor, fila));
+        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
     }
 
     [Test]
@@ -319,7 +319,7 @@ public class ImportProcessorsUnitTests
         var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "RazonSocial", "");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("RazonSocial"));
     }
 
@@ -337,7 +337,7 @@ public class ImportProcessorsUnitTests
             "Telefono", "999111",
             "Activo", "true");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.RazonSocial, Is.EqualTo("TERRENO S.A"));
@@ -351,7 +351,7 @@ public class ImportProcessorsUnitTests
         var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "RazonSocial", "  ");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("RazonSocial"));
     }
 
@@ -365,7 +365,7 @@ public class ImportProcessorsUnitTests
         var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Nombre", "MARKETING Y VENTAS", "Activo", "true");
 
-        var dto = InvocarMapear(processor, fila);
+        var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
         Assert.That(dto.Nombre, Is.EqualTo("MARKETING Y VENTAS"));
@@ -378,7 +378,7 @@ public class ImportProcessorsUnitTests
         var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory);
         var fila = CrearFila(1, "Nombre", "");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => InvocarMapear(processor, fila))!;
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Nombre"));
     }
 
@@ -420,37 +420,6 @@ public class ImportProcessorsUnitTests
 
         return new SpreadsheetRow(numeroFila, celdas);
     }
-
-    /// <summary>
-    /// Invoca el metodo protegido <c>MapearFila</c> por reflection y devuelve
-    /// <c>dynamic</c> para evitar tener que especificar el tipo generico en
-    /// cada test. Si <c>MapearFila</c> lanza una excepcion, esta se desenvuelve
-    /// del <see cref="System.Reflection.TargetInvocationException"/> que agrega
-    /// <c>MethodInfo.Invoke</c> para preservar el tipo original.
-    /// </summary>
-    private static dynamic InvocarMapear(IImportProcessor processor, SpreadsheetRow fila)
-    {
-        var metodo = processor.GetType().GetMethod(
-            "MapearFila",
-            BindingFlagsInstance | BindingFlagsNonPublic)!;
-        try
-        {
-            return metodo.Invoke(processor, new object[] { fila })!;
-        }
-        catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
-        {
-            // Re-throw la excepcion interna con su stack trace original,
-            // tal como haria un await/try en codigo de produccion.
-            var exceptionProp = ex.InnerException.GetType().GetProperty("InnerException", BindingFlagsInstance | BindingFlagsNonPublic);
-            _ = exceptionProp; // (no usado; solo para documentar la intencion)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-            throw; // inalcanzable, el Throw() anterior ya es una excepcion
-        }
-    }
-
-    // Aliases locales para no chocar con System.Reflection.BindingFlags.
-    private const System.Reflection.BindingFlags BindingFlagsInstance = System.Reflection.BindingFlags.Instance;
-    private const System.Reflection.BindingFlags BindingFlagsNonPublic = System.Reflection.BindingFlags.NonPublic;
 
     private sealed class StubRepository : IImportRepository
     {

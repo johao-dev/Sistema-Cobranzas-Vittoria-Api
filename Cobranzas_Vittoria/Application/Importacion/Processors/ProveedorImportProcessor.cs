@@ -35,7 +35,7 @@ public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto>
 
     protected override string[] EncabezadosRequeridos => new[] { "RazonSocial", "Ruc" };
 
-    protected override ProveedorImportDto MapearFila(SpreadsheetRow fila)
+    internal override ProveedorImportDto MapearFila(SpreadsheetRow fila)
     {
         var razonSocial = fila.GetString("RazonSocial");
         if (string.IsNullOrWhiteSpace(razonSocial))
@@ -45,12 +45,7 @@ public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto>
         if (string.IsNullOrWhiteSpace(ruc))
             throw new KeyNotFoundException("La columna 'Ruc' es requerida y no puede estar vacia.");
 
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
         return new ProveedorImportDto
         {

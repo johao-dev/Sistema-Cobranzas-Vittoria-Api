@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Importacion;
 using Cobranzas_Vittoria.Application.Importacion.Dtos;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
@@ -52,7 +53,7 @@ internal sealed class TestImportProcessor : ImportProcessorBase<UnidadMedidaImpo
     /// lanza DatosInvalidosException. Si no, genera un DTO con Codigo = fila 1,
     /// Nombre = celda "Nombre", Activo = true.
     /// </summary>
-    protected override UnidadMedidaImportDto MapearFila(SpreadsheetRow fila)
+    internal override UnidadMedidaImportDto MapearFila(SpreadsheetRow fila)
     {
         if (LanzarKeyNotFoundEnFila == fila.NumeroFila)
             throw new KeyNotFoundException($"Campo requerido ausente en fila {fila.NumeroFila}.");
@@ -61,7 +62,7 @@ internal sealed class TestImportProcessor : ImportProcessorBase<UnidadMedidaImpo
         if (LanzarDatosInvalidosEnFila == fila.NumeroFila)
             throw new DatosInvalidosException("Regla de negocio violada", new[]
             {
-                new DetalleErrorFila(fila.NumeroFila, "Codigo", "REGLA_NEGOCIO", "Codigo debe empezar con PREFIX-")
+                new DetalleErrorFila(fila.NumeroFila, "Codigo", CodigosError.Fila.ReglaNegocio, "Codigo debe empezar con PREFIX-")
             });
 
         var nombre = fila.GetString("Nombre") ?? string.Empty;

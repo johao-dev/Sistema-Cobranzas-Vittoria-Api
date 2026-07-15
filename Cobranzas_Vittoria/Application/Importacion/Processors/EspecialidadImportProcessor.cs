@@ -29,7 +29,7 @@ public class EspecialidadImportProcessor : ImportProcessorBase<EspecialidadImpor
 
     protected override string[] EncabezadosRequeridos => new[] { "Nombre" };
 
-    protected override EspecialidadImportDto MapearFila(SpreadsheetRow fila)
+    internal override EspecialidadImportDto MapearFila(SpreadsheetRow fila)
     {
         var nombre = fila.GetString("Nombre");
         if (string.IsNullOrWhiteSpace(nombre))
@@ -37,12 +37,7 @@ public class EspecialidadImportProcessor : ImportProcessorBase<EspecialidadImpor
 
         var descripcion = fila.GetString("Descripcion"); // opcional, null si vacia o no existe
 
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
         return new EspecialidadImportDto
         {

@@ -37,7 +37,7 @@ public class UnidadMedidaImportProcessor : ImportProcessorBase<UnidadMedidaImpor
 
     protected override string[] EncabezadosRequeridos => new[] { "Codigo", "Nombre" };
 
-    protected override UnidadMedidaImportDto MapearFila(SpreadsheetRow fila)
+    internal override UnidadMedidaImportDto MapearFila(SpreadsheetRow fila)
     {
         // Codigo: trim y validacion explicita. Si llega vacio, lanzamos para
         // que la base lo reporte como CAMPO_REQUERIDO con la fila correcta.
@@ -50,16 +50,7 @@ public class UnidadMedidaImportProcessor : ImportProcessorBase<UnidadMedidaImpor
         if (string.IsNullOrWhiteSpace(nombre))
             throw new KeyNotFoundException("La columna 'Nombre' es requerida y no puede estar vacia.");
 
-        // Activo: opcional. Si no viene o viene vacio, default true.
-        // TryGetBool devuelve false si la columna no existe o el valor es vacio,
-        // pero NO sabemos distinguir "no existe" de "valor invalido" sin el bool out.
-        // Para mantener simple: si la columna existe con valor, lo parseamos; si no, true.
-        bool activo = true;
-        if (fila.ContieneColumna("Activo") && fila.TryGetString("Activo", out var activoStr) && activoStr is not null)
-        {
-            if (!fila.TryGetBool("Activo", out activo))
-                throw new FormatException($"La columna 'Activo' contiene un valor booleano invalido: '{activoStr}'.");
-        }
+        var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
         return new UnidadMedidaImportDto
         {
