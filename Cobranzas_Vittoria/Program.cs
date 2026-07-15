@@ -1,5 +1,11 @@
 using System.Reflection;
+using Cobranzas_Vittoria.Application.Importacion.Parsers;
+using Cobranzas_Vittoria.Application.Importacion.Persistence;
+using Cobranzas_Vittoria.Application.Importacion.Processors;
+using Cobranzas_Vittoria.Application.Importacion.Services;
+using Cobranzas_Vittoria.Application.Importacion.Validators;
 using Cobranzas_Vittoria.Data;
+using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
@@ -65,6 +71,37 @@ builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoServi
 builder.Services.AddScoped<IProveedorTerrenoService, ProveedorTerrenoService>();
 builder.Services.AddScoped<IGastoProyectoService, GastoProyectoService>();
 builder.Services.AddScoped<ISunatService, SunatService>();
+
+// ============================================================================
+// Feature: Importacion masiva
+// ============================================================================
+// El FileParserResolver y el ImportRepository se registran como scoped porque
+// resuelven dependencias por request. El FileValidator y los parsers concretos
+// son stateless y se pueden registrar como singleton (se instancian una sola vez).
+//
+// El ImportService se inyecta con IEnumerable<IImportProcessor> y arma un
+// diccionario modulo -> processor en su constructor. Por eso es importante
+// registrar TODOS los processors concretos de los 7 modulos soportados
+// (UnidadMedida, Especialidad, Material, Proveedor, ProveedorGastoAdministrativo,
+// ProveedorTerreno, CategoriaGasto).
+// ============================================================================
+builder.Services.AddSingleton<IFileParser, CsvFileParser>();
+builder.Services.AddSingleton<IFileParser, ExcelFileParser>();
+builder.Services.AddSingleton<FileParserResolver>();
+builder.Services.AddSingleton<FileValidator>();
+builder.Services.AddScoped<IImportRepository, ImportRepository>();
+
+builder.Services.AddScoped<UnidadMedidaImportProcessor>();
+builder.Services.AddScoped<EspecialidadImportProcessor>();
+builder.Services.AddScoped<MaterialImportProcessor>();
+builder.Services.AddScoped<ProveedorImportProcessor>();
+builder.Services.AddScoped<ProveedorGastoAdministrativoImportProcessor>();
+builder.Services.AddScoped<ProveedorTerrenoImportProcessor>();
+builder.Services.AddScoped<CategoriaGastoImportProcessor>();
+
+// IImportProcessor se resuelve como la union de todos los processors concretos
+// (mecanismo de "tagged convention" via IEnumerable<T> en .NET 8).
+builder.Services.AddScoped<IImportService, ImportService>();
 
 var connectionString = builder.Configuration.GetConnectionString("Default");
 
