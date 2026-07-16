@@ -91,16 +91,20 @@ builder.Services.AddSingleton<FileParserResolver>();
 builder.Services.AddSingleton<FileValidator>();
 builder.Services.AddScoped<IImportRepository, ImportRepository>();
 
-builder.Services.AddScoped<UnidadMedidaImportProcessor>();
-builder.Services.AddScoped<EspecialidadImportProcessor>();
-builder.Services.AddScoped<MaterialImportProcessor>();
-builder.Services.AddScoped<ProveedorImportProcessor>();
-builder.Services.AddScoped<ProveedorGastoAdministrativoImportProcessor>();
-builder.Services.AddScoped<ProveedorTerrenoImportProcessor>();
-builder.Services.AddScoped<CategoriaGastoImportProcessor>();
+// Cada processor concreto se registra como IImportProcessor (no como su tipo
+// concreto) para que IEnumerable<IImportProcessor> se popule con los 7
+// implementaciones. Si registramos solo el tipo concreto
+// (AddScoped<UnidadMedidaImportProcessor>()), el IEnumerable queda vacio.
+builder.Services.AddScoped<IImportProcessor, UnidadMedidaImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, EspecialidadImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, MaterialImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, ProveedorImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, ProveedorGastoAdministrativoImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, ProveedorTerrenoImportProcessor>();
+builder.Services.AddScoped<IImportProcessor, CategoriaGastoImportProcessor>();
 
-// IImportProcessor se resuelve como la union de todos los processors concretos
-// (mecanismo de "tagged convention" via IEnumerable<T> en .NET 8).
+// IImportService recibe IEnumerable<IImportProcessor> y arma el diccionario
+// modulo -> processor en su constructor.
 builder.Services.AddScoped<IImportService, ImportService>();
 
 var connectionString = builder.Configuration.GetConnectionString("Default");

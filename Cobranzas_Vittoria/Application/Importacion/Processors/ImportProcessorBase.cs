@@ -238,6 +238,12 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
         try
         {
             connection = ConnectionFactory.CreateConnection();
+        // SqlConnectionFactory abre la conexion sincronamente en CreateConnection().
+        // Solo abrimos via OpenAsync si llegamos a recibir una conexion cerrada
+        // (p.ej. en tests con un fake factory). Esto evita
+        // InvalidOperationException("Connection already open").
+        if (connection.State != ConnectionState.Open)
+        {
             if (connection is SqlConnection sqlConn)
             {
                 await sqlConn.OpenAsync(ct);
@@ -246,6 +252,7 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             {
                 connection.Open();
             }
+        }
 
             transaction = connection.BeginTransaction();
 
