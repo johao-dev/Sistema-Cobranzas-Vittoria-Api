@@ -5,6 +5,7 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 
@@ -50,15 +51,18 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     protected readonly FileParserResolver ParserResolver;
     protected readonly IImportRepository Repository;
     protected readonly IDbConnectionFactory ConnectionFactory;
+    protected readonly ILogger Logger;
 
     protected ImportProcessorBase(
         FileParserResolver parserResolver,
         IImportRepository repository,
-        IDbConnectionFactory connectionFactory)
+        IDbConnectionFactory connectionFactory,
+        ILogger logger)
     {
         ParserResolver = parserResolver ?? throw new ArgumentNullException(nameof(parserResolver));
         Repository = repository ?? throw new ArgumentNullException(nameof(repository));
         ConnectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     // ============================================================================
@@ -110,12 +114,23 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
         ArgumentNullException.ThrowIfNull(file);
         ArgumentException.ThrowIfNullOrEmpty(usuario);
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        Logger.LogInformation(
+            "[{Modulo}] Iniciando importacion. Archivo={FileName} Tamano={Tamano}B Usuario={Usuario}",
+            Modulo, file.FileName, file.Length, usuario);
+
         // 1-2. Resolucion de parser + parseo
         var parser = ParserResolver.ObtenerParser(file);
         var filas = parser.Parse(file);
+        Logger.LogDebug(
+            "[{Modulo}] Parser={Formato} produjo {CantidadFilas} filas",
+            Modulo, parser.Formato, filas.Count);
 
         // 3. Validacion de estructura
         ValidarEstructura(filas);
+        Logger.LogDebug(
+            "[{Modulo}] Estructura validada: {CantidadFilas} filas, encabezados OK",
+            Modulo, filas.Count);
 
         // 4-5. Mapeo + validacion de filas
         var dtos = new List<TDto>(filas.Count);
@@ -124,13 +139,32 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
 
         if (errores.Count > 0)
         {
+            // Warning: el archivo se rechazo por validacion. Logueamos los codigos
+            // de error (metadata, NO el contenido de las filas) para detectar
+            // patrones en produccion (ej: muchos CAMPO_REQUERIDO en codigo).
+            var codigosUnicos = errores
+                .GroupBy(e => e.CodigoError)
+                .Select(g => $"{g.Key}={g.Count()}")
+                .OrderBy(s => s);
+            Logger.LogWarning(
+                "[{Modulo}] Rechazado por validacion de filas. TotalErrores={Total} Codigos=[{Codigos}]",
+                Modulo, errores.Count, string.Join(", ", codigosUnicos));
             throw new DatosInvalidosException(
                 $"El archivo contiene {errores.Count} fila(s) con errores. No se realizo ninguna insercion.",
                 errores);
         }
 
+        Logger.LogDebug(
+            "[{Modulo}] Mapeo completado: {CantidadDtos} DTOs sin errores",
+            Modulo, dtos.Count);
+
         // 6-7. Persistencia transaccional
         var filasInsertadas = await EjecutarCargaAsync(dtos, usuario, ct);
+
+        sw.Stop();
+        Logger.LogInformation(
+            "[{Modulo}] Importacion exitosa. FilasInsertadas={Filas} Duracion={Duracion}ms",
+            Modulo, filasInsertadas, sw.ElapsedMilliseconds);
 
         return new ResultadoImportacion(Modulo, parser.Formato, filasInsertadas);
     }
@@ -255,24 +289,52 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
         }
 
             transaction = connection.BeginTransaction();
+            Logger.LogDebug(
+                "[{Modulo}] Conexion abierta y transaccion iniciada. SP={Sp} TVP={Tvp} Filas={Filas}",
+                Modulo, SpName, TvpTypeName, dtos.Count);
 
             try
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var count = await Repository.ImportAsync(
                     SpName, TvpTypeName, dtos, connection, transaction,
                     new { Usuario = usuario }, ct);
+                sw.Stop();
+                Logger.LogDebug(
+                    "[{Modulo}] SP ejecutado en {Duracion}ms. FilasAfectadas={Filas}",
+                    Modulo, sw.ElapsedMilliseconds, count);
 
                 transaction.Commit();
+                Logger.LogDebug("[{Modulo}] Transaccion confirmada (commit).", Modulo);
                 return count;
             }
             catch (SqlException ex) when (ex.Number is >= 50001 and <= 50099)
             {
                 transaction.Rollback();
+                // Warning: el SP rechazo la carga por validacion de negocio.
+                // Logueamos numero, codigo mapeado y mensaje. No se incluye
+                // contenido de filas para evitar PII en logs.
+                Logger.LogWarning(
+                    "[{Modulo}] SP rechazo la carga (SqlException {Numero} -> {CodigoError}): {Mensaje}",
+                    Modulo, ex.Number, MapearCodigoSql(ex.Number), ex.Message);
                 throw TraducirSqlException(ex);
             }
-            catch
+            catch (SqlException ex)
             {
                 transaction.Rollback();
+                // Error: fallo de SQL no esperado (timeout, conexion, etc).
+                // Distinto del catch anterior: este NO es una validacion de negocio.
+                Logger.LogError(ex,
+                    "[{Modulo}] Error de SQL no esperado (Numero={Numero}). Transaccion revertida.",
+                    Modulo, ex.Number);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                transaction.Rollback();
+                Logger.LogError(ex,
+                    "[{Modulo}] Error inesperado durante la carga. Transaccion revertida. Tipo={TipoError}",
+                    Modulo, ex.GetType().Name);
                 throw;
             }
         }

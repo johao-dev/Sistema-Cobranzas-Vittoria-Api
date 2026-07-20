@@ -7,6 +7,7 @@ using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
 using Cobranzas_Vittoria.Tests.Unit.Importacion.Processors.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Processors;
 
@@ -39,7 +40,7 @@ public class ImportProcessorBaseUnitTests
             new CsvFileParser(),
             new ExcelFileParser()
         });
-        _processor = new TestImportProcessor(_parserResolver, _repository, _connectionFactory);
+        _processor = new TestImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger.Instance);
     }
 
     [SetUp]

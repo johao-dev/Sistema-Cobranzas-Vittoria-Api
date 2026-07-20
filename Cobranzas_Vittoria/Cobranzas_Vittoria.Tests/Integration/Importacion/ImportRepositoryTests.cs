@@ -4,6 +4,7 @@ using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 using Cobranzas_Vittoria.Tests.Setup;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Importacion;
 
@@ -30,7 +31,7 @@ public class ImportRepositoryTests : IntegrationTestBase
     private const string SpName = "maestra.usp_UnidadMedida_CargaMasiva";
     private const string TvpTypeName = "maestra.TVP_UnidadMedida";
 
-    private readonly IImportRepository _repo = new ImportRepository();
+    private readonly IImportRepository _repo = new ImportRepository(NullLogger<ImportRepository>.Instance);
 
     [Test]
     public async Task Import_5FilasValidas_Inserta5Filas()

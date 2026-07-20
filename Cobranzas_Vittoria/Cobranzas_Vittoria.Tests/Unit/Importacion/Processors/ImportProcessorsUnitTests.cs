@@ -4,6 +4,7 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Data;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Processors;
@@ -39,7 +40,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void UnidadMedida_FilaValida_DevuelveDtoConDatosCorrectos()
     {
-        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kilogramo", "Activo", "true");
 
         var dto = processor.MapearFila(fila);
@@ -53,7 +54,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void UnidadMedida_SinColumnaActivo_DefaultTrue()
     {
-        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kg");
 
         var dto = processor.MapearFila(fila);
@@ -64,7 +65,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void UnidadMedida_CodigoVacio_LanzaKeyNotFound()
     {
-        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance);
         var fila = CrearFila(1, "Codigo", "  ", "Nombre", "Kg");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -74,7 +75,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void UnidadMedida_NombreVacio_LanzaKeyNotFound()
     {
-        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -84,7 +85,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void UnidadMedida_ActivoInvalido_LanzaFormatException()
     {
-        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance);
         var fila = CrearFila(1, "Codigo", "UM-001", "Nombre", "Kg", "Activo", "yesyes");
 
         Assert.Throws<FormatException>(() => processor.MapearFila(fila));
@@ -97,7 +98,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Especialidad_FilaValida_DevuelveDtoConDatosCorrectos()
     {
-        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance);
         var fila = CrearFila(1,
             "Nombre", "ALBAÑILERIA",
             "Descripcion", "Trabajos de obra",
@@ -114,7 +115,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Especialidad_DescripcionVacia_EsNull()
     {
-        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance);
         var fila = CrearFila(1, "Nombre", "ELECTRICIDAD");
 
         var dto = processor.MapearFila(fila);
@@ -126,7 +127,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Especialidad_NombreVacio_LanzaKeyNotFound()
     {
-        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance);
         var fila = CrearFila(1, "Nombre", "   ");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -140,7 +141,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Material_FilaValida_ConCodigo_DevuelveDtoCompleto()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
         var fila = CrearFila(1,
             "IdEspecialidad", "1",
             "Codigo", "MAT-9999",
@@ -166,7 +167,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Material_FilaSinCodigo_CodigoEsNull_ParaAutogenerarEnSp()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
         var fila = CrearFila(1,
             "IdEspecialidad", "1",
             "Descripcion", "Arena",
@@ -182,7 +183,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Material_IdEspecialidadNoEntero_LanzaFormatException()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
         var fila = CrearFila(1,
             "IdEspecialidad", "abc",
             "Descripcion", "X",
@@ -194,7 +195,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Material_StockMinimoInvalido_LanzaFormatException()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
         var fila = CrearFila(1,
             "IdEspecialidad", "1",
             "Descripcion", "X",
@@ -207,7 +208,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Material_DescripcionVacia_LanzaKeyNotFound()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
         var fila = CrearFila(1,
             "IdEspecialidad", "1",
             "Descripcion", "",
@@ -224,7 +225,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Proveedor_FilaValida_DevuelveDtoCompleto()
     {
-        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance);
         var fila = CrearFila(1,
             "RazonSocial", "ACG EDIFICACIONES",
             "Ruc", "20601997291",
@@ -249,7 +250,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Proveedor_SoloRequeridos_DevuelveDtoConOpcionalesEnNull()
     {
-        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "X S.A.C", "Ruc", "20123456789");
 
         var dto = processor.MapearFila(fila);
@@ -262,7 +263,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Proveedor_RazonSocialVacia_LanzaKeyNotFound()
     {
-        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "  ", "Ruc", "20123456789");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -272,7 +273,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void Proveedor_RucVacio_LanzaKeyNotFound()
     {
-        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "X", "Ruc", "");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -286,7 +287,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void ProveedorGasto_FilaValidaConIdCategoria_DevuelveDtoCompleto()
     {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
         var fila = CrearFila(1,
             "RazonSocial", "PROVEEDOR X",
             "Ruc", "20123456789",
@@ -305,7 +306,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void ProveedorGasto_IdCategoriaInvalido_LanzaFormatException()
     {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
         var fila = CrearFila(1,
             "RazonSocial", "X",
             "IdCategoriaGasto", "no-es-numero");
@@ -316,7 +317,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void ProveedorGasto_RazonSocialVacia_LanzaKeyNotFound()
     {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -330,7 +331,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void ProveedorTerreno_FilaValida_DevuelveDtoCompleto()
     {
-        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance);
         var fila = CrearFila(1,
             "RazonSocial", "TERRENO S.A",
             "Ruc", "20123456789",
@@ -348,7 +349,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void ProveedorTerreno_RazonSocialVacia_LanzaKeyNotFound()
     {
-        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "  ");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -362,7 +363,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void CategoriaGasto_FilaValida_DevuelveDtoCompleto()
     {
-        var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance);
         var fila = CrearFila(1, "Nombre", "MARKETING Y VENTAS", "Activo", "true");
 
         var dto = processor.MapearFila(fila);
@@ -375,7 +376,7 @@ public class ImportProcessorsUnitTests
     [Test]
     public void CategoriaGasto_NombreVacio_LanzaKeyNotFound()
     {
-        var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory);
+        var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance);
         var fila = CrearFila(1, "Nombre", "");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
@@ -391,13 +392,13 @@ public class ImportProcessorsUnitTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("unidad-medida"));
-            Assert.That(new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("especialidad"));
-            Assert.That(new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("material"));
-            Assert.That(new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("proveedor"));
-            Assert.That(new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("proveedor-gasto"));
-            Assert.That(new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("proveedor-terreno"));
-            Assert.That(new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory).Modulo, Is.EqualTo("categoria-gasto"));
+            Assert.That(new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance).Modulo, Is.EqualTo("unidad-medida"));
+            Assert.That(new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance).Modulo, Is.EqualTo("especialidad"));
+            Assert.That(new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance).Modulo, Is.EqualTo("material"));
+            Assert.That(new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor"));
+            Assert.That(new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-gasto"));
+            Assert.That(new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-terreno"));
+            Assert.That(new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance).Modulo, Is.EqualTo("categoria-gasto"));
         });
     }
 

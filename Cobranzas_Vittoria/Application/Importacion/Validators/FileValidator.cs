@@ -1,5 +1,6 @@
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Application.Importacion.Validators;
 
@@ -35,6 +36,13 @@ public class FileValidator
         [".xls"]  = new[] { "application/vnd.ms-excel", "application/msexcel", "application/octet-stream" },
     };
 
+    private readonly ILogger<FileValidator> _logger;
+
+    public FileValidator(ILogger<FileValidator> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
     /// <summary>
     /// Valida el archivo. Lanza <see cref="ArchivoInvalidoException"/> con el codigo
     /// correspondiente si alguna regla falla.
@@ -42,36 +50,45 @@ public class FileValidator
     public void Validar(IFormFile? file)
     {
         if (file == null || file.Length == 0)
+        {
+            _logger.LogWarning("Archivo rechazado: ARCHIVO_VACIO (no se recibio archivo o esta vacio).");
             throw new ArchivoInvalidoException("ARCHIVO_VACIO", "No se recibio ningun archivo o el archivo esta vacio.");
+        }
 
-        ValidarTamanio(file.Length);
+        ValidarTamanio(file.Length, file.FileName);
         ValidarExtension(file.FileName);
         ValidarMime(file.FileName, file.ContentType);
     }
 
-    private static void ValidarTamanio(long bytes)
+    private void ValidarTamanio(long bytes, string fileName)
     {
         if (bytes > MaximoTamanioBytes)
         {
             var mb = bytes / 1024d / 1024d;
+            _logger.LogWarning(
+                "Archivo rechazado: TAMANIO_EXCEDIDO. Archivo={FileName} Tamano={Tamano:F2}MB Maximo={Maximo}MB",
+                fileName, mb, MaximoTamanioBytes / 1024d / 1024d);
             throw new ArchivoInvalidoException(
                 "TAMANIO_EXCEDIDO",
                 $"El archivo supera el tamano maximo permitido de 10 MB. Tamano actual: {mb:F2} MB.");
         }
     }
 
-    private static void ValidarExtension(string fileName)
+    private void ValidarExtension(string fileName)
     {
         var ext = ObtenerExtension(fileName);
         if (!ExtensionesPermitidas.Contains(ext))
         {
+            _logger.LogWarning(
+                "Archivo rechazado: EXTENSION_INVALIDA. Archivo={FileName} Extension='{Extension}' Permitidas={Permitidas}",
+                fileName, ext, string.Join(",", ExtensionesPermitidas));
             throw new ArchivoInvalidoException(
                 "EXTENSION_INVALIDA",
                 $"La extension '{ext}' no es valida. Solo se permiten: .csv, .xlsx, .xls.");
         }
     }
 
-    private static void ValidarMime(string fileName, string? contentType)
+    private void ValidarMime(string fileName, string? contentType)
     {
         var ext = ObtenerExtension(fileName);
         // application/octet-stream es un MIME "generico" que algunos navegadores
@@ -91,6 +108,9 @@ public class FileValidator
                 return;
         }
 
+        _logger.LogWarning(
+            "Archivo rechazado: MIME_INVALIDO. Archivo={FileName} Declarado='{Mime}' Extension='{Extension}'",
+            fileName, contentType, ext);
         throw new ArchivoInvalidoException(
             "MIME_INVALIDO",
             $"El MIME declarado '{contentType}' no coincide con la extension '{ext}' del archivo.");

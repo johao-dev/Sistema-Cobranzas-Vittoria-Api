@@ -5,6 +5,7 @@ using Cobranzas_Vittoria.Controllers;
 using Cobranzas_Vittoria.Tests.Unit.Importacion.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Controllers;
 
@@ -33,7 +34,7 @@ public class ImportControllerUnitTests
     public ImportControllerUnitTests()
     {
         _service = new RecordingImportService();
-        _controller = new ImportController(_service);
+        _controller = new ImportController(_service, NullLogger<ImportController>.Instance);
     }
 
     // =========================================================================
@@ -151,7 +152,7 @@ public class ImportControllerUnitTests
     [Test]
     public void Constructor_ServiceNulo_LanzaArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => new ImportController(null!));
+        Assert.Throws<ArgumentNullException>(() => new ImportController(null!, NullLogger<ImportController>.Instance));
     }
 
     // =========================================================================

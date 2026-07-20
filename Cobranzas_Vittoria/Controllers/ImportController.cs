@@ -43,10 +43,12 @@ public class ImportController : ControllerBase
     private const long MaxRequestSize = 11_000_000;
 
     private readonly IImportService _service;
+    private readonly ILogger<ImportController> _logger;
 
-    public ImportController(IImportService service)
+    public ImportController(IImportService service, ILogger<ImportController> logger)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -82,7 +84,48 @@ public class ImportController : ControllerBase
         // valida el archivo (extension/MIME/tamano) y resuelve el processor por modulo.
         // Cualquier excepcion tipada se propaga al ApiExceptionMiddleware que la mapea
         // al HTTP code correspondiente.
-        var resultado = await _service.ImportarAsync(modulo, archivo, usuario, ct);
-        return Ok(resultado);
+
+        var fileName = archivo?.FileName ?? "(null)";
+        var fileSize = archivo?.Length ?? 0;
+
+        // Information: trazabilidad del request. Se suprime en produccion via
+        // appsettings.json (LogLevel: Warning para Cobranzas_Vittoria.Controllers.Import).
+        _logger.LogInformation(
+            "POST /api/import/{Modulo} recibido. Archivo={FileName} Tamano={FileSize}B Usuario={Usuario}",
+            modulo, fileName, fileSize, usuario);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var resultado = await _service.ImportarAsync(modulo, archivo, usuario, ct);
+            sw.Stop();
+
+            _logger.LogInformation(
+                "POST /api/import/{Modulo} OK. Formato={Formato} FilasInsertadas={Filas} Duracion={Duracion}ms Usuario={Usuario}",
+                modulo, resultado.Formato, resultado.FilasInsertadas, sw.ElapsedMilliseconds, usuario);
+
+            return Ok(resultado);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            sw.Stop();
+            // El cliente se desconecto. Es un evento esperado, no un error,
+            // pero conviene dejarlo en Warning para detectarlo en production.
+            _logger.LogWarning(
+                "POST /api/import/{Modulo} CANCELADO por el cliente despues de {Duracion}ms Usuario={Usuario}",
+                modulo, sw.ElapsedMilliseconds, usuario);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            // Log de Error con contexto. La inner exception completa la capturara
+            // el ApiExceptionMiddleware (que tambien loguea) pero aqui dejamos
+            // el rastro del controller para facilitar la busqueda por modulo.
+            _logger.LogError(ex,
+                "POST /api/import/{Modulo} FALLO despues de {Duracion}ms Usuario={Usuario} TipoError={TipoError}",
+                modulo, sw.ElapsedMilliseconds, usuario, ex.GetType().Name);
+            throw;
+        }
     }
 }

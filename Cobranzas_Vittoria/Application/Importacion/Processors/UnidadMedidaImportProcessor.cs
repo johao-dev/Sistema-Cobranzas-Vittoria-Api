@@ -3,6 +3,7 @@ using Cobranzas_Vittoria.Application.Importacion.Parsers;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 
@@ -27,8 +28,9 @@ public class UnidadMedidaImportProcessor : ImportProcessorBase<UnidadMedidaImpor
     public UnidadMedidaImportProcessor(
         FileParserResolver parserResolver,
         IImportRepository repository,
-        IDbConnectionFactory connectionFactory)
-        : base(parserResolver, repository, connectionFactory) { }
+        IDbConnectionFactory connectionFactory,
+        ILogger<UnidadMedidaImportProcessor> logger)
+        : base(parserResolver, repository, connectionFactory, logger) { }
 
     public override string Modulo => ModuloNombre;
 

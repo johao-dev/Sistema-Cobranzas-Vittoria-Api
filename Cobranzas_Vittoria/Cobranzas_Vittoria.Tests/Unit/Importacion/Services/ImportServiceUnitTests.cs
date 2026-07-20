@@ -5,6 +5,7 @@ using Cobranzas_Vittoria.Application.Importacion.Services;
 using Cobranzas_Vittoria.Application.Importacion.Validators;
 using Cobranzas_Vittoria.Tests.Unit.Importacion.Common;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Services;
 
@@ -33,7 +34,8 @@ public class ImportServiceUnitTests
         _materialProcessor = new RecordingProcessor("material");
         _service = new ImportService(
             new IImportProcessor[] { _unidadMedidaProcessor, _materialProcessor },
-            new FileValidator());
+            new FileValidator(NullLogger<FileValidator>.Instance),
+            NullLogger<ImportService>.Instance);
     }
 
     [SetUp]
@@ -188,7 +190,7 @@ public class ImportServiceUnitTests
     [Test]
     public void Constructor_SinProcessors_CualquierModuloLanzaModuloNoSoportado()
     {
-        var service = new ImportService(Array.Empty<IImportProcessor>(), new FileValidator());
+        var service = new ImportService(Array.Empty<IImportProcessor>(), new FileValidator(NullLogger<FileValidator>.Instance), NullLogger<ImportService>.Instance);
         var archivo = TestFormFiles.FromText("Codigo,Nombre\n", "test.csv");
 
         var ex = Assert.ThrowsAsync<ModuloNoSoportadoException>(async () =>
@@ -200,14 +202,14 @@ public class ImportServiceUnitTests
     [Test]
     public void Constructor_ProcessorsNulo_LanzaArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => new ImportService(null!, new FileValidator()));
+        Assert.Throws<ArgumentNullException>(() => new ImportService(null!, new FileValidator(NullLogger<FileValidator>.Instance), NullLogger<ImportService>.Instance));
     }
 
     [Test]
     public void Constructor_FileValidatorNulo_LanzaArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new ImportService(new IImportProcessor[] { _unidadMedidaProcessor }, null!));
+            new ImportService(new IImportProcessor[] { _unidadMedidaProcessor }, null!, NullLogger<ImportService>.Instance));
     }
 
     // =========================================================================

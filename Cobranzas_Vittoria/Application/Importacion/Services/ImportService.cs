@@ -32,15 +32,28 @@ public sealed class ImportService : IImportService
 {
     private readonly IReadOnlyDictionary<string, IImportProcessor> _processorsByModulo;
     private readonly FileValidator _fileValidator;
+    private readonly ILogger<ImportService> _logger;
 
-    public ImportService(IEnumerable<IImportProcessor> processors, FileValidator fileValidator)
+    public ImportService(
+        IEnumerable<IImportProcessor> processors,
+        FileValidator fileValidator,
+        ILogger<ImportService> logger)
     {
         ArgumentNullException.ThrowIfNull(processors);
         ArgumentNullException.ThrowIfNull(fileValidator);
+        ArgumentNullException.ThrowIfNull(logger);
 
         _fileValidator = fileValidator;
+        _logger = logger;
         _processorsByModulo = processors
             .ToDictionary(p => p.Modulo, StringComparer.OrdinalIgnoreCase);
+
+        // Information: el catalogo de modulos se arma una sola vez por request-scoped
+        // service. Loguearlo al construir el diccionario es ruidoso; lo dejamos en
+        // Debug para que solo aparezca con log level Verbose o superior.
+        _logger.LogDebug(
+            "ImportService inicializado con {Cantidad} processors: {Modulos}",
+            _processorsByModulo.Count, string.Join(", ", _processorsByModulo.Keys));
     }
 
     public async Task<ResultadoImportacion> ImportarAsync(
@@ -55,16 +68,31 @@ public sealed class ImportService : IImportService
 
         // 1. Validacion del archivo ANTES de resolver el processor: si el archivo
         //    es invalido, no tiene sentido gastar el lookup.
+        // _fileValidator.Validar(archivo) lanza ArchivoInvalidoException con codigo
+        // (ARCHIVO_VACIO, TAMANIO_EXCEDIDO, EXTENSION_INVALIDA, MIME_INVALIDO);
+        // el codigo lo captura el ApiExceptionMiddleware y lo mapea al HTTP code.
         _fileValidator.Validar(archivo);
+        _logger.LogDebug(
+            "Archivo {FileName} ({Tamano}B) supero la validacion estructural",
+            archivo.FileName, archivo.Length);
 
         // 2. Resolucion del processor por modulo.
         if (!_processorsByModulo.TryGetValue(modulo, out var processor))
         {
             var modulosDisponibles = string.Join(", ", _processorsByModulo.Keys.OrderBy(k => k));
+            // Warning: el cliente pidio un modulo que no existe. Vale la pena
+            // registrarlo en produccion para detectar typos o intentos maliciosos.
+            _logger.LogWarning(
+                "Modulo '{Modulo}' no soportado por la API de importacion. Modulos disponibles: {Disponibles}",
+                modulo, modulosDisponibles);
             throw new ModuloNoSoportadoException(
                 $"El modulo '{modulo}' no es soportado por la API de importacion. " +
                 $"Modulos disponibles: {modulosDisponibles}.");
         }
+
+        _logger.LogDebug(
+            "Processor resuelto para modulo '{Modulo}': {TipoProcessor}",
+            modulo, processor.GetType().Name);
 
         // 3. Delegacion: el processor encapsula parseo, validacion de estructura,
         //    mapeo, transaccion y traduccion de SqlException -> DatosInvalidosException.

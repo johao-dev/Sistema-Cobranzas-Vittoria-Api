@@ -6,6 +6,7 @@ using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Middleware;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Middleware;
 
@@ -183,7 +184,7 @@ public class ApiExceptionMiddlewareUnitTests
     [Test]
     public async Task SinExcepcion_NoModificaLaRespuesta()
     {
-        var middleware = new ApiExceptionMiddleware();
+        var middleware = new ApiExceptionMiddleware(NullLogger<ApiExceptionMiddleware>.Instance);
         var ctx = new DefaultHttpContext();
         ctx.Response.Body = new MemoryStream();
         var next = new RequestDelegate(_ => { ctx.Response.StatusCode = 200; return Task.CompletedTask; });
@@ -200,7 +201,7 @@ public class ApiExceptionMiddlewareUnitTests
 
     private static async Task<HttpContext> InvocarConExcepcion(Exception ex)
     {
-        var middleware = new ApiExceptionMiddleware();
+        var middleware = new ApiExceptionMiddleware(NullLogger<ApiExceptionMiddleware>.Instance);
         var ctx = new DefaultHttpContext
         {
             Response = { Body = new MemoryStream() }

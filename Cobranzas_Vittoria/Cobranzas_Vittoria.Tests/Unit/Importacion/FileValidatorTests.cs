@@ -1,6 +1,7 @@
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Validators;
 using Cobranzas_Vittoria.Tests.Unit.Importacion.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion;
 
@@ -10,7 +11,7 @@ namespace Cobranzas_Vittoria.Tests.Unit.Importacion;
 /// </summary>
 public class FileValidatorTests
 {
-    private readonly FileValidator _sut = new();
+    private readonly FileValidator _sut = new(NullLogger<FileValidator>.Instance);
 
     [Test]
     public void Validar_ArchivoNulo_LanzaArchivoInvalidoVacio()

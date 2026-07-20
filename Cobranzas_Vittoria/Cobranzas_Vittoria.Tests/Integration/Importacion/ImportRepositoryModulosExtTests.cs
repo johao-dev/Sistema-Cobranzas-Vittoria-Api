@@ -3,6 +3,7 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Importacion;
 
@@ -25,7 +26,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Importacion;
 /// </summary>
 public class ImportRepositoryModulosExtTests : IntegrationTestBase
 {
-    private readonly IImportRepository _repo = new ImportRepository();
+    private readonly IImportRepository _repo = new ImportRepository(NullLogger<ImportRepository>.Instance);
 
     // =========================================================================
     // ESPECIALIDAD

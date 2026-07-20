@@ -6,6 +6,7 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Processors.Common;
 
@@ -32,8 +33,9 @@ internal sealed class TestImportProcessor : ImportProcessorBase<UnidadMedidaImpo
     public TestImportProcessor(
         FileParserResolver parserResolver,
         IImportRepository repository,
-        IDbConnectionFactory connectionFactory)
-        : base(parserResolver, repository, connectionFactory) { }
+        IDbConnectionFactory connectionFactory,
+        ILogger logger)
+        : base(parserResolver, repository, connectionFactory, logger) { }
 
     public const string TestModulo = "test-modulo";
 

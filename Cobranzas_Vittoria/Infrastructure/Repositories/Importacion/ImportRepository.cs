@@ -1,6 +1,7 @@
 using System.Data;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Dapper;
+using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 
@@ -15,6 +16,13 @@ namespace Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 /// </summary>
 public class ImportRepository : IImportRepository
 {
+    private readonly ILogger<ImportRepository> _logger;
+
+    public ImportRepository(ILogger<ImportRepository> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
     public async Task<int> ImportAsync<TDto>(
         string spName,
         string tvpTypeName,
@@ -52,16 +60,31 @@ public class ImportRepository : IImportRepository
             parameters.AddDynamicParams(extraParameters);
         }
 
+        // El processor es responsable de loguear el SP y el contexto de modulo
+        // antes de llamar a ImportAsync. Aqui solo logueamos a nivel debug
+        // porque el repository es generico y no sabe el modulo.
+        _logger.LogDebug(
+            "ImportRepository.ImportAsync SP={Sp} TVP={Tvp} Filas={Filas}",
+            spName, tvpTypeName, dataTable.Rows.Count);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         // Usamos ExecuteScalarAsync<int> en lugar de ExecuteAsync para capturar
         // el valor del SELECT @RowCount AS FilasInsertadas al final del SP.
         // ExecuteAsync sobre SPs con SET NOCOUNT ON + BEGIN TRAN puede devolver -1
         // aunque el SP haga RETURN, por eso el patron es devolver un result set escalar.
-        return await connection.ExecuteScalarAsync<int>(
+        var filas = await connection.ExecuteScalarAsync<int>(
             new CommandDefinition(
                 commandText: spName,
                 parameters: parameters,
                 transaction: transaction,
                 cancellationToken: ct,
                 commandType: CommandType.StoredProcedure));
+        sw.Stop();
+
+        _logger.LogDebug(
+            "ImportRepository.ImportAsync {Sp} completo en {Duracion}ms. FilasReportadas={Filas}",
+            spName, sw.ElapsedMilliseconds, filas);
+
+        return filas;
     }
 }
