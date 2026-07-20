@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Application.Importacion.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -55,12 +56,25 @@ public class ImportController : ControllerBase
     /// <param name="archivo">Archivo a importar (.csv, .xlsx o .xls).</param>
     /// <param name="usuario">Identificador del usuario (para @Usuario del SP).</param>
     /// <param name="ct">Token de cancelacion.</param>
+    /// <response code="200">Carga exitosa. Devuelve { modulo, formato, filasInsertadas }.</response>
+    /// <response code="400">Solicitud invalida: modulo no soportado, extension/MIME invalido, encoding invalido, o encabezados faltantes.</response>
+    /// <response code="413">El archivo excede 10 MB.</response>
+    /// <response code="422">Una o mas filas fallaron la validacion o el SP rechazo los datos. Ninguna fila se inserta (rollback).</response>
     [HttpPost("{modulo}")]
     [RequestSizeLimit(MaxRequestSize)]
     [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ResultadoImportacion), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status413RequestEntityTooLarge)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Importar(
         [FromRoute] string modulo,
-        [FromForm] IFormFile archivo,
+        // IFormFile NO lleva [FromForm]: Swashbuckle no soporta la combinacion
+        // [FromForm] + IFormFile (lanza "Error reading parameter(s) for action
+        // ... as [FromForm] attribute used with IFormFile"). ASP.NET Core
+        // bindea automaticamente los IFormFile desde el body multipart, asi
+        // que omitir el atributo no cambia el comportamiento en runtime.
+        IFormFile archivo,
         [FromForm] string usuario,
         CancellationToken ct)
     {

@@ -4,6 +4,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
+    <!-- Genera el archivo XML con la documentacion de tipos y miembros
+         para que Swashbuckle lo consuma y muestre los <summary> en Swagger UI.
+         CS1591 (falta de comentario XML) se suprime para no obligar a
+         documentar el codigo legacy preexistente; los archivos nuevos
+         (Swagger/, Importacion/) si deben documentarse. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+
     <DefaultItemExcludes>
       $(DefaultItemExcludes);
       .vs\**;

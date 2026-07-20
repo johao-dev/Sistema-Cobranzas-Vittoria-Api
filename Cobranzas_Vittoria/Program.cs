@@ -10,14 +10,25 @@ using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Services;
+using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// ============================================================================
+// Swagger / OpenAPI
+// ============================================================================
+// Solo se registra y se expone en Development y Staging. En Production la
+// superficie de descubrimiento de la API no debe estar accesible publicamente.
+// ============================================================================
+var enableSwagger = builder.Environment.IsDevelopment()
+                 || string.Equals(builder.Environment.EnvironmentName, "Staging", StringComparison.OrdinalIgnoreCase);
+if (enableSwagger)
+{
+    builder.Services.AddImportacionSwagger();
+}
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AngularCors", policy =>
@@ -156,10 +167,11 @@ var app = builder.Build();
 
 app.UseMiddleware<ApiExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+// Swagger / OpenAPI: solo Development y Staging (ver bloque equivalente en
+// la seccion de servicios). En Production el endpoint /swagger no existe.
+if (enableSwagger)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseImportacionSwagger();
 }
 
 app.UseCors("AngularCors");
