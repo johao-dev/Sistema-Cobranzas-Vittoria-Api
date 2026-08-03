@@ -122,6 +122,7 @@ builder.Services.AddScoped<IImportService, ImportService>();
 var connectionString = builder.Configuration.GetConnectionString("Default");
 
 await WaitForSqlServerAsync(connectionString);
+await EnsureDatabaseExistsAsync(connectionString);
 RunMigrations(connectionString);
 
 var app = builder.Build();
@@ -142,19 +143,15 @@ app.Run();
 
 static async Task WaitForSqlServerAsync(string? connectionString)
 {
-    if (string.IsNullOrWhiteSpace(connectionString))
-    {
-        throw new InvalidOperationException("Falta ConnectionStrings:Default");
-    }
-
     const int maxAttempts = 12;
     var delay = TimeSpan.FromSeconds(5);
+    var serverConnectionString = BuildMasterConnectionString(connectionString);
 
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
         try
         {
-            await using var connection = new SqlConnection(connectionString);
+            await using var connection = new SqlConnection(serverConnectionString);
             await connection.OpenAsync();
             Console.WriteLine("Conexion a SQL Server verificada.");
             return;
@@ -167,6 +164,39 @@ static async Task WaitForSqlServerAsync(string? connectionString)
     }
 
     throw new InvalidOperationException("No se pudo establecer conexion con SQL Server tras varios intentos.");
+}
+
+static async Task EnsureDatabaseExistsAsync(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Falta ConnectionStrings:Default");
+    }
+
+    var builder = new SqlConnectionStringBuilder(connectionString);
+    if (string.IsNullOrWhiteSpace(builder.InitialCatalog))
+    {
+        throw new InvalidOperationException("La cadena de conexion no define una base de datos.");
+    }
+
+    var databaseName = builder.InitialCatalog;
+    var serverConnectionString = BuildMasterConnectionString(connectionString);
+
+    await using var connection = new SqlConnection(serverConnectionString);
+    await connection.OpenAsync();
+
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+        IF DB_ID(@databaseName) IS NULL
+        BEGIN
+            DECLARE @sql nvarchar(max) = N'CREATE DATABASE ' + QUOTENAME(@databaseName) + N';';
+            EXEC(@sql);
+        END
+        """;
+    command.Parameters.AddWithValue("@databaseName", databaseName);
+
+    await command.ExecuteNonQueryAsync();
+    Console.WriteLine($"Base de datos lista: {databaseName}.");
 }
 
 static void RunMigrations(string? connectionString)
@@ -217,6 +247,21 @@ static void RunMigrations(string? connectionString)
         Console.ResetColor();
         throw resultRepeatable.Error;
     }
+}
+
+static string BuildMasterConnectionString(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Falta ConnectionStrings:Default");
+    }
+
+    var builder = new SqlConnectionStringBuilder(connectionString)
+    {
+        InitialCatalog = "master"
+    };
+
+    return builder.ConnectionString;
 }
 
 public partial class Program { }

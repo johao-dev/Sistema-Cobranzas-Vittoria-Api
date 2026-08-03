@@ -30,6 +30,12 @@ Desde esta carpeta:
 docker compose up -d --build db app
 ```
 
+En el primer arranque la API ahora:
+
+1. espera a que SQL Server acepte conexiones,
+2. crea `VittoriaComprasDB_Dev` si todavía no existe,
+3. aplica las migraciones DbUp.
+
 La API quedará disponible en:
 
 - `http://localhost:5000/swagger`
@@ -85,8 +91,8 @@ docker compose run --rm --profile test test bash -lc "dotnet test ./Cobranzas_Vi
 
 1. El `compose.yml` sobrescribe la cadena de conexión de desarrollo para que la API
    apunte al servicio `db` dentro de la red Docker.
-2. `Program.cs` espera a que SQL Server acepte conexiones antes de ejecutar DbUp.
-   Esto evita fallos de arranque cuando la API inicia antes que la base de datos.
+2. `Program.cs` espera a que SQL Server acepte conexiones, crea la base si falta y
+   luego ejecuta DbUp. Esto evita fallos de arranque en el primer boot.
 3. `wwwroot/uploads` se monta desde el host para que los archivos subidos no se
    pierdan al recrear el contenedor `app`.
 4. `dotnet watch` usa sondeo de archivos para detectar cambios desde bind mounts.
