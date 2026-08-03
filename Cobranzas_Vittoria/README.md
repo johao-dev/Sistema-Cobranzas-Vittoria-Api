@@ -96,6 +96,10 @@ docker compose run --rm --profile test test bash -lc "dotnet test ./Cobranzas_Vi
 3. `wwwroot/uploads` se monta desde el host para que los archivos subidos no se
    pierdan al recrear el contenedor `app`.
 4. `dotnet watch` usa sondeo de archivos para detectar cambios desde bind mounts.
+5. El arranque Docker usa `--no-launch-profile` para no heredar `launchSettings.json`
+   y así exponer correctamente la API fuera del contenedor.
+6. El servicio `db` no usa `container_name` fijo para que Docker Compose pueda recrear
+   correctamente la red y los contenedores sin conflictos entre corridas.
 
 ## Archivos Docker relevantes
 

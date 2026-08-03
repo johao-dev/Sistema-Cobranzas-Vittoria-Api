@@ -1,7 +1,6 @@
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2025-latest
-    container_name: sql2025
     restart: unless-stopped
     environment:
       ACCEPT_EULA: "Y"
@@ -47,7 +46,7 @@ services:
         condition: service_healthy
     command: >
       bash -lc "dotnet restore ./Cobranzas_Vittoria.csproj
-      && dotnet watch --project ./Cobranzas_Vittoria.csproj run --no-restore --urls http://0.0.0.0:5000"
+      && dotnet watch --project ./Cobranzas_Vittoria.csproj run --no-restore --no-launch-profile --urls http://0.0.0.0:5000"
 
   test:
     profiles:
