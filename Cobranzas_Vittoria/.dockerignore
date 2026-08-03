@@ -1,0 +1,6 @@
+.vs/
+bin/
+obj/
+Cobranzas_Vittoria.Tests/bin/
+Cobranzas_Vittoria.Tests/obj/
+wwwroot/uploads/

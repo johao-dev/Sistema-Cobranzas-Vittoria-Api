@@ -13,6 +13,7 @@ using Cobranzas_Vittoria.Services;
 using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -120,48 +121,8 @@ builder.Services.AddScoped<IImportService, ImportService>();
 
 var connectionString = builder.Configuration.GetConnectionString("Default");
 
-// Migraciones versionadas: Tablas y estructura
-
-var versionedUpgradeEngine = DeployChanges.To
-    .SqlDatabase(connectionString)
-    .WithScriptsEmbeddedInAssembly(
-        Assembly.GetExecutingAssembly(),
-        filter => filter.Contains(".Migrations.Versioned."))
-    .LogToConsole()
-    .Build();
-
-if (versionedUpgradeEngine.IsUpgradeRequired())
-{
-    Console.WriteLine("Nuevas migraciones versionadas detectadas. Aplicando...");
-    var resultVersioned =versionedUpgradeEngine.PerformUpgrade();
-    if (!resultVersioned.Successful)
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Error en migraciones versionadas: {resultVersioned.Error}");
-        Console.ResetColor();
-        throw resultVersioned.Error; // Detiene el arranque si falla
-    }
-}
-
-// Migraciones repetibles: Stored Procedures, Views, Typos.
-var repeatableUpgradeEngine = DeployChanges.To
-    .SqlDatabase(connectionString)
-    .WithScriptsEmbeddedInAssembly(
-        Assembly.GetExecutingAssembly(), 
-        filter => filter.Contains(".Migrations.Repeatable."))
-    .JournalTo(new NullJournal()) // NO usa bitácora, se ejecutan SIEMPRE
-    .LogToConsole()
-    .Build();
-
-Console.WriteLine("Sincronizando objetos repetibles (CREATE OR ALTER)...");
-var resultRepeatable = repeatableUpgradeEngine.PerformUpgrade();
-if (!resultRepeatable.Successful)
-{
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine($"Error en objetos repetibles: {resultRepeatable.Error}");
-    Console.ResetColor();
-    throw resultRepeatable.Error;
-}
+await WaitForSqlServerAsync(connectionString);
+RunMigrations(connectionString);
 
 var app = builder.Build();
 
@@ -178,5 +139,84 @@ app.UseCors("AngularCors");
 app.UseStaticFiles();
 app.MapControllers();
 app.Run();
+
+static async Task WaitForSqlServerAsync(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Falta ConnectionStrings:Default");
+    }
+
+    const int maxAttempts = 12;
+    var delay = TimeSpan.FromSeconds(5);
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            Console.WriteLine("Conexion a SQL Server verificada.");
+            return;
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            Console.WriteLine($"SQL Server aun no esta listo (intento {attempt}/{maxAttempts}). Reintentando en {delay.TotalSeconds} segundos. Detalle: {ex.Message}");
+            await Task.Delay(delay);
+        }
+    }
+
+    throw new InvalidOperationException("No se pudo establecer conexion con SQL Server tras varios intentos.");
+}
+
+static void RunMigrations(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Falta ConnectionStrings:Default");
+    }
+
+    // Migraciones versionadas: Tablas y estructura
+    var versionedUpgradeEngine = DeployChanges.To
+        .SqlDatabase(connectionString)
+        .WithScriptsEmbeddedInAssembly(
+            Assembly.GetExecutingAssembly(),
+            filter => filter.Contains(".Migrations.Versioned."))
+        .LogToConsole()
+        .Build();
+
+    if (versionedUpgradeEngine.IsUpgradeRequired())
+    {
+        Console.WriteLine("Nuevas migraciones versionadas detectadas. Aplicando...");
+        var resultVersioned = versionedUpgradeEngine.PerformUpgrade();
+        if (!resultVersioned.Successful)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error en migraciones versionadas: {resultVersioned.Error}");
+            Console.ResetColor();
+            throw resultVersioned.Error; // Detiene el arranque si falla
+        }
+    }
+
+    // Migraciones repetibles: Stored Procedures, Views, Typos.
+    var repeatableUpgradeEngine = DeployChanges.To
+        .SqlDatabase(connectionString)
+        .WithScriptsEmbeddedInAssembly(
+            Assembly.GetExecutingAssembly(),
+            filter => filter.Contains(".Migrations.Repeatable."))
+        .JournalTo(new NullJournal()) // NO usa bitácora, se ejecutan SIEMPRE
+        .LogToConsole()
+        .Build();
+
+    Console.WriteLine("Sincronizando objetos repetibles (CREATE OR ALTER)...");
+    var resultRepeatable = repeatableUpgradeEngine.PerformUpgrade();
+    if (!resultRepeatable.Successful)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Error en objetos repetibles: {resultRepeatable.Error}");
+        Console.ResetColor();
+        throw resultRepeatable.Error;
+    }
+}
 
 public partial class Program { }

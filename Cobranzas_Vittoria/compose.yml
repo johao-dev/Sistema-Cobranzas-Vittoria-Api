@@ -4,14 +4,79 @@ services:
     container_name: sql2025
     restart: unless-stopped
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=AdminPassword12# # contra solo para dev local
-      - MSSQL_PID=Evaluation
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "AdminPassword12#"
+      MSSQL_PID: "Evaluation"
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace/Cobranzas_Vittoria
+    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:5000
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_CLI_HOME: /tmp/dotnet
+      NUGET_PACKAGES: /tmp/nuget/packages
+      ConnectionStrings__Default: Server=db,1433;Database=VittoriaComprasDB_Dev;User Id=sa;Password=AdminPassword12#;TrustServerCertificate=True;
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/workspace/Cobranzas_Vittoria
+      - ./wwwroot/uploads:/workspace/Cobranzas_Vittoria/wwwroot/uploads
+      - nuget_cache:/tmp/nuget/packages
+      - dotnet_cli_home:/tmp/dotnet
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      bash -lc "dotnet restore ./Cobranzas_Vittoria.csproj
+      && dotnet watch --project ./Cobranzas_Vittoria.csproj run --no-restore --urls http://0.0.0.0:5000"
+
+  test:
+    profiles:
+      - test
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /workspace/Cobranzas_Vittoria
+    user: "0:0"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Test
+      DOTNET_CLI_HOME: /tmp/dotnet
+      NUGET_PACKAGES: /tmp/nuget/packages
+      TESTCONTAINERS_HOST_OVERRIDE: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/workspace/Cobranzas_Vittoria
+      - nuget_cache:/tmp/nuget/packages
+      - dotnet_cli_home:/tmp/dotnet
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      bash -lc "dotnet restore ./Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj
+      && dotnet test ./Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj --no-restore"
 
 volumes:
   sqlserver_data:
     name: sqlserver_data_vittoria
+  nuget_cache:
+    name: nuget_cache_vittoria
+  dotnet_cli_home:
+    name: dotnet_cli_home_vittoria
