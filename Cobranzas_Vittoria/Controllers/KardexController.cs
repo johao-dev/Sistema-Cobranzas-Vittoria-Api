@@ -27,8 +27,33 @@ namespace Cobranzas_Vittoria.Controllers
             return Ok(data);
         }
 
-        [HttpPost("salidas")]
-        public async Task<IActionResult> RegistrarSalida([FromBody] KardexSalidaCreateDto dto)
+        /// <summary>
+        /// Endpoint legacy de registro de salidas manuales. Marcado con
+        /// [Obsolete] en la Fase 3 del modulo Inventario y renombrado de
+        /// <c>POST /salidas</c> a <c>POST /salidas-manuales</c> para liberar
+        /// la ruta <c>/salidas</c> al nuevo <c>KardexInventarioController</c>.
+        ///
+        /// <para>
+        /// <b>Por que se conserva y no se elimina</b>:
+        /// el plan del modulo Inventario es ADITIVO. La logica legacy
+        /// (que usa <c>almacen.KardexMovimiento</c> acoplado a
+        /// <c>compras.CompraDetalle</c>) sigue siendo la unica que
+        /// soporta salidas derivadas de Ordenes de Compra. Se eliminara
+        /// unicamente cuando se confirme la migracion completa de todas
+        /// las pantallas frontend al nuevo endpoint, en una fase posterior
+        /// a la salida a produccion del KardexInventarioController.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>Reemplazo</b>: usar
+        /// <c>POST /api/almacen/kardex/salidas</c> del
+        /// <c>KardexInventarioController</c> (ruta limpia, DTOs tipados,
+        /// TVP, transaccionalidad del SP, traduccion 51100-51199 -> 422).
+        /// </para>
+        /// </summary>
+        [Obsolete("Endpoint legacy. Use POST /api/almacen/kardex/salidas del KardexInventarioController (modulo Inventario / Kardex manual).")]
+        [HttpPost("salidas-manuales")]
+        public async Task<IActionResult> RegistrarSalidaManualLegacy([FromBody] KardexSalidaCreateDto dto)
             => Ok(await _service.RegistrarSalidaAsync(dto));
     }
 }

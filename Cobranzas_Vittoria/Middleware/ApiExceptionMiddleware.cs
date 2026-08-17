@@ -1,5 +1,6 @@
 using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
+using Cobranzas_Vittoria.Application.Inventario.Excepciones;
 using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Middleware
@@ -16,6 +17,8 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - DatosInvalidosValidacionException -> 422 Unprocessable Entity (+ lista de errores generica;
     ///                                       usado por modulos que no son Importacion, ej: Inventario)
     ///   - ModuloNoSoportadoException      -> 400 BadRequest (codigo "MODULO_NO_SOPORTADO")
+    ///   - IdRutaInconsistenteException    -> 400 BadRequest (codigo "ID_RUTA_INCONSISTENTE"; PUT con idRuta != idCuerpo)
+    ///   - KardexNoEncontradoException     -> 404 NotFound   (codigo "KARDEX_NO_ENCONTRADO"; id de kardex inexistente)
     ///   - SqlException                    -> 500 SQL_ERROR        (deuda tecnica documentada)
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
     ///
@@ -124,6 +127,38 @@ namespace Cobranzas_Vittoria.Middleware
                     nameof(ModuloNoSoportadoException), context.Request.Method, context.Request.Path,
                     ModuloNoSoportadoException.CodigoError, ex.Message);
                 await EscribirErrorAsync(context, StatusCodes.Status400BadRequest, ModuloNoSoportadoException.CodigoError, ex.Message);
+            }
+            catch (IdRutaInconsistenteException ex)
+            {
+                // PUT con idRuta != dto.idKardex*. El controller lo lanza antes
+                // de delegar al service para mantener el service libre de
+                // dependencias con HttpContext. Se traduce a 400 Bad Request
+                // con el codigo del propio tipo.
+                _logger.LogWarning(
+                    "Rechazo 400 ({Tipo}) en {Method} {Path}: {Codigo} - idRuta={IdRuta} idCuerpo={IdCuerpo} campo={Campo}",
+                    nameof(IdRutaInconsistenteException), context.Request.Method, context.Request.Path,
+                    IdRutaInconsistenteException.CodigoError, ex.IdRuta, ex.IdCuerpo, ex.CampoCuerpo);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status400BadRequest,
+                    IdRutaInconsistenteException.CodigoError,
+                    ex.Message);
+            }
+            catch (KardexNoEncontradoException ex)
+            {
+                // El SP del modulo Inventario responde 51104 cuando un
+                // IdKardex* no existe. El KardexInventarioService lo traduce
+                // a esta excepcion para evitar filtrar detalles del SP al
+                // cliente. Se mapea a 404 Not Found con el codigo del tipo.
+                _logger.LogWarning(
+                    "Rechazo 404 ({Tipo}) en {Method} {Path}: {Codigo} - tipoKardex={TipoKardex} idKardex={IdKardex}",
+                    nameof(KardexNoEncontradoException), context.Request.Method, context.Request.Path,
+                    KardexNoEncontradoException.CodigoError, ex.TipoKardex, ex.IdKardex);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status404NotFound,
+                    KardexNoEncontradoException.CodigoError,
+                    ex.Message);
             }
             catch (SqlException ex)
             {
