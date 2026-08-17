@@ -1096,10 +1096,18 @@ GO
 --   a maestra para que el front reciba CodigoMaterial, Nombre, UnidadMedida
 --   y los nombres legibles. No usa la vista vw_Kardex_StockActual_v2
 --   para mantener este SP autocontenido y orden-independiente.
+--
+--   Filtros (todos opcionales):
+--     @IdEspecialidad : por especialidad del kardex
+--     @IdProyecto     : por proyecto (NULL = incluye globales y por proyecto)
+--     @FechaDesde     : FechaUltimaMovimiento >= @FechaDesde
+--     @FechaHasta     : FechaUltimaMovimiento <= @FechaHasta
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_StockActual_Listar]
-    @IdEspecialidad INT = NULL,
-    @IdProyecto     INT = NULL
+    @IdEspecialidad INT  = NULL,
+    @IdProyecto     INT  = NULL,
+    @FechaDesde     DATE = NULL,
+    @FechaHasta     DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -1125,6 +1133,8 @@ BEGIN
     WHERE (@IdEspecialidad IS NULL OR ks.IdEspecialidad = @IdEspecialidad)
       AND (@IdProyecto     IS NULL OR ks.IdProyecto     = @IdProyecto
            OR (@IdProyecto IS NULL AND ks.IdProyecto IS NULL))
+      AND (@FechaDesde IS NULL OR ks.FechaUltimaMovimiento >= @FechaDesde)
+      AND (@FechaHasta IS NULL OR ks.FechaUltimaMovimiento <= @FechaHasta)
     ORDER BY
         e.Nombre,
         m.Descripcion;

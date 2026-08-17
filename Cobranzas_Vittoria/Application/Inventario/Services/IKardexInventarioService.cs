@@ -89,9 +89,8 @@ public interface IKardexInventarioService
     // KardexStock (stock-actual)
     // ============================================================================
 
-    /// <summary>Lista el stock actual consolidado con filtros opcionales.</summary>
+    /// <summary>Lista el stock actual consolidado con filtros opcionales (especialidad, proyecto, rango de fechas).</summary>
     Task<IReadOnlyList<KardexStockActualResponseDto>> ListarStockActualAsync(
-        int? idEspecialidad,
-        int? idProyecto,
+        KardexStockFiltroInventarioDto filtro,
         CancellationToken ct = default);
 }

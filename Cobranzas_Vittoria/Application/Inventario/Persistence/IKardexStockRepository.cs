@@ -22,21 +22,24 @@ namespace Cobranzas_Vittoria.Application.Inventario.Persistence;
 /// directamente el SP evita el acoplamiento a una vista que solo agrega
 /// un nivel de indireccion sin valor aqui.
 /// </para>
+///
+/// <para>
+/// <b>Filtros soportados por el SP</b>: <c>IdEspecialidad</c>,
+/// <c>IdProyecto</c>, <c>FechaDesde</c> y <c>FechaHasta</c>. Si
+/// <c>IdProyecto</c> es NULL, se incluyen tanto las filas con proyecto
+/// como las globales (IdProyecto NULL en KardexStock) para que el front
+/// vea el inventario completo. Si <c>FechaDesde</c> o <c>FechaHasta</c>
+/// son NULL, no se filtra por ese extremo (rango abierto).
+/// </para>
 /// </summary>
 public interface IKardexStockRepository
 {
     /// <summary>
     /// Lista el stock actual consolidado con joins a maestra.
-    /// Filtros opcionales: <paramref name="idEspecialidad"/> y
-    /// <paramref name="idProyecto"/>. Si <paramref name="idProyecto"/>
-    /// es NULL, se incluyen tanto las filas con proyecto como las globales
-    /// (IdProyecto NULL) para que el front vea el inventario completo.
     /// </summary>
-    /// <param name="idEspecialidad">Filtro por especialidad (opcional).</param>
-    /// <param name="idProyecto">Filtro por proyecto (opcional, NULL = incluir globales).</param>
+    /// <param name="filtro">Filtro de busqueda (todos los campos son opcionales).</param>
     /// <param name="ct">Token de cancelacion.</param>
     Task<IReadOnlyList<KardexStockActualResponseDto>> ListarAsync(
-        int? idEspecialidad,
-        int? idProyecto,
+        KardexStockFiltroInventarioDto filtro,
         CancellationToken ct = default);
 }

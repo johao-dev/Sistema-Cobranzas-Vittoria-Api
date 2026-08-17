@@ -1,5 +1,6 @@
-using Cobranzas_Vittoria.Application.Importacion.Excepciones;
+using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Dtos;
+using Cobranzas_Vittoria.Application.Inventario.Excepciones;
 using Cobranzas_Vittoria.Interfaces;
 
 namespace Cobranzas_Vittoria.Application.Inventario.Validators;
@@ -10,8 +11,9 @@ namespace Cobranzas_Vittoria.Application.Inventario.Validators;
 /// <para>
 /// <b>Responsabilidad</b>: aplicar las reglas de negocio que se pueden
 /// verificar SIN tocar la base de datos, antes de invocar al SP. Si la
-/// validacion falla, lanza <see cref="DatosInvalidosException"/> con la
-/// lista de <see cref="DetalleErrorFila"/> y el controller la traduce a 422.
+/// validacion falla, lanza <see cref="ValidacionNegocioInventarioException"/>
+/// (que extiende <see cref="DatosInvalidosValidacionException"/>) y el
+/// controller la traduce a 422.
 /// </para>
 ///
 /// <para>
@@ -33,7 +35,7 @@ namespace Cobranzas_Vittoria.Application.Inventario.Validators;
 ///
 /// <para>
 /// <b>Acumulacion de errores</b>: el validador NO aborta al primer error.
-/// Recorre todas las reglas y junta los <see cref="DetalleErrorFila"/>
+/// Recorre todas las reglas y junta los <see cref="DetalleErrorValidacion"/>
 /// en una lista, para que el cliente vea TODOS los problemas en una
 /// sola respuesta 422 (mismo patron que <c>ImportProcessorBase</c>).
 /// </para>
@@ -62,7 +64,7 @@ public sealed class KardexInventarioValidator
     // ============================================================================
 
     /// <summary>
-    /// Valida un DTO de entrada. Lanza <see cref="DatosInvalidosException"/>
+    /// Valida un DTO de entrada. Lanza <see cref="ValidacionNegocioInventarioException"/>
     /// si encuentra errores. Los errores se acumulan: el cliente ve TODOS
     /// los problemas en una sola respuesta.
     /// </summary>
@@ -72,7 +74,7 @@ public sealed class KardexInventarioValidator
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        var errores = new List<DetalleErrorFila>();
+        var errores = new List<DetalleErrorValidacion>();
 
         // ---------- Campos requeridos ----------
         if (dto.IdEspecialidad <= 0)
@@ -112,9 +114,7 @@ public sealed class KardexInventarioValidator
 
         if (errores.Count > 0)
         {
-            throw new DatosInvalidosException(
-                $"La entrada de Kardex fue rechazada con {errores.Count} error(es) de validacion.",
-                errores);
+            throw new ValidacionNegocioInventarioException(errores);
         }
     }
 
@@ -123,7 +123,7 @@ public sealed class KardexInventarioValidator
     // ============================================================================
 
     /// <summary>
-    /// Valida un DTO de salida. Lanza <see cref="DatosInvalidosException"/>
+    /// Valida un DTO de salida. Lanza <see cref="ValidacionNegocioInventarioException"/>
     /// si encuentra errores. Los errores se acumulan.
     /// </summary>
     /// <param name="dto">DTO a validar.</param>
@@ -132,7 +132,7 @@ public sealed class KardexInventarioValidator
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        var errores = new List<DetalleErrorFila>();
+        var errores = new List<DetalleErrorValidacion>();
 
         // ---------- Campos de cabecera requeridos ----------
         if (dto.IdEspecialidad <= 0)
@@ -229,9 +229,7 @@ public sealed class KardexInventarioValidator
 
         if (errores.Count > 0)
         {
-            throw new DatosInvalidosException(
-                $"La salida de Kardex fue rechazada con {errores.Count} error(es) de validacion.",
-                errores);
+            throw new ValidacionNegocioInventarioException(errores);
         }
     }
 
@@ -249,16 +247,13 @@ public sealed class KardexInventarioValidator
         // validamos que el id sea > 0.
         if (idKardexSalida <= 0)
         {
-            throw new DatosInvalidosException(
+            throw new ValidacionNegocioInventarioException(
                 "El id de la salida es invalido.",
-                new[]
-                {
-                    new DetalleErrorFila(
-                        0,
-                        "idKardexSalida",
-                        CodigosErrorInventario.Validacion.CampoRequerido,
-                        "El idKardexSalida debe ser mayor a 0.")
-                });
+                new DetalleErrorValidacion(
+                    Fila: null,
+                    Campo: "idKardexSalida",
+                    CodigoError: CodigosErrorInventario.Validacion.CampoRequerido,
+                    Mensaje: "El idKardexSalida debe ser mayor a 0."));
         }
 
         // Touch del CT para evitar warning en implementaciones async.
@@ -274,7 +269,7 @@ public sealed class KardexInventarioValidator
     /// no aborta.
     /// </summary>
     private async Task ValidarFkAsync(
-        List<DetalleErrorFila> errores,
+        List<DetalleErrorValidacion> errores,
         int idEspecialidad,
         int? idMaterial,
         int? idProveedor,
@@ -339,6 +334,6 @@ public sealed class KardexInventarioValidator
         }
     }
 
-    private static DetalleErrorFila Error(string campo, string codigo, string mensaje)
-        => new(Fila: 0, Campo: campo, CodigoError: codigo, Mensaje: mensaje);
+    private static DetalleErrorValidacion Error(string campo, string codigo, string mensaje)
+        => new(Fila: null, Campo: campo, CodigoError: codigo, Mensaje: mensaje);
 }

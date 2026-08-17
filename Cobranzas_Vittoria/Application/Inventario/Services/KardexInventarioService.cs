@@ -1,5 +1,5 @@
 using Cobranzas_Vittoria.Application.Common;
-using Cobranzas_Vittoria.Application.Importacion.Excepciones;
+using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Dtos;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Persistence;
@@ -21,7 +21,7 @@ namespace Cobranzas_Vittoria.Application.Inventario.Services;
 ///      <see cref="ResultadoTraduccionSql"/>.
 ///   4. El service envuelve el resultado en
 ///      <see cref="ValidacionNegocioInventarioException"/> (que extiende
-///      <see cref="DatosInvalidosException"/>) para que el
+///      <see cref="DatosInvalidosValidacionException"/>) para que el
 ///      <c>ApiExceptionMiddleware</c> la mapee a HTTP 422.
 /// </para>
 ///
@@ -90,7 +90,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        // El validator ya lanza DatosInvalidosException si falla.
+        // El validator ya lanza DatosInvalidosValidacionException si falla.
         await _validator.ValidarEntradaAsync(dto, ct);
 
         _logger.LogDebug(
@@ -109,15 +109,13 @@ public sealed class KardexInventarioService : IKardexInventarioService
         ArgumentNullException.ThrowIfNull(dto);
         if (dto.IdKardexEntrada is null or <= 0)
         {
-            throw new DatosInvalidosException(
+            throw new ValidacionNegocioInventarioException(
                 "El idKardexEntrada es obligatorio para actualizar.",
-                new[]
-                {
-                    new DetalleErrorFila(
-                        0, "idKardexEntrada",
-                        CodigosErrorInventario.Validacion.CampoRequerido,
-                        "El campo idKardexEntrada es obligatorio y debe ser mayor a 0.")
-                });
+                new DetalleErrorValidacion(
+                    Fila: null,
+                    Campo: "idKardexEntrada",
+                    CodigoError: CodigosErrorInventario.Validacion.CampoRequerido,
+                    Mensaje: "El campo idKardexEntrada es obligatorio y debe ser mayor a 0."));
         }
 
         await _validator.ValidarEntradaAsync(dto, ct);
@@ -135,15 +133,13 @@ public sealed class KardexInventarioService : IKardexInventarioService
     {
         if (idKardexEntrada <= 0)
         {
-            throw new DatosInvalidosException(
+            throw new ValidacionNegocioInventarioException(
                 "El idKardexEntrada es invalido.",
-                new[]
-                {
-                    new DetalleErrorFila(
-                        0, "idKardexEntrada",
-                        CodigosErrorInventario.Validacion.CampoRequerido,
-                        "El idKardexEntrada debe ser mayor a 0.")
-                });
+                new DetalleErrorValidacion(
+                    Fila: null,
+                    Campo: "idKardexEntrada",
+                    CodigoError: CodigosErrorInventario.Validacion.CampoRequerido,
+                    Mensaje: "El idKardexEntrada debe ser mayor a 0."));
         }
 
         _logger.LogDebug("Eliminando entrada de Kardex. idKardexEntrada={IdKardexEntrada}", idKardexEntrada);
@@ -201,15 +197,13 @@ public sealed class KardexInventarioService : IKardexInventarioService
         ArgumentNullException.ThrowIfNull(dto);
         if (dto.IdKardexSalida is null or <= 0)
         {
-            throw new DatosInvalidosException(
+            throw new ValidacionNegocioInventarioException(
                 "El idKardexSalida es obligatorio para actualizar.",
-                new[]
-                {
-                    new DetalleErrorFila(
-                        0, "idKardexSalida",
-                        CodigosErrorInventario.Validacion.CampoRequerido,
-                        "El campo idKardexSalida es obligatorio y debe ser mayor a 0.")
-                });
+                new DetalleErrorValidacion(
+                    Fila: null,
+                    Campo: "idKardexSalida",
+                    CodigoError: CodigosErrorInventario.Validacion.CampoRequerido,
+                    Mensaje: "El campo idKardexSalida es obligatorio y debe ser mayor a 0."));
         }
 
         await _validator.ValidarSalidaAsync(dto, ct);
@@ -227,15 +221,13 @@ public sealed class KardexInventarioService : IKardexInventarioService
     {
         if (idKardexSalida <= 0)
         {
-            throw new DatosInvalidosException(
+            throw new ValidacionNegocioInventarioException(
                 "El idKardexSalida es invalido.",
-                new[]
-                {
-                    new DetalleErrorFila(
-                        0, "idKardexSalida",
-                        CodigosErrorInventario.Validacion.CampoRequerido,
-                        "El idKardexSalida debe ser mayor a 0.")
-                });
+                new DetalleErrorValidacion(
+                    Fila: null,
+                    Campo: "idKardexSalida",
+                    CodigoError: CodigosErrorInventario.Validacion.CampoRequerido,
+                    Mensaje: "El idKardexSalida debe ser mayor a 0."));
         }
 
         await _validator.ValidarSalidaExisteAsync(idKardexSalida, ct);
@@ -256,16 +248,17 @@ public sealed class KardexInventarioService : IKardexInventarioService
     // ============================================================================
 
     public async Task<IReadOnlyList<KardexStockActualResponseDto>> ListarStockActualAsync(
-        int? idEspecialidad,
-        int? idProyecto,
+        KardexStockFiltroInventarioDto filtro,
         CancellationToken ct = default)
     {
+        filtro ??= new KardexStockFiltroInventarioDto();
+
         _logger.LogDebug(
-            "Listando stock actual de Kardex. idEspecialidad={IdEspecialidad} idProyecto={IdProyecto}",
-            idEspecialidad, idProyecto);
+            "Listando stock actual de Kardex. idEspecialidad={IdEspecialidad} idProyecto={IdProyecto} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
+            filtro.IdEspecialidad, filtro.IdProyecto, filtro.FechaDesde, filtro.FechaHasta);
 
         var resultado = await EjecutarAsync(
-            () => _stockRepository.ListarAsync(idEspecialidad, idProyecto, ct),
+            () => _stockRepository.ListarAsync(filtro, ct),
             "ListarStockActual");
         return resultado;
     }
@@ -315,7 +308,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
                 throw new KardexNoEncontradoException(tipoKardex, idKardex: 0);
             }
 
-            var detalle = new DetalleErrorFila(
+            var detalle = new DetalleErrorValidacion(
                 Fila: traduccion.Fila,
                 Campo: string.Empty,
                 CodigoError: traduccion.CodigoError,

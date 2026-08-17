@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Microsoft.Data.SqlClient;
 
@@ -12,6 +13,8 @@ namespace Cobranzas_Vittoria.Middleware
     ///       - Resto de codigos            -> 400 BadRequest
     ///   - EstructuraInvalidaException    -> 400 BadRequest
     ///   - DatosInvalidosException         -> 422 Unprocessable Entity (+ lista de errores por fila)
+    ///   - DatosInvalidosValidacionException -> 422 Unprocessable Entity (+ lista de errores generica;
+    ///                                       usado por modulos que no son Importacion, ej: Inventario)
     ///   - ModuloNoSoportadoException      -> 400 BadRequest (codigo "MODULO_NO_SOPORTADO")
     ///   - SqlException                    -> 500 SQL_ERROR        (deuda tecnica documentada)
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
@@ -76,32 +79,43 @@ namespace Cobranzas_Vittoria.Middleware
             }
             catch (DatosInvalidosException ex)
             {
-                // 422: logueamos solo metadata (no contenido de filas) para
-                // evitar PII en logs. La cantidad y los codigos unicos son
-                // suficientes para detectar patrones de fallo en produccion.
-                var codigosUnicos = ex.Errores
-                    .GroupBy(e => e.CodigoError)
-                    .Select(g => $"{g.Key}={g.Count()}")
-                    .OrderBy(s => s);
-                _logger.LogWarning(
-                    "Rechazo 422 (DatosInvalidosException) en {Method} {Path}. TotalErrores={Total} Codigos=[{Codigos}]",
-                    context.Request.Method, context.Request.Path, ex.Errores.Count,
-                    string.Join(", ", codigosUnicos));
-                context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
-                context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    ok = false,
-                    error = "DATOS_INVALIDOS",
-                    message = ex.Message,
-                    errores = ex.Errores.Select(e => new
+                await EscribirRespuestaValidacionAsync(
+                    context,
+                    tipoOrigen: "DatosInvalidosException",
+                    message: ex.Message,
+                    erroresSerializables: ex.Errores.Select(e => new
                     {
                         fila = e.Fila,
                         campo = e.Campo,
                         codigoError = e.CodigoError,
                         mensaje = e.Mensaje
-                    })
-                });
+                    }),
+                    codigosUnicos: ex.Errores
+                        .GroupBy(e => e.CodigoError)
+                        .Select(g => $"{g.Key}={g.Count()}")
+                        .OrderBy(s => s));
+            }
+            catch (DatosInvalidosValidacionException ex)
+            {
+                // Misma respuesta 422 que DatosInvalidosException (de Importacion),
+                // pero para modulos que usan el modelo generico de Common
+                // (ej: Inventario, Kardex). El campo `fila` puede ser null
+                // (no aplica a payloads HTTP) y se serializa como tal.
+                await EscribirRespuestaValidacionAsync(
+                    context,
+                    tipoOrigen: nameof(DatosInvalidosValidacionException),
+                    message: ex.Message,
+                    erroresSerializables: ex.Errores.Select(e => new
+                    {
+                        fila = e.Fila,
+                        campo = e.Campo,
+                        codigoError = e.CodigoError,
+                        mensaje = e.Mensaje
+                    }),
+                    codigosUnicos: ex.Errores
+                        .GroupBy(e => e.CodigoError)
+                        .Select(g => $"{g.Key}={g.Count()}")
+                        .OrderBy(s => s));
             }
             catch (ModuloNoSoportadoException ex)
             {
@@ -141,6 +155,47 @@ namespace Cobranzas_Vittoria.Middleware
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsJsonAsync(new { ok = false, error = codigo, message = mensaje });
+        }
+
+        /// <summary>
+        /// Serializa una respuesta 422 a partir de una coleccion ya proyectada
+        /// de errores. Reusado por los catches de <see cref="DatosInvalidosException"/>
+        /// (Importacion) y <see cref="DatosInvalidosValidacionException"/>
+        /// (Common, ej: Inventario). Asi ambos tipos producen la misma forma
+        /// de respuesta sin acoplar el middleware a namespaces de modulo.
+        /// </summary>
+        /// <param name="erroresSerializables">
+        /// Errores ya proyectados al anonimo con campos
+        /// <c>{ fila, campo, codigoError, mensaje }</c>.
+        /// </param>
+        /// <param name="codigosUnicos">
+        /// Lista de <c>"CODIGO=cantidad"</c> para el log (no se expone al cliente
+        /// para evitar PII, solo metadata de patrones).
+        /// </param>
+        private async Task EscribirRespuestaValidacionAsync(
+            HttpContext context,
+            string tipoOrigen,
+            string message,
+            IEnumerable<object> erroresSerializables,
+            IEnumerable<string> codigosUnicos)
+        {
+            var lista = erroresSerializables as IList<object> ?? erroresSerializables.ToList();
+            var codigos = codigosUnicos as IList<string> ?? codigosUnicos.ToList();
+
+            _logger.LogWarning(
+                "Rechazo 422 ({TipoOrigen}) en {Method} {Path}. TotalErrores={Total} Codigos=[{Codigos}]",
+                tipoOrigen, context.Request.Method, context.Request.Path, lista.Count,
+                string.Join(", ", codigos));
+
+            context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                ok = false,
+                error = "DATOS_INVALIDOS",
+                message = message,
+                errores = lista
+            });
         }
     }
 }
