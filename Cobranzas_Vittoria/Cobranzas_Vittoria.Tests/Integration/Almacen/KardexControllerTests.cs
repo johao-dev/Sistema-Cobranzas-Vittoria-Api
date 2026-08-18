@@ -11,7 +11,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Almacen;
 /// Pruebas de KardexController.
 ///
 ///   GET   /api/almacen/kardex/movimientos?idCompra=&idMaterial=&idEspecialidad=&fechaDesde=&fechaHasta=
-///   POST  /api/almacen/kardex/salidas
+///   POST  /api/almacen/kardex/salidas-manuales (legacy)
 ///
 /// Reglas de negocio:
 ///   - Las ENTRADAS del Kardex se derivan automaticamente de CompraDetalle
@@ -198,7 +198,7 @@ public class KardexControllerTests : IntegrationTestBase
             CantidadSalida = 5m,
             Observacion = "Salida de prueba OK"
         };
-        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas-manuales", dto);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
@@ -230,7 +230,7 @@ public class KardexControllerTests : IntegrationTestBase
             FechaMovimiento = DateTime.Today,
             CantidadSalida = 0m
         };
-        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas-manuales", dto);
 
         // Assert - el middleware traduce SqlException 51001 a 500 con error=SQL_ERROR
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
@@ -254,7 +254,7 @@ public class KardexControllerTests : IntegrationTestBase
             FechaMovimiento = DateTime.Today,
             CantidadSalida = 15m
         };
-        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas-manuales", dto);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
@@ -278,7 +278,7 @@ public class KardexControllerTests : IntegrationTestBase
             FechaMovimiento = DateTime.Today,
             CantidadSalida = 1m
         };
-        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas-manuales", dto);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
@@ -300,7 +300,7 @@ public class KardexControllerTests : IntegrationTestBase
             CantidadSalida = cantidad,
             Observacion = "Salida de setup"
         };
-        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas-manuales", dto);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Setup falló al registrar salida. Body: {await response.Content.ReadAsStringAsync()}");
     }

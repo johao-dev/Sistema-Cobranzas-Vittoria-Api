@@ -118,6 +118,19 @@ public static class SwaggerConfiguration
                 // Solo incluye en el doc "v1" las APIs que no tienen otro doc explicito.
                 return string.IsNullOrEmpty(apiDesc.GroupName) || apiDesc.GroupName == docName;
             });
+
+            // -----------------------------------------------------------------
+            // CustomSchemaIds: usa el FullName (con namespace) para evitar
+            // colisiones entre DTOs de distinto namespace que comparten nombre
+            // simple. Caso concreto: el modulo Inventario introdujo
+            // Application.Inventario.Dtos.KardexSalidaCreateDto, que colisiona
+            // con el legacy Dtos.Almacen.KardexSalidaCreateDto del KardexController
+            // (marcado [Obsolete] pero aun presente). Swashbuckle, por defecto,
+            // usa solo el nombre del tipo, lo que provoca
+            //   "The same schemaId is already used for type X"
+            // y rompe la generacion del documento OpenAPI.
+            // -----------------------------------------------------------------
+            options.CustomSchemaIds(t => t.FullName);
         });
 
         return services;

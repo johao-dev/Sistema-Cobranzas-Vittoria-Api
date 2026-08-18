@@ -50,18 +50,33 @@ public static class SqlExceptionTranslator
     public static ResultadoTraduccionSql? Traducir(SqlException ex)
     {
         ArgumentNullException.ThrowIfNull(ex);
+        return Traducir(ex.Number, ex.Message);
+    }
 
-        if (ex.Number is < RangoInventarioInicio or > RangoInventarioFin)
+    /// <summary>
+    /// Overload de testing-friendly: traduce un par (numero, mensaje) sin
+    /// necesidad de construir una <see cref="SqlException"/> real. SqlException
+    /// es sealed y su propiedad <c>Number</c> no se puede inyectar limpiamente
+    /// sin un constructor interno no documentado, por lo que este overload
+    /// es el punto de entrada real de la logica y se reutiliza en
+    /// <c>Traducir(SqlException)</c>.
+    /// </summary>
+    /// <param name="number">Numero del error SQL (THROW 51100, ...).</param>
+    /// <param name="message">Mensaje crudo del SP (formato <c>'CODIGO: detalle'</c>).</param>
+    /// <returns>Tupla con codigo, mensaje y fila, o <c>null</c> si el numero esta fuera de rango.</returns>
+    public static ResultadoTraduccionSql? Traducir(int number, string message)
+    {
+        if (number is < RangoInventarioInicio or > RangoInventarioFin)
         {
             return null;
         }
 
-        var (codigo, mensaje) = ParsearMensaje(ex.Message);
+        var (codigo, mensaje) = ParsearMensaje(message);
         return new ResultadoTraduccionSql(
             CodigoError: codigo,
             Mensaje: mensaje,
             Fila: 0, // Los SPs de Inventario no reportan fila (mejora futura).
-            NumeroSql: ex.Number);
+            NumeroSql: number);
     }
 
     /// <summary>

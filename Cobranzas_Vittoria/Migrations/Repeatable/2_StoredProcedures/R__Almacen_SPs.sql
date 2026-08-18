@@ -603,10 +603,14 @@ BEGIN
                OR IdProyecto = @IdProyecto);
 
         IF @StockActual IS NOT NULL AND @StockActual - @Cantidad < 0
-            THROW 51111, 'STOCK_INCONSISTENTE_AL_ELIMINAR: idKardexEntrada='
-                 + CAST(@IdKardexEntrada AS NVARCHAR(20))
-                 + ' stockActual=' + CAST(@StockActual AS NVARCHAR(20))
-                 + ' cantidad=' + CAST(@Cantidad AS NVARCHAR(20)), 1;
+        BEGIN
+            DECLARE @MsgInconsistente NVARCHAR(1000) =
+                N'STOCK_INCONSISTENTE_AL_ELIMINAR: idKardexEntrada='
+                + CAST(@IdKardexEntrada AS NVARCHAR(20))
+                + N' stockActual=' + CAST(@StockActual AS NVARCHAR(20))
+                + N' cantidad=' + CAST(@Cantidad AS NVARCHAR(20));
+            THROW 51111, @MsgInconsistente, 1;
+        END;
 
         DELETE FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
 
@@ -761,7 +765,9 @@ BEGIN
                 + N' disponible=' + CAST(Disponible AS NVARCHAR(20))
                 + N' solicitado=' + CAST(Solicitado AS NVARCHAR(20)) + N';'
             FROM @Insuficientes;
-            THROW 51110, 'STOCK_INSUFICIENTE:' + @DetalleInsuficiente, 1;
+            DECLARE @MsgStockInsuficiente NVARCHAR(1500) =
+                N'STOCK_INSUFICIENTE:' + @DetalleInsuficiente;
+            THROW 51110, @MsgStockInsuficiente, 1;
         END
 
         -- ---------- Insert cabecera ----------
@@ -901,6 +907,13 @@ BEGIN
         -- ---------- Calcular diff por triada (IdMaterial, IdEspecialidad, IdProyecto) ----------
         -- diff > 0: la nueva salida pide MAS que la vieja -> hay que validar stock.
         -- diff < 0: la nueva salida pide MENOS -> el stock se repone automaticamente.
+        -- Usamos una tabla temporal porque necesitamos reutilizar el diff en dos
+        -- sentencias separadas (IF EXISTS y luego SELECT para armar el mensaje).
+        DECLARE @Diff TABLE (
+            IdMaterial INT          NOT NULL,
+            Cantidad   DECIMAL(18,2) NOT NULL
+        );
+
         ;WITH OldItems AS (
             SELECT ksd.IdMaterial, SUM(ksd.Cantidad) AS Cantidad
             FROM almacen.KardexSalidaDetalle ksd
@@ -911,18 +924,18 @@ BEGIN
             SELECT i.IdMaterial, SUM(i.Cantidad) AS Cantidad
             FROM @Items i
             GROUP BY i.IdMaterial
-        ),
-        Diff AS (
-            SELECT
-                COALESCE(o.IdMaterial, n.IdMaterial)        AS IdMaterial,
-                ISNULL(n.Cantidad, 0) - ISNULL(o.Cantidad, 0) AS Cantidad
-            FROM NewItems n
-            FULL OUTER JOIN OldItems o ON o.IdMaterial = n.IdMaterial
         )
+        INSERT INTO @Diff (IdMaterial, Cantidad)
+        SELECT
+            COALESCE(o.IdMaterial, n.IdMaterial)         AS IdMaterial,
+            ISNULL(n.Cantidad, 0) - ISNULL(o.Cantidad, 0) AS Cantidad
+        FROM NewItems n
+        FULL OUTER JOIN OldItems o ON o.IdMaterial = n.IdMaterial;
+
         -- Validar que para los diffs positivos haya stock suficiente.
         IF EXISTS (
             SELECT 1
-            FROM Diff d
+            FROM @Diff d
             LEFT JOIN almacen.KardexStock ks
                 ON  ks.IdMaterial     = d.IdMaterial
                 AND ks.IdEspecialidad = @IdEspecialidad
@@ -937,7 +950,7 @@ BEGIN
                 + N' idMaterial=' + CAST(d.IdMaterial AS NVARCHAR(20))
                 + N' solicitado=' + CAST(d.Cantidad AS NVARCHAR(20))
                 + N' disponible=' + CAST(ISNULL(ks.Stock, 0) AS NVARCHAR(20)) + N';'
-            FROM Diff d
+            FROM @Diff d
             LEFT JOIN almacen.KardexStock ks
                 ON  ks.IdMaterial     = d.IdMaterial
                 AND ks.IdEspecialidad = @IdEspecialidad
@@ -945,7 +958,9 @@ BEGIN
                      OR ks.IdProyecto = @IdProyecto)
             WHERE d.Cantidad > 0
               AND ISNULL(ks.Stock, 0) < d.Cantidad;
-            THROW 51110, 'STOCK_INSUFICIENTE:' + @DetalleInsuficienteUpd, 1;
+            DECLARE @MsgStockInsuficienteUpd NVARCHAR(1500) =
+                N'STOCK_INSUFICIENTE:' + @DetalleInsuficienteUpd;
+            THROW 51110, @MsgStockInsuficienteUpd, 1;
         END
 
         -- ---------- Update cabecera ----------
@@ -968,35 +983,26 @@ BEGIN
         FROM @Items i;
 
         -- ---------- Aplicar diff a KardexStock ----------
-        ;WITH OldItems AS (
-            SELECT ksd.IdMaterial, SUM(ksd.Cantidad) AS Cantidad
-            FROM almacen.KardexSalidaDetalle ksd
-            WHERE ksd.IdKardexSalida = @IdKardexSalida
-            GROUP BY ksd.IdMaterial
-        ),
-        NewItems AS (
-            SELECT i.IdMaterial, SUM(i.Cantidad) AS Cantidad
-            FROM @Items i
-            GROUP BY i.IdMaterial
-        ),
-        Diff AS (
-            SELECT
-                COALESCE(o.IdMaterial, n.IdMaterial)         AS IdMaterial,
-                ISNULL(n.Cantidad, 0) - ISNULL(o.Cantidad, 0) AS Cantidad
-            FROM NewItems n
-            FULL OUTER JOIN OldItems o ON o.IdMaterial = n.IdMaterial
-            WHERE ISNULL(n.Cantidad, 0) <> ISNULL(o.Cantidad, 0)
-        )
+        -- Reutilizamos @Diff (calculado arriba ANTES de borrar el detalle
+        -- antiguo). Si recalcularamos aqui leyendo de KardexSalidaDetalle,
+        -- OldItems seria 0 (el detalle ya fue reemplazado) y la formula
+        -- Diff = New - Old daria siempre el valor nuevo completo,
+        -- descontando o sumando de mas.
+        -- Recordar: Cantidad del diff es New - Old. Positivo = la nueva
+        -- salida pide MAS que la vieja (hay que descontar del stock);
+        -- negativo = pide MENOS (se repone stock). Stock - CantidadDiff
+        -- cubre ambos signos.
         UPDATE ks
         SET TotalSalida = ks.TotalSalida + d.Cantidad,
             Stock        = ks.Stock       - d.Cantidad,
             FechaUltimaMovimiento = @Fecha
         FROM almacen.KardexStock ks
-        INNER JOIN Diff d
+        INNER JOIN @Diff d
             ON  d.IdMaterial     = ks.IdMaterial
             AND ks.IdEspecialidad = @IdEspecialidad
             AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-                 OR ks.IdProyecto = @IdProyecto);
+                 OR ks.IdProyecto = @IdProyecto)
+        WHERE d.Cantidad <> 0;
 
         COMMIT;
 

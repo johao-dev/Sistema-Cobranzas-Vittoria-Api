@@ -1,4 +1,5 @@
 using System.Reflection;
+using Cobranzas_Vittoria.Application.Common;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
@@ -17,11 +18,23 @@ using Cobranzas_Vittoria.Services;
 using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
+using Dapper;
 using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+// ============================================================================
+// Dapper: registro de TypeHandlers globales
+// ============================================================================
+// DateOnlyTypeHandler: Dapper en Microsoft.Data.SqlClient 6.x NO soporta
+// DateOnly nativamente (ni como parametro de SP ni como propiedad de DTO
+// de salida contra columnas DATE). Este handler centraliza la conversion
+// DateTime <-> DateOnly para toda la aplicacion. Una sola linea cubre los
+// modulos que usen DateOnly en sus DTOs (actualmente: Inventario).
+// ============================================================================
+SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
 // ============================================================================
 // Swagger / OpenAPI
 // ============================================================================

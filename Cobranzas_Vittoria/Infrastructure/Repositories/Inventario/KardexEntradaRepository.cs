@@ -49,6 +49,9 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
         CancellationToken ct = default)
     {
         using var db = Open();
+        // Dapper no soporta DateOnly como parametro de Stored Procedure en
+        // Microsoft.Data.SqlClient 6.x: lo convertimos a DateTime para que
+        // el driver lo serialice como DATE en SQL Server.
         var result = await db.QueryAsync<KardexEntradaResponseDto>(
             new CommandDefinition(
                 commandText: "almacen.usp_KardexEntrada_Listar",
@@ -57,8 +60,8 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
                     IdEspecialidad = filtro.IdEspecialidad,
                     IdProyecto = filtro.IdProyecto,
                     IdProveedor = filtro.IdProveedor,
-                    FechaDesde = filtro.FechaDesde,
-                    FechaHasta = filtro.FechaHasta
+                    FechaDesde = filtro.FechaDesde?.ToDateTime(TimeOnly.MinValue),
+                    FechaHasta = filtro.FechaHasta?.ToDateTime(TimeOnly.MinValue)
                 },
                 cancellationToken: ct,
                 commandType: CommandType.StoredProcedure));
@@ -80,7 +83,7 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
                     IdProveedor = dto.IdProveedor,
                     IdProyecto = dto.IdProyecto,
                     NumeroDocumento = dto.NumeroDocumento,
-                    Fecha = dto.Fecha,
+                    Fecha = dto.Fecha.ToDateTime(TimeOnly.MinValue),
                     Cantidad = dto.Cantidad,
                     Observacion = dto.Observacion
                 },
@@ -105,7 +108,7 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
                     IdProveedor = dto.IdProveedor,
                     IdProyecto = dto.IdProyecto,
                     NumeroDocumento = dto.NumeroDocumento,
-                    Fecha = dto.Fecha,
+                    Fecha = dto.Fecha.ToDateTime(TimeOnly.MinValue),
                     Cantidad = dto.Cantidad,
                     Observacion = dto.Observacion
                 },
