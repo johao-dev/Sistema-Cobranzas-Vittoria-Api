@@ -56,6 +56,7 @@ public class KardexInventarioServiceUnitTests
 
         var service = new KardexInventarioService(
             entradaRepo, salidaRepo, stockRepo, validator,
+            new StubExcelExporter(),
             NullLogger<KardexInventarioService>.Instance);
         return (service, entradaRepo, salidaRepo, stockRepo, validator);
     }
@@ -466,21 +467,26 @@ public class KardexInventarioServiceUnitTests
         var prov = new StubProveedorRepository();
         var proy = new StubProyectoRepository();
         var validator = new KardexInventarioValidator(esp, mat, prov, proy);
+        var exporter = new StubExcelExporter();
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            null!, salidaRepo, stockRepo, validator,
+            null!, salidaRepo, stockRepo, validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, null!, stockRepo, validator,
+            entradaRepo, null!, stockRepo, validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, salidaRepo, null!, validator,
+            entradaRepo, salidaRepo, null!, validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, salidaRepo, stockRepo, null!,
+            entradaRepo, salidaRepo, stockRepo, null!, exporter,
+            NullLogger<KardexInventarioService>.Instance));
+
+        Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
+            entradaRepo, salidaRepo, stockRepo, validator, null!,
             NullLogger<KardexInventarioService>.Instance));
     }
 }

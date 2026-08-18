@@ -93,4 +93,22 @@ public interface IKardexInventarioService
     Task<IReadOnlyList<KardexStockActualResponseDto>> ListarStockActualAsync(
         KardexStockFiltroInventarioDto filtro,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Exporta el stock actual consolidado a un archivo <c>.xlsx</c> (bytes)
+    /// listo para ser devuelto por el controller como <c>FileContentResult</c>.
+    /// Los filtros aplicados se incluyen como subtitulo de la hoja.
+    /// </summary>
+    /// <param name="filtro">
+    /// Filtros opcionales. Si es null se trata como filtro vacio (lista completa).
+    /// </param>
+    /// <param name="ct">Token de cancelacion.</param>
+    /// <returns>
+    /// Bytes del archivo <c>.xlsx</c> con:
+    /// titulo, subtitulo de filtros, fecha de generacion, header de columnas,
+    /// filas de datos y fila de totales (suma de Entrada/Salida/Stock).
+    /// </returns>
+    Task<byte[]> ExportarStockActualAsync(
+        KardexStockFiltroInventarioDto filtro,
+        CancellationToken ct = default);
 }

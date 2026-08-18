@@ -1,7 +1,9 @@
 using Cobranzas_Vittoria.Application.Common;
 using Cobranzas_Vittoria.Application.Common.Excepciones;
+using Cobranzas_Vittoria.Application.Common.Exports;
 using Cobranzas_Vittoria.Application.Inventario.Dtos;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
+using Cobranzas_Vittoria.Application.Inventario.Exports;
 using Cobranzas_Vittoria.Application.Inventario.Persistence;
 using Cobranzas_Vittoria.Application.Inventario.Validators;
 using Microsoft.Data.SqlClient;
@@ -48,6 +50,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
     private readonly IKardexSalidaRepository _salidaRepository;
     private readonly IKardexStockRepository _stockRepository;
     private readonly KardexInventarioValidator _validator;
+    private readonly IExcelExporter _exporter;
     private readonly ILogger<KardexInventarioService> _logger;
 
     public KardexInventarioService(
@@ -55,12 +58,14 @@ public sealed class KardexInventarioService : IKardexInventarioService
         IKardexSalidaRepository salidaRepository,
         IKardexStockRepository stockRepository,
         KardexInventarioValidator validator,
+        IExcelExporter exporter,
         ILogger<KardexInventarioService> logger)
     {
         _entradaRepository = entradaRepository ?? throw new ArgumentNullException(nameof(entradaRepository));
         _salidaRepository = salidaRepository ?? throw new ArgumentNullException(nameof(salidaRepository));
         _stockRepository = stockRepository ?? throw new ArgumentNullException(nameof(stockRepository));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -261,6 +266,84 @@ public sealed class KardexInventarioService : IKardexInventarioService
             () => _stockRepository.ListarAsync(filtro, ct),
             "ListarStockActual");
         return resultado;
+    }
+
+    public async Task<byte[]> ExportarStockActualAsync(
+        KardexStockFiltroInventarioDto filtro,
+        CancellationToken ct = default)
+    {
+        filtro ??= new KardexStockFiltroInventarioDto();
+
+        _logger.LogDebug(
+            "Exportando stock actual de Kardex a Excel. idEspecialidad={IdEspecialidad} idProyecto={IdProyecto} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
+            filtro.IdEspecialidad, filtro.IdProyecto, filtro.FechaDesde, filtro.FechaHasta);
+
+        // 1. Obtener datos via el mismo metodo que GET /stock-actual. Asi el
+        //    reporte refleja exactamente la misma vista que el JSON.
+        var stocks = await EjecutarAsync(
+            () => _stockRepository.ListarAsync(filtro, ct),
+            "ExportarStockActual");
+
+        // 2. Mapear al DTO de export. El contador Numero se asigna aqui (no
+        //    en el DTO) para que el helper de export permanezca generico.
+        var rows = stocks
+            .Select((s, i) => new KardexStockExcelRow
+            {
+                Numero = i + 1,
+                Proyecto = s.Proyecto,
+                Especialidad = s.Especialidad,
+                CodigoMaterial = s.CodigoMaterial,
+                Nombre = s.Nombre,
+                UnidadMedida = s.UnidadMedida,
+                Entrada = s.TotalEntrada,
+                Salida = s.TotalSalida,
+                Stock = s.Stock,
+                Fecha = s.FechaUltimaMovimiento
+            })
+            .ToList();
+
+        // 3. Configurar la hoja. El subtitulo de filtros se construye a
+        //    partir del DTO de filtro; si todos los campos son null se
+        //    muestra "(sin filtros)".
+        var config = new ExcelSheetConfig
+        {
+            SheetName = "Kardex Stock",
+            Title = "CONSOLIDADO DE INVENTARIO",
+            FiltersSubtitle = BuildFiltersSubtitle(filtro),
+            IncludeTotalsRow = true
+        };
+
+        // 4. Delegar al helper generico. Este metodo es sincrono (NPOI
+        //    construye el workbook en memoria); el await de arriba ya
+        //    libero el thread del request para la consulta a BD.
+        return _exporter.ExportToXlsx(rows, config);
+    }
+
+    /// <summary>
+    /// Construye el subtitulo de filtros para el reporte. Formato:
+    ///   - Con filtros: "Filtros: idEspecialidad=2, idProyecto=10, fecha=2026-01-01..2026-12-31"
+    ///   - Sin filtros: "Filtros: (sin filtros)"
+    /// </summary>
+    private static string BuildFiltersSubtitle(KardexStockFiltroInventarioDto filtro)
+    {
+        var parts = new List<string>(4);
+        if (filtro.IdEspecialidad.HasValue)
+        {
+            parts.Add($"idEspecialidad={filtro.IdEspecialidad.Value}");
+        }
+        if (filtro.IdProyecto.HasValue)
+        {
+            parts.Add($"idProyecto={filtro.IdProyecto.Value}");
+        }
+        if (filtro.FechaDesde.HasValue || filtro.FechaHasta.HasValue)
+        {
+            var desde = filtro.FechaDesde?.ToString("yyyy-MM-dd") ?? "...";
+            var hasta = filtro.FechaHasta?.ToString("yyyy-MM-dd") ?? "...";
+            parts.Add($"fecha={desde}..{hasta}");
+        }
+        return parts.Count > 0
+            ? "Filtros: " + string.Join(", ", parts)
+            : "Filtros: (sin filtros)";
     }
 
     // ============================================================================
