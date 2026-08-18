@@ -1,5 +1,6 @@
 using System.Reflection;
 using Cobranzas_Vittoria.Application.Common;
+using Cobranzas_Vittoria.Application.Common.Exports;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
@@ -158,6 +159,13 @@ builder.Services.AddScoped<IKardexSalidaRepository, KardexSalidaRepository>();
 builder.Services.AddScoped<IKardexStockRepository, KardexStockRepository>();
 builder.Services.AddScoped<KardexInventarioValidator>();
 builder.Services.AddScoped<IKardexInventarioService, KardexInventarioService>();
+
+// IExcelExporter es un helper stateless (NPOI construye un workbook nuevo
+// por llamada, sin estado de instancia; la cache de reflexion es static).
+// Se registra como Singleton por consistencia con otros helpers
+// (FileValidator, FileParserResolver) y porque no mantiene conexiones
+// ni recursos costosos.
+builder.Services.AddSingleton<IExcelExporter, NpoiExcelExporter>();
 
 var connectionString = builder.Configuration.GetConnectionString("Default");
 

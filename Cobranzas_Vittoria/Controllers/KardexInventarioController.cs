@@ -21,6 +21,7 @@ namespace Cobranzas_Vittoria.Controllers;
 ///   <item><c>PUT    /salidas/{id}</c>  -> actualizar salida manual (reemplaza cabecera + items).</item>
 ///   <item><c>DELETE /salidas/{id}</c>  -> eliminar salida manual (repone stock).</item>
 ///   <item><c>GET    /stock-actual</c>  -> stock consolidado (filtros: idEspecialidad, idProyecto, fechaDesde, fechaHasta).</item>
+///   <item><c>GET    /stock-actual/exportar-excel</c> -> descarga el stock consolidado en un archivo <c>.xlsx</c>.</item>
 /// </list>
 /// </para>
 ///
@@ -233,6 +234,54 @@ public class KardexInventarioController : ControllerBase
         };
         var data = await _service.ListarStockActualAsync(filtro, ct);
         return Ok(data);
+    }
+
+    /// <summary>
+    /// Exporta el stock actual consolidado a un archivo <c>.xlsx</c> listo
+    /// para descargar. Mismos filtros que <c>GET /stock-actual</c>.
+    ///
+    /// <para>
+    /// <b>Respuesta</b>: <c>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</c>
+    /// con header <c>Content-Disposition: attachment; filename="kardex-stock-{yyyyMMdd-HHmm}.xlsx"</c>.
+    /// El cuerpo contiene: titulo, subtitulo de filtros, fecha de generacion,
+    /// header de columnas, filas de datos y fila de totales (suma de Entrada/Salida/Stock).
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Por que un endpoint separado en lugar de <c>?format=xlsx</c> en
+    /// el GET JSON</b>: la negociacion de contenido para un binario es
+    /// engorrosa en .NET; un endpoint dedicado es mas simple para el
+    /// cliente (solo cambia la URL y dispara la descarga) y mantiene
+    /// <c>GET /stock-actual</c> 100% JSON.
+    /// </para>
+    /// </summary>
+    [HttpGet("stock-actual/exportar-excel")]
+    public async Task<IActionResult> ExportarStockActual(
+        [FromQuery] int? idEspecialidad,
+        [FromQuery] int? idProyecto,
+        [FromQuery] DateOnly? fechaDesde,
+        [FromQuery] DateOnly? fechaHasta,
+        CancellationToken ct)
+    {
+        var filtro = new KardexStockFiltroInventarioDto
+        {
+            IdEspecialidad = idEspecialidad,
+            IdProyecto = idProyecto,
+            FechaDesde = fechaDesde,
+            FechaHasta = fechaHasta
+        };
+
+        var bytes = await _service.ExportarStockActualAsync(filtro, ct);
+
+        // Nombre del archivo: kardex-stock-{yyyyMMdd-HHmm}.xlsx. Esto permite
+        // al usuario descargar multiples reportes en la misma sesion sin
+        // pisar archivos locales.
+        var fileName = $"kardex-stock-{DateTime.Now:yyyyMMdd-HHmm}.xlsx";
+
+        return File(
+            fileContents: bytes,
+            contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            fileDownloadName: fileName);
     }
 
     // ============================================================================
