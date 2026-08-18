@@ -489,4 +489,159 @@ public class KardexInventarioServiceUnitTests
             entradaRepo, salidaRepo, stockRepo, validator, null!,
             NullLogger<KardexInventarioService>.Instance));
     }
+
+    // =========================================================================
+    // ExportarStockActualAsync
+    // =========================================================================
+
+    [Test]
+    public async Task ExportarStockActual_ConDatos_LlamaAlRepositoryYDelegaAlExporter()
+    {
+        // Arrange
+        var exporter = new StubExcelExporter();
+        var serviceConExporter = CrearServiceConExporter(exporter);
+        var stockRepo = serviceConExporter.StockRepo;
+
+        stockRepo.OnListar = _ => new List<KardexStockActualResponseDto>
+        {
+            new()
+            {
+                IdKardexStock = 1,
+                IdMaterial = 2,
+                CodigoMaterial = "MAT-0001",
+                Nombre = "MORTERO LISTO",
+                UnidadMedida = "BOL",
+                IdEspecialidad = 2,
+                Especialidad = "Albañilería",
+                IdProyecto = 10,
+                Proyecto = "Mayta Capac II",
+                TotalEntrada = 50m,
+                TotalSalida = 3m,
+                Stock = 47m,
+                FechaUltimaMovimiento = new DateOnly(2026, 1, 16)
+            }
+        };
+
+        var filtro = new KardexStockFiltroInventarioDto
+        {
+            IdEspecialidad = 2,
+            IdProyecto = 10
+        };
+
+        // Act
+        var bytes = await serviceConExporter.Service.ExportarStockActualAsync(filtro);
+
+        // Assert
+        Assert.That(bytes, Is.Not.Null, "El servicio debe devolver los bytes del exporter (pueden ser vacios del stub).");
+        Assert.That(exporter.Llamadas, Is.EqualTo(1), "Debe invocarse el exporter exactamente una vez.");
+        Assert.That(stockRepo.LlamadasListar, Has.Count.EqualTo(1), "Debe consultarse el stock repo una vez.");
+        Assert.That(stockRepo.LlamadasListar[0].IdEspecialidad, Is.EqualTo(2));
+        Assert.That(stockRepo.LlamadasListar[0].IdProyecto, Is.EqualTo(10));
+    }
+
+    [Test]
+    public async Task ExportarStockActual_FiltroNull_SeTrataComoVacio()
+    {
+        // Arrange
+        var exporter = new StubExcelExporter();
+        var serviceConExporter = CrearServiceConExporter(exporter);
+        var (stockRepo, _, _, _, _) = serviceConExporter.GetStubs();
+
+        // Act
+        await serviceConExporter.Service.ExportarStockActualAsync(null);
+
+        // Assert
+        Assert.That(stockRepo.LlamadasListar, Has.Count.EqualTo(1));
+        Assert.That(stockRepo.LlamadasListar[0].IdEspecialidad, Is.Null);
+        Assert.That(stockRepo.LlamadasListar[0].IdProyecto, Is.Null);
+    }
+
+    [Test]
+    public async Task ExportarStockActual_SinDatos_GeneraArchivoVacioYDelegaAlExporter()
+    {
+        // Arrange
+        var exporter = new StubExcelExporter();
+        var serviceConExporter = CrearServiceConExporter(exporter);
+        var (_, _, _, _, _) = serviceConExporter.GetStubs();
+
+        // Act
+        await serviceConExporter.Service.ExportarStockActualAsync(new KardexStockFiltroInventarioDto());
+
+        // Assert
+        Assert.That(exporter.Llamadas, Is.EqualTo(1),
+            "El exporter debe invocarse aunque no haya datos (genera workbook con solo el header).");
+    }
+
+    [Test]
+    public async Task ExportarStockActual_ConExcepcionDeRepository_PropagaLaExcepcion()
+    {
+        // Arrange
+        var exporter = new StubExcelExporter();
+        var serviceConExporter = CrearServiceConExporter(exporter);
+        var (stockRepo, _, _, _, _) = serviceConExporter.GetStubs();
+        stockRepo.OnListar = _ => throw new InvalidOperationException("BD no disponible");
+
+        // Act + Assert
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            () => serviceConExporter.Service.ExportarStockActualAsync(new KardexStockFiltroInventarioDto()));
+        Assert.That(ex!.Message, Is.EqualTo("BD no disponible"));
+        Assert.That(exporter.Llamadas, Is.EqualTo(0),
+            "El exporter no debe invocarse si la consulta al repo fallo.");
+    }
+
+    [Test]
+    public async Task ExportarStockActual_ConSqlException51110_TraduceAValidacionNegocio()
+    {
+        // Arrange
+        var exporter = new StubExcelExporter();
+        var serviceConExporter = CrearServiceConExporter(exporter);
+        var stockRepo = serviceConExporter.StockRepo;
+        var sqlEx = SqlExceptionBuilder.Crear(51110, "STOCK_INSUFICIENTE: idMaterial=2 disponible=2.00 solicitado=10.00");
+        stockRepo.OnListar = _ => throw sqlEx;
+
+        // Act + Assert
+        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(
+            () => serviceConExporter.Service.ExportarStockActualAsync(new KardexStockFiltroInventarioDto()));
+        Assert.That(ex!.Errores, Has.Count.EqualTo(1));
+        Assert.That(ex.Errores[0].CodigoError, Is.EqualTo(CodigosErrorInventario.Stock.StockInsuficiente));
+        Assert.That(exporter.Llamadas, Is.EqualTo(0),
+            "El exporter no debe invocarse si la consulta fallo con error de validacion.");
+    }
+
+    // =========================================================================
+    // Helpers para ExportarStockActualAsync
+    // =========================================================================
+
+    /// <summary>
+    /// Crea el service usando un <see cref="StubExcelExporter"/> provisto
+    /// (no el por defecto) para poder inspeccionar las llamadas.
+    /// </summary>
+    private static ServiceConStubs CrearServiceConExporter(StubExcelExporter exporter)
+    {
+        var entradaRepo = new StubKardexEntradaRepository();
+        var salidaRepo = new StubKardexSalidaRepository();
+        var stockRepo = new StubKardexStockRepository();
+        var esp = new StubEspecialidadRepository();
+        var mat = new StubMaterialRepository();
+        var prov = new StubProveedorRepository();
+        var proy = new StubProyectoRepository();
+        var validator = new KardexInventarioValidator(esp, mat, prov, proy);
+
+        var service = new KardexInventarioService(
+            entradaRepo, salidaRepo, stockRepo, validator,
+            exporter,
+            NullLogger<KardexInventarioService>.Instance);
+        return new ServiceConStubs(service, entradaRepo, salidaRepo, stockRepo, validator);
+    }
+
+    private sealed record ServiceConStubs(
+        KardexInventarioService Service,
+        StubKardexEntradaRepository EntradaRepo,
+        StubKardexSalidaRepository SalidaRepo,
+        StubKardexStockRepository StockRepo,
+        KardexInventarioValidator Validator)
+    {
+        public (StubKardexStockRepository, StubKardexEntradaRepository, StubKardexSalidaRepository, StubKardexStockRepository, KardexInventarioValidator) GetStubs()
+            => (StockRepo, EntradaRepo, SalidaRepo, StockRepo, Validator);
+    }
 }
