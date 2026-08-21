@@ -154,10 +154,9 @@ GO
 --   (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo,
 --    FechaCreacion, IdUnidadMedida, CodigoProveedor)
 -- Validaciones:
---   - 50001: IdEspecialidad, Descripcion, UnidadMedida obligatorios.
---   - 50002: Codigos duplicados dentro del archivo (Codigo es NULLable: solo
---            se valida si viene con valor).
---   - 50003: Codigos que ya existen en BD (idem).
+--   - 50001: IdEspecialidad, Codigo, Descripcion, UnidadMedida obligatorios.
+--   - 50002: Codigos duplicados dentro del archivo.
+--   - 50003: Codigos que ya existen en BD.
 --   - 50004: IdEspecialidad o IdUnidadMedida no existen en sus tablas.
 -- NOTA: el SP autogenera Codigo si llega NULL (sigue patron de usp_Material_Upsert
 --       en R__Maestra_SPs.sql: 'MAT-' + correlativo).
@@ -177,15 +176,15 @@ BEGIN
         IF EXISTS (
             SELECT 1 FROM @Filas
             WHERE IdEspecialidad IS NULL
+               OR NULLIF(LTRIM(RTRIM(Codigo)), '') IS NULL
                OR NULLIF(LTRIM(RTRIM(Descripcion)), '') IS NULL
                OR NULLIF(LTRIM(RTRIM(UnidadMedida)), '') IS NULL
         )
-            THROW 50001, 'CAMPO_OBLIGATORIO: IdEspecialidad, Descripcion y UnidadMedida son requeridos.', 1;
+            THROW 50001, 'CAMPO_OBLIGATORIO: IdEspecialidad, Codigo, Descripcion y UnidadMedida son requeridos.', 1;
 
-        -- Validacion 2: Codigos duplicados dentro del archivo (solo si vienen con valor)
+        -- Validacion 2: Codigos duplicados dentro del archivo
         IF EXISTS (
             SELECT Codigo FROM @Filas
-            WHERE NULLIF(LTRIM(RTRIM(Codigo)), '') IS NOT NULL
             GROUP BY Codigo
             HAVING COUNT(*) > 1
         )
@@ -196,7 +195,6 @@ BEGIN
             SELECT 1
             FROM @Filas f
             INNER JOIN maestra.Material m WITH (UPDLOCK, HOLDLOCK) ON m.Codigo = f.Codigo
-            WHERE NULLIF(LTRIM(RTRIM(f.Codigo)), '') IS NOT NULL
         )
             THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un Material con ese Codigo.', 1;
 
@@ -214,20 +212,14 @@ BEGIN
         )
             THROW 50004, 'FK_NO_EXISTE: Alguna fila referencia un IdUnidadMedida inexistente.', 1;
 
-        -- Insert con autogeneracion de Codigo cuando viene NULL.
-        -- Estrategia: si el Codigo es NULL, lo generamos como 'MAT-' + siguiente correlativo
-        -- dentro del mismo batch (ROW_NUMBER particionado) + el maximo actual en la tabla.
-        DECLARE @MaxActual INT = ISNULL(
-            (SELECT MAX(TRY_CONVERT(INT, REPLACE(Codigo, 'MAT-', ''))) FROM maestra.Material WHERE Codigo LIKE 'MAT-[0-9]%'),
-            0
-        );
+        -- Insert. Codigo es obligatorio en v2: ya no se autogenera, el SP lo
+        -- persiste tal cual llega (previamente trimeado por el processor).
         DECLARE @RowCount INT = 0;
         INSERT INTO maestra.Material
             (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo, FechaCreacion, IdUnidadMedida, CodigoProveedor)
         SELECT
             f.IdEspecialidad,
-            ISNULL(NULLIF(LTRIM(RTRIM(f.Codigo)), ''),
-                   CONCAT('MAT-', RIGHT(CONCAT('0000', @MaxActual + ROW_NUMBER() OVER (ORDER BY f._Fila)), 4))),
+            LTRIM(RTRIM(f.Codigo)),
             f.Descripcion,
             f.UnidadMedida,
             ISNULL(f.StockMinimo, 0),
@@ -235,6 +227,89 @@ BEGIN
             GETDATE(),
             f.IdUnidadMedida,
             NULLIF(LTRIM(RTRIM(f.CodigoProveedor)), '')
+        FROM @Filas f;
+        SET @RowCount = @@ROWCOUNT;
+
+        COMMIT;
+        SELECT @RowCount AS FilasInsertadas;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK;
+        THROW;
+    END CATCH
+END;
+GO
+
+
+-- -----------------------------------------------------------------------------
+-- Material v2: SP de carga masiva para la nueva plantilla amigable de 4
+-- columnas (Especialidad, Nombre, UnidadMedida, Codigo). El processor
+-- (MaterialImportProcessor) se encarga de:
+--   - Resolver IdEspecialidad / IdUnidadMedida (creando catalogos si hace
+--     falta) DENTRO de la misma transaccion, antes de invocar este SP.
+--   - Mapear "Nombre" -> Descripcion.
+-- Por lo tanto, el SP v2 NO genera catalogos: solo persiste la lista de
+-- filas ya validadas. Es deliberadamente mas simple que v1: no hace falta
+-- chequear FKs (ya las resolvio el processor) ni autogenerar Codigo.
+--
+-- Validaciones:
+--   - 50001: IdEspecialidad, Codigo, Descripcion, UnidadMedida obligatorios.
+--   - 50002: Codigos duplicados dentro del archivo.
+--   - 50003: Codigos que ya existen en BD.
+-- -----------------------------------------------------------------------------
+CREATE OR ALTER PROCEDURE [maestra].[usp_Material_CargaMasiva_v2]
+    @Filas maestra.TVP_Material_v2 READONLY,
+    @Usuario VARCHAR(100) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRAN;
+
+        -- Validacion 1: obligatoriedad. Las FKs ya fueron resueltas por el
+        -- processor; este SP solo verifica que el TVP venga completo.
+        IF EXISTS (
+            SELECT 1 FROM @Filas
+            WHERE IdEspecialidad IS NULL
+               OR NULLIF(LTRIM(RTRIM(Codigo)), '') IS NULL
+               OR NULLIF(LTRIM(RTRIM(Descripcion)), '') IS NULL
+               OR NULLIF(LTRIM(RTRIM(UnidadMedida)), '') IS NULL
+        )
+            THROW 50001, 'CAMPO_OBLIGATORIO: Codigo, Descripcion y UnidadMedida son requeridos.', 1;
+
+        -- Validacion 2: Codigos duplicados dentro del archivo
+        IF EXISTS (
+            SELECT Codigo FROM @Filas
+            GROUP BY Codigo
+            HAVING COUNT(*) > 1
+        )
+            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Codigo de Material repetido en el archivo.', 1;
+
+        -- Validacion 3: Codigos que ya existen en BD
+        IF EXISTS (
+            SELECT 1
+            FROM @Filas f
+            INNER JOIN maestra.Material m WITH (UPDLOCK, HOLDLOCK) ON m.Codigo = f.Codigo
+        )
+            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un Material con ese Codigo.', 1;
+
+        -- Insert. Defaults consistentes con v1: Activo=1, StockMinimo=0.
+        -- En v2 ambos siempre llegan con valor del processor, pero mantenemos
+        -- ISNULL como red de seguridad ante cambios futuros.
+        DECLARE @RowCount INT = 0;
+        INSERT INTO maestra.Material
+            (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo, FechaCreacion, IdUnidadMedida)
+        SELECT
+            f.IdEspecialidad,
+            LTRIM(RTRIM(f.Codigo)),
+            f.Descripcion,
+            f.UnidadMedida,
+            0,
+            1,
+            GETDATE(),
+            f.IdUnidadMedida
         FROM @Filas f;
         SET @RowCount = @@ROWCOUNT;
 

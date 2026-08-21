@@ -1,3 +1,4 @@
+using System.Data;
 using Cobranzas_Vittoria.Application.Inventario.Dtos;
 using Cobranzas_Vittoria.Application.Inventario.Persistence;
 using Cobranzas_Vittoria.Dtos.Maestra;
@@ -21,6 +22,9 @@ public sealed class StubEspecialidadRepository : IEspecialidadRepository
 {
     public List<Especialidad> Especialidades { get; } = new();
 
+    /// <summary>Bandera para forzar que <see cref="UpsertEnTransaccionAsync"/> lance una excepcion (ej: tests de retry de concurrencia).</summary>
+    public Func<EspecialidadUpsertDto, Task<int>>? OnUpsertEnTransaccion { get; set; }
+
     public Task<IEnumerable<Especialidad>> ListAsync(bool? activo)
     {
         IEnumerable<Especialidad> q = Especialidades;
@@ -28,8 +32,33 @@ public sealed class StubEspecialidadRepository : IEspecialidadRepository
         return Task.FromResult(q.AsEnumerable());
     }
 
+    public Task<IEnumerable<Especialidad>> ListEnTransaccionAsync(
+        bool? activo, IDbConnection cn, IDbTransaction? tx, CancellationToken ct)
+    {
+        // Reutiliza la logica de ListAsync; el test no usa realmente la transaccion
+        // porque opera sobre la coleccion in-memory.
+        return ListAsync(activo);
+    }
+
     public Task<int> UpsertAsync(EspecialidadUpsertDto dto)
         => throw new NotImplementedException("Stub no soporta UpsertAsync.");
+
+    public Task<int> UpsertEnTransaccionAsync(
+        EspecialidadUpsertDto dto, IDbConnection cn, IDbTransaction tx, CancellationToken ct)
+    {
+        if (OnUpsertEnTransaccion is not null)
+            return OnUpsertEnTransaccion(dto);
+
+        // Default: simula la insercion sumando 1 al maximo Id y agregando a la lista.
+        var nuevoId = Especialidades.Count == 0 ? 1 : Especialidades.Max(e => e.IdEspecialidad) + 1;
+        Especialidades.Add(new Especialidad
+        {
+            IdEspecialidad = nuevoId,
+            Nombre = dto.Nombre,
+            Activo = dto.Activo
+        });
+        return Task.FromResult(nuevoId);
+    }
 
     public void Add(int idEspecialidad, string nombre, bool activo = true)
         => Especialidades.Add(new Especialidad

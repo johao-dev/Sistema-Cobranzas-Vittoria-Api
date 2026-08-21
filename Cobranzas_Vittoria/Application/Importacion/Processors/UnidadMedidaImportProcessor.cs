@@ -20,7 +20,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 ///   - <c>Nombre</c>: requerido, se trimea. Mismo manejo que Codigo.
 ///   - <c>Activo</c>: opcional. Si la columna no existe o esta vacia, default true.
 /// </summary>
-public class UnidadMedidaImportProcessor : ImportProcessorBase<UnidadMedidaImportDto>
+public class UnidadMedidaImportProcessor : ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>
 {
     /// <summary>Modulo expuesto en la URL: <c>POST /api/import/unidad-medida</c>.</summary>
     public const string ModuloNombre = "unidad-medida";

@@ -6,6 +6,7 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Cobranzas_Vittoria.Tests.Unit.Importacion.Common;
 using Cobranzas_Vittoria.Tests.Unit.Importacion.Processors.Common;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -68,21 +69,6 @@ public class ImportProcessorBaseUnitTests
     }
 
     [Test]
-    public void ValidarEstructura_MasDe100Filas_LanzaDatosInvalidosConDemasiadasFilas()
-    {
-        // 101 filas validas (con Codigo y Nombre)
-        var filas = Enumerable.Range(1, 101)
-            .Select(i => CrearFila(i, $"C{i:000}", $"N{i}"))
-            .ToList();
-
-        var ex = Assert.Throws<DatosInvalidosException>(() => _processor.LlamarValidarEstructura(filas))!;
-        Assert.That(ex.Message, Does.Contain("101"));
-        Assert.That(ex.Errores.Count, Is.EqualTo(1));
-        Assert.That(ex.Errores[0].CodigoError, Is.EqualTo(CodigosError.Estructura.DemasiadasFilas));
-        Assert.That(ex.Errores[0].Fila, Is.EqualTo(0));
-    }
-
-    [Test]
     public void ValidarEstructura_FaltaEncabezadoRequerido_LanzaEstructuraInvalida()
     {
         // Construimos una fila sin la columna "Nombre" (solo con Codigo).
@@ -127,9 +113,12 @@ public class ImportProcessorBaseUnitTests
     }
 
     [Test]
-    public void ValidarEstructura_Exactamente100Filas_NoLanza()
+    public void ValidarEstructura_MuchasFilas_NoLanzaPorqueLimiteEsPorPeso()
     {
-        var filas = Enumerable.Range(1, 100)
+        // A diferencia de v1, en v2 NO hay limite de filas: el limite es por peso
+        // (5MB), validado en EjecutarAsync antes de llegar a ValidarEstructura.
+        // Por lo tanto, 200 filas validas no deben lanzar nada aqui.
+        var filas = Enumerable.Range(1, 200)
             .Select(i => CrearFila(i, $"C{i:000}", $"N{i}"))
             .ToList();
 
@@ -261,32 +250,62 @@ public class ImportProcessorBaseUnitTests
     [Test]
     public void MapearCodigoSql_50001_DevuelveCampoObligatorio()
     {
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50001), Is.EqualTo(CodigosError.Sp.CampoObligatorio));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50001), Is.EqualTo(CodigosError.Sp.CampoObligatorio));
     }
 
     [Test]
     public void MapearCodigoSql_50002_DevuelveValorDuplicadoEnArchivo()
     {
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50002), Is.EqualTo(CodigosError.Sp.ValorDuplicadoEnArchivo));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50002), Is.EqualTo(CodigosError.Sp.ValorDuplicadoEnArchivo));
     }
 
     [Test]
     public void MapearCodigoSql_50003_DevuelveValorYaExisteEnBd()
     {
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50003), Is.EqualTo(CodigosError.Sp.ValorYaExisteEnBd));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50003), Is.EqualTo(CodigosError.Sp.ValorYaExisteEnBd));
     }
 
     [Test]
     public void MapearCodigoSql_50004_DevuelveFkNoExiste()
     {
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50004), Is.EqualTo(CodigosError.Sp.FkNoExiste));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50004), Is.EqualTo(CodigosError.Sp.FkNoExiste));
     }
 
     [Test]
     public void MapearCodigoSql_FueraDeRango_DevuelveErrorValidacionN()
     {
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50099), Is.EqualTo($"{CodigosError.Sp.ErrorValidacionPrefijo}_50099"));
-        Assert.That(ImportProcessorBase<UnidadMedidaImportDto>.MapearCodigoSql(50100), Is.EqualTo($"{CodigosError.Sp.ErrorValidacionPrefijo}_50100"));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50099), Is.EqualTo($"{CodigosError.Sp.ErrorValidacionPrefijo}_50099"));
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MapearCodigoSql(50100), Is.EqualTo($"{CodigosError.Sp.ErrorValidacionPrefijo}_50100"));
+    }
+
+    // =========================================================================
+    // Validacion de peso (5 MB). Esta validacion se hace en EjecutarAsync
+    // ANTES de invocar el parser: si el archivo excede el limite, se lanza
+    // ArchivoInvalidoException con codigo TAMANIO_EXCEDIDO (mapea a HTTP 413).
+    // =========================================================================
+
+    [Test]
+    public void EjecutarAsync_ArchivoExcede5MB_LanzaArchivoInvalidoConTamanioExcedido()
+    {
+        // Creamos un IFormFile con Length = 5 MB + 1 byte. No necesitamos que sea
+        // un CSV/Excel valido porque la validacion de peso ocurre antes del parser.
+        var bytes = new byte[ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MaxBytesPorArchivo + 1];
+        var file = TestFormFiles.FromBytes(bytes, "archivo-grande.xlsx");
+
+        var ex = Assert.ThrowsAsync<ArchivoInvalidoException>(async () =>
+            await _processor.EjecutarAsync(file, "test-user", CancellationToken.None))!;
+
+        Assert.That(ex.Codigo, Is.EqualTo("TAMANIO_EXCEDIDO"));
+        Assert.That(ex.Message, Does.Contain("5"));
+    }
+
+    [Test]
+    public void MaxBytesPorArchivo_Es5MB()
+    {
+        // Constante publica: protege contra cambios accidentales del limite.
+        // Si se cambia, revisar el comentario en el header del endpoint
+        // y los tests de integracion que validan el codigo HTTP 413.
+        Assert.That(ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>.MaxBytesPorArchivo, Is.EqualTo(5L * 1024L * 1024L));
     }
 
     // =========================================================================

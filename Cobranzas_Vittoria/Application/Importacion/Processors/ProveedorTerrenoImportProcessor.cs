@@ -13,7 +13,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// Encabezados requeridos: <c>RazonSocial</c>.
 /// Opcionales: <c>Ruc</c>, datos de contacto, <c>Activo</c>.
 /// </summary>
-public class ProveedorTerrenoImportProcessor : ImportProcessorBase<ProveedorTerrenoImportDto>
+public class ProveedorTerrenoImportProcessor : ImportProcessorBase<ProveedorTerrenoImportDto, ProveedorTerrenoImportDto>
 {
     public const string ModuloNombre = "proveedor-terreno";
 

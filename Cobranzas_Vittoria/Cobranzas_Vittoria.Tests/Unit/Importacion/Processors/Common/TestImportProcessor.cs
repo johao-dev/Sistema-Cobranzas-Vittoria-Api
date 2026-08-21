@@ -11,15 +11,19 @@ using Microsoft.Extensions.Logging;
 namespace Cobranzas_Vittoria.Tests.Unit.Importacion.Processors.Common;
 
 /// <summary>
-/// Subclase concreta de <see cref="ImportProcessorBase{TDto}"/> usada SOLO en
-/// pruebas unitarias. Expone los miembros <c>protected</c> para poder
+/// Subclase concreta de <see cref="ImportProcessorBase{TArchivo, TTvp}"/> usada
+/// SOLO en pruebas unitarias. Expone los miembros <c>protected</c> para poder
 /// validarlos de forma aislada sin necesidad de parsers, conexiones ni SPs.
 ///
+/// Usa <typeparamref name="UnidadMedidaImportDto"/> para ambos parametros
+/// genericos (TArchivo = TTvp) porque su transformacion es 1-a-1. Para probar
+/// el caso donde TArchivo != TTvp (Material v2) se usan los tests del
+/// <c>MaterialImportProcessor</c> directamente.
+///
 /// Mantiene un mapeo trivial (cada fila genera un DTO con un contador en Codigo
-/// y el primer campo string como Nombre). Para probar mapeos reales de cada
-/// modulo se usan los tests unitarios de cada processor concreto.
+/// y el primer campo string como Nombre).
 /// </summary>
-internal sealed class TestImportProcessor : ImportProcessorBase<UnidadMedidaImportDto>
+internal sealed class TestImportProcessor : ImportProcessorBase<UnidadMedidaImportDto, UnidadMedidaImportDto>
 {
     /// <summary>Bandera para que <see cref="MapearFila"/> lance <see cref="KeyNotFoundException"/> en la fila indicada (1-based).</summary>
     public int? LanzarKeyNotFoundEnFila { get; set; }

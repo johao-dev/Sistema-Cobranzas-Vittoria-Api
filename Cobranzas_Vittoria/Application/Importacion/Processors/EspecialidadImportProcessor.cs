@@ -13,7 +13,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// Encabezados requeridos: <c>Nombre</c>.
 /// Opcionales: <c>Descripcion</c>, <c>Activo</c> (default true).
 /// </summary>
-public class EspecialidadImportProcessor : ImportProcessorBase<EspecialidadImportDto>
+public class EspecialidadImportProcessor : ImportProcessorBase<EspecialidadImportDto, EspecialidadImportDto>
 {
     public const string ModuloNombre = "especialidad";
 

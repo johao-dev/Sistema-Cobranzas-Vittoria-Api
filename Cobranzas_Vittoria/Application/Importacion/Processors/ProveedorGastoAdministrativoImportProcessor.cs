@@ -18,7 +18,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 ///   - <c>Ruc</c>: opcional, validacion de unicidad en SP solo si se proporciona.
 ///   - <c>IdCategoriaGasto</c>: opcional, entero; FK validada en SP.
 /// </summary>
-public class ProveedorGastoAdministrativoImportProcessor : ImportProcessorBase<ProveedorGastoAdministrativoImportDto>
+public class ProveedorGastoAdministrativoImportProcessor : ImportProcessorBase<ProveedorGastoAdministrativoImportDto, ProveedorGastoAdministrativoImportDto>
 {
     public const string ModuloNombre = "proveedor-gasto";
 

@@ -13,7 +13,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// Encabezados requeridos: <c>Nombre</c>.
 /// Opcionales: <c>Activo</c> (default true).
 /// </summary>
-public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoImportDto>
+public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoImportDto, CategoriaGastoImportDto>
 {
     public const string ModuloNombre = "categoria-gasto";
 

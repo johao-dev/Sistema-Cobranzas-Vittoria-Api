@@ -75,41 +75,38 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
     }
 
     // =========================================================================
-    // MATERIAL
+    // MATERIAL v2: usa TVP_Material_v2 (con IdEspecialidad/IdUnidadMedida
+    // ya resueltos) + SP usp_Material_CargaMasiva_v2. La resolucion de los
+    // catalogos (Especialidad, UnidadMedida por nombre) ocurre en el
+    // MaterialImportProcessor, NO en el SP. Aqui testeamos solo el SP.
     // =========================================================================
-    private const string SpMaterial = "maestra.usp_Material_CargaMasiva";
-    private const string TvpMaterial = "maestra.TVP_Material";
+    private const string SpMaterial = "maestra.usp_Material_CargaMasiva_v2";
+    private const string TvpMaterial = "maestra.TVP_Material_v2";
 
     [Test]
-    public async Task Material_HappyPath_Inserta2Filas_ConYSinCodigo()
+    public async Task Material_HappyPath_Inserta2Filas_ConCodigoManual()
     {
         var prefijo = PrefijoUnico();
 
         var dtos = new[]
         {
-            new MaterialImportDto
+            new MaterialImportTvpDto
             {
                 _Fila = 2,
                 IdEspecialidad = 1,                       // 'prueba' del seed
-                Codigo = $"{prefijo}-001",                // codigo manual
+                Codigo = $"{prefijo}-001",                // codigo manual obligatorio en v2
                 Descripcion = $"{prefijo} desc 1",
-                UnidadMedida = "BOL",
-                StockMinimo = 10m,
-                Activo = true,
                 IdUnidadMedida = null,
-                CodigoProveedor = "PROV-1"
+                UnidadMedida = "BOL"
             },
-            new MaterialImportDto
+            new MaterialImportTvpDto
             {
                 _Fila = 3,
                 IdEspecialidad = 1,
-                Codigo = null,                            // SP debe autogenerar MAT-####
+                Codigo = $"{prefijo}-002",                // codigo manual (v2 no autogenera)
                 Descripcion = $"{prefijo} desc 2",
-                UnidadMedida = "UND",
-                StockMinimo = 0m,
-                Activo = true,
                 IdUnidadMedida = null,
-                CodigoProveedor = null
+                UnidadMedida = "UND"
             }
         };
 
@@ -118,24 +115,18 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
 
         Assert.That(count, Is.EqualTo(2));
         Assert.That(ContarMaterialPorPrefijo(connection, prefijo), Is.EqualTo(2));
-
-        // El segundo dto no tenia codigo: verificamos que se genero uno.
-        var codigoGenerado = connection.QueryFirstOrDefault<string?>(
-            "SELECT Codigo FROM maestra.Material WHERE Descripcion = @Desc",
-            new { Desc = $"{prefijo} desc 2" });
-        Assert.That(codigoGenerado, Does.StartWith("MAT-"));
     }
 
     [Test]
-    public async Task Material_DescripcionVacia_Lanza50001_Rollback()
+    public async Task Material_CodigoVacio_Lanza50001_Rollback()
     {
         var prefijo = PrefijoUnico();
 
         var dtos = new[]
         {
-            new MaterialImportDto { _Fila = 2, IdEspecialidad = 1, Descripcion = $"{prefijo} ok",  UnidadMedida = "BOL", Activo = true },
-            new MaterialImportDto { _Fila = 3, IdEspecialidad = 1, Descripcion = "",                UnidadMedida = "BOL", Activo = true },
-            new MaterialImportDto { _Fila = 4, IdEspecialidad = 1, Descripcion = $"{prefijo} ok2", UnidadMedida = "BOL", Activo = true }
+            new MaterialImportTvpDto { _Fila = 2, IdEspecialidad = 1, Codigo = $"{prefijo}-OK1", Descripcion = $"{prefijo} ok",  UnidadMedida = "BOL" },
+            new MaterialImportTvpDto { _Fila = 3, IdEspecialidad = 1, Codigo = "",                Descripcion = $"{prefijo} bad", UnidadMedida = "BOL" },
+            new MaterialImportTvpDto { _Fila = 4, IdEspecialidad = 1, Codigo = $"{prefijo}-OK2", Descripcion = $"{prefijo} ok2", UnidadMedida = "BOL" }
         };
 
         using var connection = AbrirConexion();
@@ -146,30 +137,15 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
         Assert.That(ContarMaterialPorPrefijo(connection, prefijo), Is.EqualTo(0));
     }
 
-    [Test]
-    public async Task Material_IdEspecialidadInexistente_Lanza50004_FKNoExiste()
-    {
-        var prefijo = PrefijoUnico();
-
-        var dtos = new[]
-        {
-            new MaterialImportDto
-            {
-                _Fila = 2,
-                IdEspecialidad = 999_999,             // no existe
-                Descripcion = $"{prefijo} test",
-                UnidadMedida = "UND",
-                Activo = true
-            }
-        };
-
-        using var connection = AbrirConexion();
-        var ex = Assert.ThrowsAsync<SqlException>(async () =>
-            await _repo.ImportAsync(SpMaterial, TvpMaterial, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" }))!;
-
-        Assert.That(ex.Number, Is.EqualTo(50004));
-        Assert.That(ex.Message, Does.Contain("FK_NO_EXISTE"));
-    }
+    // NOTA: el test "Material_IdEspecialidadInexistente_Lanza50004_FKNoExiste"
+    // ya no aplica en v2. En el modelo v2, el MaterialImportProcessor
+    // resuelve los nombres de Especialidad y UnidadMedida a IDs a traves de
+    // ResolvedorEntidadesService, DENTRO de la transaccion que abrio la base.
+    // El resolver CREA la entidad si no existe (atomicidad real con la carga
+    // de Materiales). Por lo tanto, cuando el SP se invoca, los IDs siempre
+    // existen; el caso "IdEspecialidad inexistente" es imposible por contrato
+    // y queda cubierto en el service layer (ver
+    // ResolvedorEntidadesServiceUnitTests y MaterialImportProcessorUnitTests).
 
     // =========================================================================
     // PROVEEDOR

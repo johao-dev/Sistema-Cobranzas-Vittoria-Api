@@ -2,8 +2,10 @@ using Cobranzas_Vittoria.Application.Importacion.Dtos;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
+using Cobranzas_Vittoria.Application.Importacion.Services;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Cobranzas_Vittoria.Tests.Unit.Importacion.Stubs;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Data;
 
@@ -135,87 +137,118 @@ public class ImportProcessorsUnitTests
     }
 
     // =========================================================================
-    // MaterialImportProcessor
+    // MaterialImportProcessor (v2: 4 encabezados amigables)
     // =========================================================================
 
     [Test]
-    public void Material_FilaValida_ConCodigo_DevuelveDtoCompleto()
+    public void Material_FilaValida_DevuelveDtoCompleto()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
+        var processor = new MaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
         var fila = CrearFila(1,
-            "IdEspecialidad", "1",
-            "Codigo", "MAT-9999",
-            "Descripcion", "Cemento",
-            "UnidadMedida", "BOL",
-            "StockMinimo", "10.5",
-            "Activo", "true",
-            "IdUnidadMedida", "1",
-            "CodigoProveedor", "PROV-1");
+            "Especialidad", "Albañileria",
+            "Nombre", "Cemento Portland",
+            "UnidadMedida", "Bolsa",
+            "Codigo", "MAT-001");
 
         var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
-        Assert.That(dto.IdEspecialidad, Is.EqualTo(1));
-        Assert.That(dto.Codigo, Is.EqualTo("MAT-9999"));
-        Assert.That(dto.Descripcion, Is.EqualTo("Cemento"));
-        Assert.That(dto.UnidadMedida, Is.EqualTo("BOL"));
-        Assert.That(dto.StockMinimo, Is.EqualTo(10.5m));
-        Assert.That(dto.IdUnidadMedida, Is.EqualTo(1));
-        Assert.That(dto.CodigoProveedor, Is.EqualTo("PROV-1"));
+        Assert.That(dto.Especialidad, Is.EqualTo("Albañileria"));
+        Assert.That(dto.Nombre, Is.EqualTo("Cemento Portland"));
+        Assert.That(dto.UnidadMedida, Is.EqualTo("Bolsa"));
+        Assert.That(dto.Codigo, Is.EqualTo("MAT-001"));
     }
 
     [Test]
-    public void Material_FilaSinCodigo_CodigoEsNull_ParaAutogenerarEnSp()
+    public void Material_EspecialidadVacia_LanzaKeyNotFound()
     {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
+        var processor = new MaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
         var fila = CrearFila(1,
-            "IdEspecialidad", "1",
-            "Descripcion", "Arena",
-            "UnidadMedida", "M3");
-
-        var dto = processor.MapearFila(fila);
-
-        Assert.That(dto.Codigo, Is.Null);
-        Assert.That(dto.StockMinimo, Is.EqualTo(0m));
-        Assert.That(dto.IdUnidadMedida, Is.Null);
-    }
-
-    [Test]
-    public void Material_IdEspecialidadNoEntero_LanzaFormatException()
-    {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "IdEspecialidad", "abc",
-            "Descripcion", "X",
-            "UnidadMedida", "UND");
-
-        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
-    }
-
-    [Test]
-    public void Material_StockMinimoInvalido_LanzaFormatException()
-    {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "IdEspecialidad", "1",
-            "Descripcion", "X",
-            "UnidadMedida", "UND",
-            "StockMinimo", "no-es-numero");
-
-        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
-    }
-
-    [Test]
-    public void Material_DescripcionVacia_LanzaKeyNotFound()
-    {
-        var processor = new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "IdEspecialidad", "1",
-            "Descripcion", "",
-            "UnidadMedida", "UND");
+            "Especialidad", "  ",
+            "Nombre", "Cemento",
+            "UnidadMedida", "Bolsa",
+            "Codigo", "MAT-001");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
-        Assert.That(ex.Message, Does.Contain("Descripcion"));
+        Assert.That(ex.Message, Does.Contain("Especialidad"));
+    }
+
+    [Test]
+    public void Material_NombreVacio_LanzaKeyNotFound()
+    {
+        var processor = new MaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
+        var fila = CrearFila(1,
+            "Especialidad", "Albañileria",
+            "Nombre", "",
+            "UnidadMedida", "Bolsa",
+            "Codigo", "MAT-001");
+
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
+        Assert.That(ex.Message, Does.Contain("Nombre"));
+    }
+
+    [Test]
+    public void Material_UnidadMedidaVacia_LanzaKeyNotFound()
+    {
+        var processor = new MaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
+        var fila = CrearFila(1,
+            "Especialidad", "Albañileria",
+            "Nombre", "Cemento",
+            "UnidadMedida", "  ",
+            "Codigo", "MAT-001");
+
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
+        Assert.That(ex.Message, Does.Contain("UnidadMedida"));
+    }
+
+    [Test]
+    public void Material_CodigoVacio_LanzaKeyNotFound_EnV2EsObligatorio()
+    {
+        // En v2 el codigo NO se autogenera: si viene vacio, la fila se rechaza.
+        var processor = new MaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
+        var fila = CrearFila(1,
+            "Especialidad", "Albañileria",
+            "Nombre", "Cemento",
+            "UnidadMedida", "Bolsa",
+            "Codigo", "");
+
+        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
+        Assert.That(ex.Message, Does.Contain("Codigo"));
+    }
+
+    [Test]
+    public void Material_EncabezadosRequeridos_Contiene4NombresAmigables()
+    {
+        // Verifica que la plantilla exige los 4 encabezados visibles al usuario
+        // (Especialidad, Nombre, UnidadMedida, Codigo), no los IDs tecnicos.
+        // EncabezadosRequeridos es protected, asi que usamos una subclase de
+        // prueba para exponerlo sin contaminar la API publica.
+        var processor = new TestMaterialImportProcessor(
+            _parserResolver, _repository, _connectionFactory,
+            new StubResolvedorEntidadesService(), NullLogger<MaterialImportProcessor>.Instance);
+
+        var encabezados = processor.GetEncabezadosRequeridos();
+
+        Assert.That(encabezados.Length, Is.EqualTo(4));
+        Assert.That(encabezados, Does.Contain("Especialidad"));
+        Assert.That(encabezados, Does.Contain("Nombre"));
+        Assert.That(encabezados, Does.Contain("UnidadMedida"));
+        Assert.That(encabezados, Does.Contain("Codigo"));
     }
 
     // =========================================================================
@@ -390,11 +423,12 @@ public class ImportProcessorsUnitTests
     [Test]
     public void TodosLosModulos_TienenModuloSpYTvpAsignados()
     {
+        var stubResolvedor = new StubResolvedorEntidadesService();
         Assert.Multiple(() =>
         {
             Assert.That(new UnidadMedidaImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<UnidadMedidaImportProcessor>.Instance).Modulo, Is.EqualTo("unidad-medida"));
             Assert.That(new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance).Modulo, Is.EqualTo("especialidad"));
-            Assert.That(new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<MaterialImportProcessor>.Instance).Modulo, Is.EqualTo("material"));
+            Assert.That(new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, stubResolvedor, NullLogger<MaterialImportProcessor>.Instance).Modulo, Is.EqualTo("material"));
             Assert.That(new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor"));
             Assert.That(new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-gasto"));
             Assert.That(new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-terreno"));
@@ -434,5 +468,25 @@ public class ImportProcessorsUnitTests
     private sealed class StubConnectionFactory : IDbConnectionFactory
     {
         public IDbConnection CreateConnection() => throw new NotSupportedException("Stub usado solo para construir processors en unit tests.");
+    }
+
+    /// <summary>
+    /// Subclase de prueba que expone <c>EncabezadosRequeridos</c> como public.
+    /// El proyecto no usa Moq; la herencia es la forma de acceder a miembros
+    /// protected desde los tests sin contaminar la API publica del processor.
+    /// </summary>
+    private sealed class TestMaterialImportProcessor : MaterialImportProcessor
+    {
+        public TestMaterialImportProcessor(
+            FileParserResolver parserResolver,
+            IImportRepository repository,
+            IDbConnectionFactory connectionFactory,
+            ResolvedorEntidadesService resolvedor,
+            Microsoft.Extensions.Logging.ILogger<MaterialImportProcessor> logger)
+            : base(parserResolver, repository, connectionFactory, resolvedor, logger)
+        {
+        }
+
+        public string[] GetEncabezadosRequeridos() => EncabezadosRequeridos;
     }
 }

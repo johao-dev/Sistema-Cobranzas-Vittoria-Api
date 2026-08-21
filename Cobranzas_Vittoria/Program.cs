@@ -133,6 +133,11 @@ builder.Services.AddScoped<IImportProcessor, ProveedorGastoAdministrativoImportP
 builder.Services.AddScoped<IImportProcessor, ProveedorTerrenoImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, CategoriaGastoImportProcessor>();
 
+// ResolvedorEntidadesService: servicio transversal usado por MaterialImportProcessor
+// para resolver IDs de catalogos (Especialidad, UnidadMedida) dentro de la
+// transaccion de carga masiva. Scoped porque depende de repos scoped.
+builder.Services.AddScoped<ResolvedorEntidadesService>();
+
 // IImportService recibe IEnumerable<IImportProcessor> y arma el diccionario
 // modulo -> processor en su constructor.
 builder.Services.AddScoped<IImportService, ImportService>();

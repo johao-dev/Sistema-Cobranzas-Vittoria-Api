@@ -5,7 +5,6 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Logging;
 
 namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 
@@ -13,40 +12,75 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// Clase base abstracta que implementa el patron Template Method para la
 /// importacion masiva.
 ///
-/// El algoritmo de importacion esta definido aqui y es invariable:
-///   1. <b>Resolucion del parser</b>: se delega al <see cref="FileParserResolver"/>
-///      para elegir entre CSV, XLSX o XLS segun extension + magic numbers.
-///   2. <b>Parseo</b>: el parser convierte el <see cref="IFormFile"/> en una lista
-///      de <see cref="SpreadsheetRow"/>.
-///   3. <b>Validacion de estructura</b>: cantidad de filas dentro del limite,
-///      y presencia de los encabezados requeridos declarados por la subclase.
-///   4. <b>Mapeo fila-a-DTO</b>: delega en <see cref="MapearFila"/>, capturando
-///      excepciones de conversion (FormatException, KeyNotFoundException) y
-///      traduciendolas a <see cref="DetalleErrorFila"/>.
-///   5. <b>Validacion de filas</b>: si se acumulo algun error, aborta con
-///      <see cref="DatosInvalidosException"/> sin tocar la BD.
-///   6. <b>Persistencia transaccional</b>: abre conexion + transaccion,
-///      invoca el SP con el TVP, hace commit.
-///   7. <b>Traduccion de errores del SP</b>: si el SP lanza SqlException con
-///      numero 50001-50004 (validaciones de negocio), se traduce a
-///      <see cref="DatosInvalidosException"/> para mantener un unico contrato HTTP.
+/// <para>
+/// <b>Algoritmo de importacion:</b>
+/// <list type="number">
+///   <item><b>Validacion de peso</b>: el archivo no debe exceder
+///         <see cref="MaxBytesPorArchivo"/>; si lo excede, se lanza
+///         <see cref="ArchivoInvalidoException"/> con codigo
+///         <c>TAMANIO_EXCEDIDO</c> (mapea a HTTP 413).</item>
+///   <item><b>Resolucion de parser</b>: se delega al
+///         <see cref="FileParserResolver"/> para elegir entre CSV, XLSX o XLS
+///         segun extension + magic numbers.</item>
+///   <item><b>Parseo</b>: el parser convierte el <see cref="IFormFile"/> en
+///         una lista de <see cref="SpreadsheetRow"/>.</item>
+///   <item><b>Validacion de estructura</b>: presencia de los encabezados
+///         requeridos declarados por la subclase.</item>
+///   <item><b>Mapeo fila-a-DTO de archivo</b>: delega en
+///         <see cref="MapearFila"/>, capturando excepciones de conversion y
+///         traduciendolas a <see cref="DetalleErrorFila"/>.</item>
+///   <item><b>Validacion de filas</b>: si se acumulo algun error, aborta con
+///         <see cref="DatosInvalidosException"/> sin tocar la BD.</item>
+///   <item><b>Construccion del TVP</b>: se delega en
+///         <see cref="OnConstruirTvpAsync"/>. Para los 6 modulos sin logica
+///         adicional, el default convierte archivo-a-TVP 1-a-1. Para Material
+///         v2, la subclase override resuelve catalogos y mapea IDs.</item>
+///   <item><b>Persistencia transaccional</b>: abre conexion + transaccion,
+///         invoca el SP con el TVP, hace commit.</item>
+///   <item><b>Traduccion de errores del SP</b>: si el SP lanza
+///         <see cref="SqlException"/> 50001-50004 (validaciones de negocio),
+///         se traduce a <see cref="DatosInvalidosException"/>.</item>
+/// </list>
+/// </para>
 ///
-/// Las subclases concretas solo necesitan implementar:
-///   - <see cref="Modulo"/>
-///   - <see cref="SpName"/>
-///   - <see cref="TvpTypeName"/>
-///   - <see cref="EncabezadosRequeridos"/>
-///   - <see cref="MapearFila"/>
-/// </summary>
-/// <typeparam name="TDto">
-/// Tipo del DTO de importacion (ej: <c>UnidadMedidaImportDto</c>).
-/// Debe ser una clase con propiedades publicas en el mismo orden que el TVP
-/// (requerido por <see cref="TvpMapper"/>).
+/// <para>
+/// <b>Subclases concretas solo necesitan implementar:</b>
+/// <list type="bullet">
+///   <item><see cref="Modulo"/></item>
+///   <item><see cref="SpName"/></item>
+///   <item><see cref="TvpTypeName"/></item>
+///   <item><see cref="EncabezadosRequeridos"/></item>
+///   <item><see cref="MapearFila"/></item>
+/// </list>
+/// Si la transformacion archivo-a-TVP es trivial (mismo shape), no es
+/// necesario override de <see cref="OnConstruirTvpAsync"/>: el comportamiento
+/// default funciona (1-a-1 cast).
+/// </para>
+///
+/// <typeparam name="TArchivo">
+/// Tipo del DTO que representa una fila del archivo (ej:
+/// <c>MaterialImportDto</c> con 4 campos string). Se usa en
+/// <see cref="MapearFila"/>.
 /// </typeparam>
-public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : class
+/// <typeparam name="TTvp">
+/// Tipo del DTO que se envia al TVP (ej: <c>MaterialImportTvpDto</c> con IDs
+/// resueltos). Se usa al invocar el SP. Si el shape es identico a TArchivo,
+/// la subclase puede usar el mismo tipo para ambos parametros genericos.
+/// </typeparam>
+/// </summary>
+public abstract class ImportProcessorBase<TArchivo, TTvp> : IImportProcessor
+    where TArchivo : class
+    where TTvp : class
 {
-    /// <summary>Limite maximo de filas que puede contener un archivo de importacion.</summary>
-    public const int MaxFilasPorArchivo = 100;
+    /// <summary>
+    /// Tamano maximo del archivo de importacion en bytes (5 MB). Reemplaza
+    /// al antiguo limite de 100 filas porque el feature ahora soporta
+    /// archivos grandes (decenas de miles de filas) siempre que el peso
+    /// no exceda este umbral. Se valida en el processor (no en
+    /// <c>FileValidator</c>) para mantener el control cerca de la logica
+    /// de negocio.
+    /// </summary>
+    public const long MaxBytesPorArchivo = 5L * 1024L * 1024L;
 
     protected readonly FileParserResolver ParserResolver;
     protected readonly IImportRepository Repository;
@@ -86,7 +120,10 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     protected abstract string[] EncabezadosRequeridos { get; }
 
     /// <summary>
-    /// Convierte una fila del archivo en el DTO de importacion.
+    /// Convierte una fila del archivo en el DTO de importacion (forma
+    /// "archivo"). Esta representacion puede no coincidir con la forma TVP:
+    /// por ejemplo, Material v2 recibe strings (Especialidad, UnidadMedida)
+    /// y luego se traducen a IDs antes de invocar el SP.
     ///
     /// Esta implementacion puede lanzar:
     ///   - <see cref="KeyNotFoundException"/>: si la columna requerida no existe o esta vacia.
@@ -96,14 +133,48 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     ///
     /// Todas estas excepciones son capturadas por la base y traducidas a
     /// <see cref="DetalleErrorFila"/> con el numero de fila correspondiente.
-    ///
-    /// Se declara <c>internal</c> (no <c>protected</c>) para que el proyecto de
-    /// tests pueda invocarlo directamente sin reflection ni <c>dynamic</c>. La
-    /// visibilidad externa de la API no cambia porque sigue siendo accesible
-    /// solo desde el mismo assembly o, via <c>InternalsVisibleTo</c>, desde
-    /// el assembly de tests.
     /// </summary>
-    internal abstract TDto MapearFila(SpreadsheetRow fila);
+    internal abstract TArchivo MapearFila(SpreadsheetRow fila);
+
+    // ============================================================================
+    // Hook de extension: archivo -> TVP
+    // ============================================================================
+
+    /// <summary>
+    /// Hook opcional para que las subclases conviertan la lista de DTOs de
+    /// archivo en la lista de DTOs de TVP. La implementacion default hace un
+    /// cast 1-a-1 (util cuando <typeparamref name="TArchivo"/> y
+    /// <typeparamref name="TTvp"/> son el mismo tipo, como en los 6 modulos
+    /// que no necesitan transformacion).
+    ///
+    /// <para>
+    /// Las subclases que SÍ necesitan transformacion (ej: Material v2,
+    /// donde el archivo trae strings y el TVP espera IDs) override este
+    /// metodo. La implementacion override se ejecuta DENTRO de la transaccion
+    /// que abrio la base, lo cual permite que la subclase haga lecturas y
+    /// escrituras atomicas con la insercion final del SP.
+    /// </para>
+    /// </summary>
+    /// <param name="archivos">DTOs validados de la plantilla del usuario.</param>
+    /// <param name="cn">Conexion abierta de la transaccion en curso.</param>
+    /// <param name="tx">Transaccion en curso (la misma que se usara para el SP).</param>
+    /// <param name="ct">Token de cancelacion.</param>
+    /// <returns>Lista de DTOs con la forma que espera el TVP.</returns>
+    protected virtual Task<IReadOnlyList<TTvp>> OnConstruirTvpAsync(
+        IReadOnlyList<TArchivo> archivos,
+        IDbConnection cn,
+        IDbTransaction tx,
+        CancellationToken ct)
+    {
+        // Default 1-a-1: solo funciona si TArchivo y TTvp son el mismo tipo.
+        // La conversion se hace via Cast<TTvp> que fallara en runtime si los
+        // tipos no son compatibles. Es una garantia estatica: si el processor
+        // declara ImportProcessorBase<MaterialImportDto, MaterialImportDto>,
+        // el cast funciona; si declara tipos distintos, DEBE override este
+        // metodo.
+        var tvps = archivos.Cast<TTvp>().ToList();
+        return Task.FromResult<IReadOnlyList<TTvp>>(tvps);
+    }
 
     // ============================================================================
     // Template Method
@@ -113,6 +184,22 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentException.ThrowIfNullOrEmpty(usuario);
+
+        // 0. Validar peso del archivo. Reemplazo al antiguo limite de 100 filas.
+        //    Se valida aqui (no en FileValidator) porque el limite es propio de
+        //    la logica de importacion (otros endpoints pueden tolerar archivos
+        //    mas grandes). El codigo "TAMANIO_EXCEDIDO" ya esta mapeado a
+        //    HTTP 413 en el ApiExceptionMiddleware.
+        if (file.Length > MaxBytesPorArchivo)
+        {
+            var mb = file.Length / 1024d / 1024d;
+            Logger.LogWarning(
+                "[{Modulo}] Archivo rechazado por peso. Tamano={Tamano:F2}MB Maximo={Maximo}MB",
+                Modulo, mb, MaxBytesPorArchivo / 1024d / 1024d);
+            throw new ArchivoInvalidoException(
+                "TAMANIO_EXCEDIDO",
+                $"El archivo supera el tamano maximo permitido de {MaxBytesPorArchivo / 1024 / 1024} MB. Tamano actual: {mb:F2} MB.");
+        }
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
         Logger.LogInformation(
@@ -132,16 +219,13 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             "[{Modulo}] Estructura validada: {CantidadFilas} filas, encabezados OK",
             Modulo, filas.Count);
 
-        // 4-5. Mapeo + validacion de filas
-        var dtos = new List<TDto>(filas.Count);
+        // 4-5. Mapeo + validacion de filas (forma "archivo")
+        var archivos = new List<TArchivo>(filas.Count);
         var errores = new List<DetalleErrorFila>();
-        MapearFilas(filas, dtos, errores);
+        MapearFilas(filas, archivos, errores);
 
         if (errores.Count > 0)
         {
-            // Warning: el archivo se rechazo por validacion. Logueamos los codigos
-            // de error (metadata, NO el contenido de las filas) para detectar
-            // patrones en produccion (ej: muchos CAMPO_REQUERIDO en codigo).
             var codigosUnicos = errores
                 .GroupBy(e => e.CodigoError)
                 .Select(g => $"{g.Key}={g.Count()}")
@@ -155,11 +239,11 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
         }
 
         Logger.LogDebug(
-            "[{Modulo}] Mapeo completado: {CantidadDtos} DTOs sin errores",
-            Modulo, dtos.Count);
+            "[{Modulo}] Mapeo completado: {CantidadArchivos} DTOs de archivo sin errores",
+            Modulo, archivos.Count);
 
-        // 6-7. Persistencia transaccional
-        var filasInsertadas = await EjecutarCargaAsync(dtos, usuario, ct);
+        // 6-8. Construccion del TVP + persistencia transaccional
+        var filasInsertadas = await EjecutarCargaAsync(archivos, usuario, ct);
 
         sw.Stop();
         Logger.LogInformation(
@@ -174,9 +258,16 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     // ============================================================================
 
     /// <summary>
-    /// Valida la cantidad de filas y los encabezados requeridos. Lanza
+    /// Valida los encabezados requeridos. Lanza
     /// <see cref="DatosInvalidosException"/> si el archivo esta vacio o
     /// <see cref="EstructuraInvalidaException"/> si faltan encabezados.
+    ///
+    /// <para>
+    /// A diferencia de la v1, esta validacion NO incluye un limite de filas
+    /// (eliminado al introducir el limite de peso). Los archivos pueden
+    /// contener cualquier cantidad de filas; el cuello de botella es el
+    /// peso (5 MB), no la cantidad.
+    /// </para>
     /// </summary>
     protected virtual void ValidarEstructura(IReadOnlyList<SpreadsheetRow> filas)
     {
@@ -185,17 +276,6 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             throw new DatosInvalidosException(
                 "El archivo no contiene filas de datos (solo encabezados o esta vacio).",
                 Array.Empty<DetalleErrorFila>());
-        }
-
-        if (filas.Count > MaxFilasPorArchivo)
-        {
-            throw new DatosInvalidosException(
-                $"El archivo contiene {filas.Count} filas, excede el maximo permitido de {MaxFilasPorArchivo}.",
-                new[]
-                {
-                    new DetalleErrorFila(0, string.Empty, CodigosError.Estructura.DemasiadasFilas,
-                        $"El maximo es {MaxFilasPorArchivo} filas por archivo.")
-                });
         }
 
         // Tomamos los encabezados de la primera fila del archivo.
@@ -219,13 +299,13 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     }
 
     /// <summary>
-    /// Mapea cada fila al DTO. Los errores de conversion se acumulan en
-    /// <paramref name="errores"/> en lugar de abortar el mapeo completo: asi
+    /// Mapea cada fila al DTO de archivo. Los errores de conversion se acumulan
+    /// en <paramref name="errores"/> en lugar de abortar el mapeo completo: asi
     /// el usuario recibe TODOS los errores en una sola respuesta 422.
     /// </summary>
     protected virtual void MapearFilas(
         IReadOnlyList<SpreadsheetRow> filas,
-        List<TDto> dtos,
+        List<TArchivo> archivos,
         List<DetalleErrorFila> errores)
     {
         foreach (var fila in filas)
@@ -233,12 +313,10 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             try
             {
                 var dto = MapearFila(fila);
-                dtos.Add(dto);
+                archivos.Add(dto);
             }
             catch (DatosInvalidosException dex) when (dex.Errores.Count > 0)
             {
-                // La subclase ya construyo un DetalleErrorFila con contexto
-                // (fila, campo, mensaje). Lo agregamos a la coleccion global.
                 errores.AddRange(dex.Errores);
             }
             catch (KeyNotFoundException ex)
@@ -260,44 +338,80 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
     }
 
     /// <summary>
-    /// Abre la conexion, inicia la transaccion, invoca el SP y commitea.
-    /// Si el SP lanza <see cref="SqlException"/> 50001-50004, se traduce a
-    /// <see cref="DatosInvalidosException"/> con el mensaje original.
+    /// Abre la conexion, inicia la transaccion, delega en
+    /// <see cref="OnConstruirTvpAsync"/> para construir el TVP, invoca el SP
+    /// y commitea. Si el SP lanza <see cref="SqlException"/> 50001-50004, se
+    /// traduce a <see cref="DatosInvalidosException"/> con el mensaje original.
+    ///
+    /// <para>
+    /// Se hizo PRIVATE de nuevo (igual que en v1) para que las subclases NO
+    /// puedan intervenir en la transaccion. Las subclases que necesitan logica
+    /// adicional (resolucion de catalogos, calculos derivados) override
+    /// <see cref="OnConstruirTvpAsync"/>, que se invoca DENTRO de la
+    /// transaccion que abrimos aca. Asi el patron Template Method sigue
+    /// rigiendo el flujo transaccional.
+    /// </para>
     /// </summary>
     private async Task<int> EjecutarCargaAsync(
-        IReadOnlyList<TDto> dtos, string usuario, CancellationToken ct)
+        IReadOnlyList<TArchivo> archivos, string usuario, CancellationToken ct)
     {
         IDbConnection? connection = null;
         IDbTransaction? transaction = null;
         try
         {
             connection = ConnectionFactory.CreateConnection();
-        // SqlConnectionFactory abre la conexion sincronamente en CreateConnection().
-        // Solo abrimos via OpenAsync si llegamos a recibir una conexion cerrada
-        // (p.ej. en tests con un fake factory). Esto evita
-        // InvalidOperationException("Connection already open").
-        if (connection.State != ConnectionState.Open)
-        {
-            if (connection is SqlConnection sqlConn)
+            if (connection.State != ConnectionState.Open)
             {
-                await sqlConn.OpenAsync(ct);
+                if (connection is SqlConnection sqlConn)
+                {
+                    await sqlConn.OpenAsync(ct);
+                }
+                else
+                {
+                    connection.Open();
+                }
             }
-            else
-            {
-                connection.Open();
-            }
-        }
 
             transaction = connection.BeginTransaction();
             Logger.LogDebug(
                 "[{Modulo}] Conexion abierta y transaccion iniciada. SP={Sp} TVP={Tvp} Filas={Filas}",
-                Modulo, SpName, TvpTypeName, dtos.Count);
+                Modulo, SpName, TvpTypeName, archivos.Count);
+
+            // Construir el TVP dentro de la transaccion. Esto permite que la
+            // subclase (si override OnConstruirTvpAsync) haga lecturas y
+            // escrituras atomicas con la insercion final del SP.
+            IReadOnlyList<TTvp> tvps;
+            try
+            {
+                tvps = await OnConstruirTvpAsync(archivos, connection, transaction, ct);
+            }
+            catch (Exception ex) when (ex is not DatosInvalidosException)
+            {
+                // Si la transformacion archivo -> TVP falla (ej: no se pudo
+                // resolver un catalogo), hacemos rollback y relanzamos.
+                transaction.Rollback();
+                Logger.LogError(ex,
+                    "[{Modulo}] Fallo la construccion del TVP. TipoError={TipoError}",
+                    Modulo, ex.GetType().Name);
+                throw;
+            }
+
+            if (tvps.Count == 0)
+            {
+                // Sin filas para TVP (no deberia pasar porque ValidarEstructura
+                // ya rechazo el caso vacio, pero defendemos en profundidad).
+                transaction.Rollback();
+                Logger.LogWarning(
+                    "[{Modulo}] OnConstruirTvpAsync devolvio 0 filas; no se invoca el SP.",
+                    Modulo);
+                return 0;
+            }
 
             try
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var count = await Repository.ImportAsync(
-                    SpName, TvpTypeName, dtos, connection, transaction,
+                    SpName, TvpTypeName, tvps, connection, transaction,
                     new { Usuario = usuario }, ct);
                 sw.Stop();
                 Logger.LogDebug(
@@ -311,9 +425,6 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             catch (SqlException ex) when (ex.Number is >= 50001 and <= 50099)
             {
                 transaction.Rollback();
-                // Warning: el SP rechazo la carga por validacion de negocio.
-                // Logueamos numero, codigo mapeado y mensaje. No se incluye
-                // contenido de filas para evitar PII en logs.
                 Logger.LogWarning(
                     "[{Modulo}] SP rechazo la carga (SqlException {Numero} -> {CodigoError}): {Mensaje}",
                     Modulo, ex.Number, MapearCodigoSql(ex.Number), ex.Message);
@@ -322,8 +433,6 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
             catch (SqlException ex)
             {
                 transaction.Rollback();
-                // Error: fallo de SQL no esperado (timeout, conexion, etc).
-                // Distinto del catch anterior: este NO es una validacion de negocio.
                 Logger.LogError(ex,
                     "[{Modulo}] Error de SQL no esperado (Numero={Numero}). Transaccion revertida.",
                     Modulo, ex.Number);
@@ -352,9 +461,7 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
 
     /// <summary>
     /// Traduce una <see cref="SqlException"/> lanzada por el SP a una
-    /// <see cref="DatosInvalidosException"/>. Por ahora la fila reportada es 0
-    /// (no se incluye en el THROW); mejorar el SP para emitir la fila y
-    /// parsearla aqui es una mejora futura.
+    /// <see cref="DatosInvalidosException"/>.
     /// </summary>
     internal static DatosInvalidosException TraducirSqlException(SqlException ex)
     {
@@ -371,9 +478,6 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
 
     /// <summary>
     /// Mapea el numero de error del SP a un codigo de error legible.
-    /// Extraido de <see cref="TraducirSqlException"/> para poder testearlo
-    /// sin necesidad de instanciar un <see cref="SqlException"/> (que es sealed
-    /// y no tiene constructor publico).
     /// Se declara <c>internal</c> (no <c>public</c>) para que solo lo consuma
     /// el processor y el proyecto de tests.
     /// </summary>
@@ -391,13 +495,6 @@ public abstract class ImportProcessorBase<TDto> : IImportProcessor where TDto : 
 
     // ============================================================================
     // Helpers de mapeo reutilizables para las subclases.
-    //
-    // Centralizan la logica repetida de "columna opcional con default" que
-    // antes duplicaban los 7 processors: tres lineas de ContieneColumna +
-    // TryGetString + TryGetT para parsear un valor que puede estar ausente.
-    // Lanzan <see cref="FormatException"/> (mapeado por la base a
-    // CodigosError.Fila.FormatoInvalido) si la columna existe pero el valor
-    // no es parseable.
     // ============================================================================
 
     /// <summary>

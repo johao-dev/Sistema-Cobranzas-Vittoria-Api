@@ -19,7 +19,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 ///   - <c>TrabajamosConProveedor</c>: opcional, string libre (max 10 chars).
 ///   - Resto: opcionales, strings libres.
 /// </summary>
-public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto>
+public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto, ProveedorImportDto>
 {
     public const string ModuloNombre = "proveedor";
 

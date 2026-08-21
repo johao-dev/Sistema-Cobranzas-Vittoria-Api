@@ -42,13 +42,13 @@ public interface IImportProcessor
     /// <param name="file">Archivo enviado en el request HTTP.</param>
     /// <param name="usuario">Identificador del usuario que ejecuta la importacion (para @Usuario del SP).</param>
     /// <param name="ct">Token de cancelacion.</param>
-    /// <exception cref="Cobranzas_Vittoria.Application.Importacion.Excepciones.ArchivoInvalidoException">
+    /// <exception cref="Excepciones.ArchivoInvalidoException">
     ///     Extension/MIME/tamanio invalido. HTTP 400 o 413.
     /// </exception>
-    /// <exception cref="Cobranzas_Vittoria.Application.Importacion.Excepciones.EstructuraInvalidaException">
+    /// <exception cref="Excepciones.EstructuraInvalidaException">
     ///     Encoding, delimitador, encabezados faltantes. HTTP 400.
     /// </exception>
-    /// <exception cref="Cobranzas_Vittoria.Application.Importacion.Excepciones.DatosInvalidosException">
+    /// <exception cref="Excepciones.DatosInvalidosException">
     ///     Fila con tipo/formato/regla de negocio invalida, o error del SP. HTTP 422.
     /// </exception>
     Task<ResultadoImportacion> EjecutarAsync(IFormFile file, string usuario, CancellationToken ct);

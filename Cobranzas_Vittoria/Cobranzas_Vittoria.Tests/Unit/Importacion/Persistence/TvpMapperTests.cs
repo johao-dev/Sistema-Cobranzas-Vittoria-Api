@@ -127,6 +127,11 @@ public class TvpMapperTests
     // correspondiente. El orden de columnas es importante porque TvpMapper usa
     // el orden de declaracion de las propiedades, y el SQL rechaza la insercion
     // si los tipos no calzan (ej. string -> bit).
+    //
+    // NOTA: MaterialImportDto (plantilla amigable de 4 encabezados) NO se
+    // mapea a TVP directamente. La conversion a TVP se hace con
+    // MaterialImportTvpDto, testeada en
+    // ToDataTable_ConMaterialTvpDto_MapeaValoresIncluyendoNulables mas abajo.
     // ====================================================================
 
     [Test]
@@ -138,23 +143,6 @@ public class TvpMapperTests
         Assert.That(dataTable.Columns["Nombre"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Descripcion"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
-        Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));
-    }
-
-    [Test]
-    public void ToDataTable_ConMaterialDto_DevuelveColumnasYTiposEsperados()
-    {
-        var dataTable = TvpMapper.ToDataTable(Array.Empty<MaterialImportDto>());
-
-        Assert.That(dataTable.Columns.Count, Is.EqualTo(9));
-        Assert.That(dataTable.Columns["IdEspecialidad"]!.DataType, Is.EqualTo(typeof(int)));
-        Assert.That(dataTable.Columns["Codigo"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Descripcion"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["UnidadMedida"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["StockMinimo"]!.DataType, Is.EqualTo(typeof(decimal)));
-        Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
-        Assert.That(dataTable.Columns["IdUnidadMedida"]!.DataType, Is.EqualTo(typeof(int)));
-        Assert.That(dataTable.Columns["CodigoProveedor"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));
     }
 
@@ -224,21 +212,21 @@ public class TvpMapperTests
     }
 
     [Test]
-    public void ToDataTable_ConMaterialDto_MapeaValoresIncluyendoDecimalesYNulables()
+    public void ToDataTable_ConMaterialTvpDto_MapeaValoresIncluyendoNulables()
     {
+        // MaterialImportTvpDto es el DTO que viaja al TVP_Material_v2.
+        // Su shape es distinto al MaterialImportDto: tiene IdEspecialidad,
+        // IdUnidadMedida (nullable), Codigo, Descripcion, UnidadMedida.
         var dtos = new[]
         {
-            new MaterialImportDto
+            new MaterialImportTvpDto
             {
                 _Fila = 2,
                 IdEspecialidad = 1,
                 Codigo = "MAT-TEST-1",
                 Descripcion = "Cemento",
                 UnidadMedida = "BOL",
-                StockMinimo = 100.50m,
-                Activo = true,
-                IdUnidadMedida = null,         // opcional
-                CodigoProveedor = "ABC-123"
+                IdUnidadMedida = null         // opcional
             }
         };
 
@@ -247,9 +235,9 @@ public class TvpMapperTests
         Assert.That(dataTable.Rows.Count, Is.EqualTo(1));
         Assert.That(dataTable.Rows[0]["IdEspecialidad"], Is.EqualTo(1));
         Assert.That(dataTable.Rows[0]["Codigo"], Is.EqualTo("MAT-TEST-1"));
-        Assert.That(dataTable.Rows[0]["StockMinimo"], Is.EqualTo(100.50m));
+        Assert.That(dataTable.Rows[0]["Descripcion"], Is.EqualTo("Cemento"));
+        Assert.That(dataTable.Rows[0]["UnidadMedida"], Is.EqualTo("BOL"));
         Assert.That(dataTable.Rows[0]["IdUnidadMedida"], Is.EqualTo(DBNull.Value));
-        Assert.That(dataTable.Rows[0]["CodigoProveedor"], Is.EqualTo("ABC-123"));
     }
 
     private sealed class DtoConIntNullable
