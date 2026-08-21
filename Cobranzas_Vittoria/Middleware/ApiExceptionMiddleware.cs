@@ -17,6 +17,8 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - DatosInvalidosValidacionException -> 422 Unprocessable Entity (+ lista de errores generica;
     ///                                       usado por modulos que no son Importacion, ej: Inventario)
     ///   - ModuloNoSoportadoException      -> 400 BadRequest (codigo "MODULO_NO_SOPORTADO")
+    ///   - FormatoPlantillaInvalidoException -> 400 BadRequest (codigo "FORMATO_PLANTILLA_INVALIDO")
+    ///   - PlantillaNoDisponibleException  -> 404 NotFound   (codigo "PLANTILLA_NO_DISPONIBLE")
     ///   - IdRutaInconsistenteException    -> 400 BadRequest (codigo "ID_RUTA_INCONSISTENTE"; PUT con idRuta != idCuerpo)
     ///   - KardexNoEncontradoException     -> 404 NotFound   (codigo "KARDEX_NO_ENCONTRADO"; id de kardex inexistente)
     ///   - SqlException                    -> 500 SQL_ERROR        (deuda tecnica documentada)
@@ -127,6 +129,30 @@ namespace Cobranzas_Vittoria.Middleware
                     nameof(ModuloNoSoportadoException), context.Request.Method, context.Request.Path,
                     ModuloNoSoportadoException.CodigoError, ex.Message);
                 await EscribirErrorAsync(context, StatusCodes.Status400BadRequest, ModuloNoSoportadoException.CodigoError, ex.Message);
+            }
+            catch (FormatoPlantillaInvalidoException ex)
+            {
+                _logger.LogWarning(
+                    "Rechazo 400 ({Tipo}) en {Method} {Path}: {Codigo} FormatoRecibido={Formato} - {Mensaje}",
+                    nameof(FormatoPlantillaInvalidoException), context.Request.Method, context.Request.Path,
+                    FormatoPlantillaInvalidoException.CodigoError, ex.FormatoRecibido, ex.Message);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status400BadRequest,
+                    FormatoPlantillaInvalidoException.CodigoError,
+                    ex.Message);
+            }
+            catch (PlantillaNoDisponibleException ex)
+            {
+                _logger.LogWarning(
+                    "Rechazo 404 ({Tipo}) en {Method} {Path}: {Codigo} Modulo={Modulo} - {Mensaje}",
+                    nameof(PlantillaNoDisponibleException), context.Request.Method, context.Request.Path,
+                    PlantillaNoDisponibleException.CodigoError, ex.Modulo, ex.Message);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status404NotFound,
+                    PlantillaNoDisponibleException.CodigoError,
+                    ex.Message);
             }
             catch (IdRutaInconsistenteException ex)
             {
