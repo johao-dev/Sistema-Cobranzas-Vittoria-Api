@@ -209,6 +209,12 @@ public abstract class ImportProcessorBase<TArchivo, TTvp> : IImportProcessor
         // 1-2. Resolucion de parser + parseo
         var parser = ParserResolver.ObtenerParser(file);
         var filas = parser.Parse(file);
+        // El formato del ResultadoImportacion se calcula a partir de la
+        // extension real del archivo (no de parser.Formato) porque
+        // ExcelFileParser.Formato es "xlsx/xls" (cubre ambos formatos con
+        // el mismo parser); queremos que el campo "formato" de la respuesta
+        // sea "xlsx" o "xls" segun corresponda.
+        var formatoRespuesta = InferirFormatoDesdeExtension(file.FileName, parser.Formato);
         Logger.LogDebug(
             "[{Modulo}] Parser={Formato} produjo {CantidadFilas} filas",
             Modulo, parser.Formato, filas.Count);
@@ -250,7 +256,26 @@ public abstract class ImportProcessorBase<TArchivo, TTvp> : IImportProcessor
             "[{Modulo}] Importacion exitosa. FilasInsertadas={Filas} Duracion={Duracion}ms",
             Modulo, filasInsertadas, sw.ElapsedMilliseconds);
 
-        return new ResultadoImportacion(Modulo, parser.Formato, filasInsertadas);
+        return new ResultadoImportacion(Modulo, formatoRespuesta, filasInsertadas);
+    }
+
+    /// <summary>
+    /// Normaliza el formato reportado al cliente HTTP a partir de la extension
+    /// del archivo. Se usa porque <c>ExcelFileParser.Formato</c> cubre dos
+    /// formatos con un unico parser (devuelve "xlsx/xls"); queremos que el
+    /// campo <c>formato</c> del <see cref="ResultadoImportacion"/> refleje
+    /// la extension real (.xlsx o .xls).
+    /// </summary>
+    private static string InferirFormatoDesdeExtension(string fileName, string parserFormato)
+    {
+        var ext = Path.GetExtension(fileName)?.TrimStart('.').ToLowerInvariant();
+        return ext switch
+        {
+            "csv"   => "csv",
+            "xlsx"  => "xlsx",
+            "xls"   => "xls",
+            _       => parserFormato
+        };
     }
 
     // ============================================================================

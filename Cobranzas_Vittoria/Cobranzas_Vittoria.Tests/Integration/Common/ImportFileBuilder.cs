@@ -1,4 +1,5 @@
 using System.Text;
+using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 
@@ -40,6 +41,63 @@ public static class ImportFileBuilder
     }
 
     /// <summary>
+    /// Genera un CSV con el delimitador indicado. Usado para probar que el
+    /// parser detecta ';' (default del proyecto) y ',' (fallback).
+    /// </summary>
+    /// <param name="separador">Caracter delimitador (';' o ','). El caller
+    /// es responsable de usar el mismo caracter en todas las filas del array
+    /// (incluyendo el header); este builder no hace sustituciones.</param>
+    /// <param name="filas">Primera fila = header, resto = datos.</param>
+    public static byte[] BuildCsvConSeparador(char separador, params string[] filas)
+    {
+        if (filas.Length == 0)
+            throw new ArgumentException("Se requiere al menos la fila de encabezados.", nameof(filas));
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < filas.Length; i++)
+        {
+            sb.Append(filas[i]);
+            if (i < filas.Length - 1) sb.Append('\n');
+        }
+        _ = separador; // documentado para el lector; no transformamos el contenido
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    /// <summary>
+    /// Genera un CSV con la codificacion indicada (ej: Encoding.GetEncoding("Windows-1252")
+    /// para el caso tipico de "Guardar como CSV" en Excel sobre Windows en espanol).
+    /// </summary>
+    public static byte[] BuildCsvConEncoding(Encoding encoding, params string[] filas)
+    {
+        if (filas.Length == 0)
+            throw new ArgumentException("Se requiere al menos la fila de encabezados.", nameof(filas));
+        if (encoding is null)
+            throw new ArgumentNullException(nameof(encoding));
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < filas.Length; i++)
+        {
+            sb.Append(filas[i]);
+            if (i < filas.Length - 1) sb.Append('\n');
+        }
+        return encoding.GetBytes(sb.ToString());
+    }
+
+    /// <summary>
+    /// Genera un CSV UTF-8 con BOM al inicio. Util para probar que el parser
+    /// maneja el byte-order-mark de UTF-8 sin lanzar excepciones.
+    /// </summary>
+    public static byte[] BuildCsvConBOM(params string[] filas)
+    {
+        var baseBytes = BuildCsv(filas);
+        var bom = new byte[] { 0xEF, 0xBB, 0xBF };
+        var result = new byte[bom.Length + baseBytes.Length];
+        Buffer.BlockCopy(bom, 0, result, 0, bom.Length);
+        Buffer.BlockCopy(baseBytes, 0, result, bom.Length, baseBytes.Length);
+        return result;
+    }
+
+    /// <summary>
     /// Genera un XLSX (formato OOXML) en memoria con la primera fila como
     /// encabezados y el resto como datos. Usa NPOI (mismo paquete que la app).
     /// </summary>
@@ -75,6 +133,54 @@ public static class ImportFileBuilder
                     var cell = row.CreateCell(c);
                     // Intentamos parsear como numero para que NPOI serialice
                     // el tipo correcto al lector del ExcelFileParser.
+                    if (double.TryParse(valores[c], System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out var d))
+                    {
+                        cell.SetCellValue(d);
+                    }
+                    else
+                    {
+                        cell.SetCellValue(valores[c]);
+                    }
+                }
+            }
+
+            workbook.Write(ms, leaveOpen: true);
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Genera un XLS (formato legacy BIFF, HSSF) en memoria. Util para probar
+    /// que el parser de la app detecta la firma OLE2 y crea un <c>HSSFWorkbook</c>
+    /// (no XSSF).
+    /// </summary>
+    public static byte[] BuildXls(string[] encabezados, params string[][] filas)
+    {
+        if (encabezados.Length == 0)
+            throw new ArgumentException("Se requieren encabezados.", nameof(encabezados));
+
+        using var ms = new MemoryStream();
+        using (var workbook = new HSSFWorkbook())
+        {
+            var sheet = workbook.CreateSheet("Datos");
+
+            var headerRow = sheet.CreateRow(0);
+            for (int i = 0; i < encabezados.Length; i++)
+                headerRow.CreateCell(i).SetCellValue(encabezados[i]);
+
+            for (int r = 0; r < filas.Length; r++)
+            {
+                var row = sheet.CreateRow(r + 1);
+                var valores = filas[r];
+                if (valores.Length != encabezados.Length)
+                    throw new ArgumentException(
+                        $"La fila {r} tiene {valores.Length} valores pero hay {encabezados.Length} encabezados.",
+                        nameof(filas));
+
+                for (int c = 0; c < valores.Length; c++)
+                {
+                    var cell = row.CreateCell(c);
                     if (double.TryParse(valores[c], System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out var d))
                     {
