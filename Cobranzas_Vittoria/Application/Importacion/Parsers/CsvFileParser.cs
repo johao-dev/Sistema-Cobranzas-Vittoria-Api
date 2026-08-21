@@ -10,24 +10,37 @@ namespace Cobranzas_Vittoria.Application.Importacion.Parsers;
 /// <summary>
 /// Parser de archivos CSV usando <see cref="CsvHelper"/>.
 ///
-/// Reglas:
-///   - Delimitador obligatorio: coma (","). Punto y coma, tab, pipe u otros
-///     producen <see cref="EstructuraInvalidaException"/> con codigo "FORMATO_INVALIDO".
-///   - Codificacion: UTF-8 con BOM. La ausencia de BOM se tolera, pero si el
-///     contenido contiene bytes no-ASCII invalidos para UTF-8, se lanza
-///     <see cref="EstructuraInvalidaException"/> con codigo "CODIFICACION_INVALIDA".
+/// Reglas (alineadas con el plan de Fase 3 del feature v2):
+///   - Delimitador detectado automaticamente:
+///       * Si la primera linea tiene mas ";" que ",", se usa ";".
+///       * Si tiene mas "," que ";", se usa ",".
+///       * Si no tiene ninguno de los dos, se usa ";" por default (convencion
+///         del proyecto para Excel en espanol).
+///       * Tabulador y pipe se rechazan con <see cref="EstructuraInvalidaException"/>
+///         codigo "FORMATO_INVALIDO" (delimitadores no soportados).
+///   - Codificacion dual:
+///       * Se intenta UTF-8 estricto primero (lanzara
+///         <see cref="EstructuraInvalidaException"/> codigo "CODIFICACION_INVALIDO"
+///         si el contenido no es UTF-8 valido).
+///       * Si el archivo tiene BOM UTF-8 (EF BB BF), siempre se trata como UTF-8.
+///       * Si no tiene BOM y los bytes NO son UTF-8 valido, se reintenta como
+///         Windows-1252 (Latin-1, superconjunto de ISO-8859-1, cubre acentos
+///         castellanos). Este es el formato tipico de exportacion desde Excel
+///         "guardar como CSV" en Windows en espanol.
 ///   - Primera fila = encabezados. Las filas vacias se omiten.
-///   - Los nombres de encabezado se preservan tal cual (case-sensitive en el archivo,
-///     case-insensitive en <see cref="SpreadsheetRow"/>).
+///   - Los nombres de encabezado se preservan tal cual (case-sensitive en el
+///     archivo, case-insensitive en <see cref="SpreadsheetRow"/>).
 ///   - Si los primeros bytes del archivo coinciden con un magic number conocido
-///     de otro formato (PDF, ZIP, OLE2, PNG, etc.), se rechaza aunque la extension sea .csv.
+///     de otro formato (PDF, ZIP, OLE2, PNG, etc.), se rechaza aunque la
+///     extension sea .csv.
 /// </summary>
 public class CsvFileParser : IFileParser
 {
     public const string CodigoDelimitadorInvalido = "FORMATO_INVALIDO";
     public const string CodigoEncodingInvalido = "CODIFICACION_INVALIDO";
 
-    private const char DelimitadorEsperado = ',';
+    private const char DelimitadorDefault = ';';
+    private const char DelimitadorComa = ',';
     private const int MaxBytesParaSniffing = 4096;
 
     /// <summary>
@@ -71,10 +84,10 @@ public class CsvFileParser : IFileParser
         {
             var b = primerosBytes[i];
             // Permitir: tab (9), LF (10), CR (13), printable ASCII (32-126), y bytes altos
-            // (>= 128) que seran UTF-8 multibyte.
+            // (>= 128) que seran UTF-8 multibyte o parte de Windows-1252.
             if (b == 0x09 || b == 0x0A || b == 0x0D) continue;
             if (b >= 0x20 && b <= 0x7E) continue;
-            if (b >= 0x80) continue; // byte alto: probablemente UTF-8 multibyte
+            if (b >= 0x80) continue; // byte alto: probablemente multibyte de algun encoding
             return false;
         }
         return true;
@@ -91,13 +104,18 @@ public class CsvFileParser : IFileParser
         ValidarContenidoCsv(sniffBuffer.AsSpan(0, bytesLeidos));
         var encoding = DetectarEncoding(sniffBuffer.AsSpan(0, bytesLeidos));
 
+        // Decodificamos el sniff en texto para inspeccionar la primera linea y
+        // detectar delimitador. Usamos el encoding detectado.
+        var textoSniff = encoding.GetString(sniffBuffer, 0, bytesLeidos);
+        var delimitador = DetectarDelimitador(textoSniff);
+
         // Releemos el archivo desde el principio con la codificacion detectada.
         using var stream = file.OpenReadStream();
         using var reader = new StreamReader(stream, encoding, detectEncodingFromByteOrderMarks: true);
 
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
-            Delimiter = DelimitadorEsperado.ToString(),
+            Delimiter = delimitador.ToString(),
             HasHeaderRecord = true,
             BadDataFound = null,            // No abortar por campos malformados
             MissingFieldFound = null,        // No abortar por columnas faltantes
@@ -155,9 +173,10 @@ public class CsvFileParser : IFileParser
 
     private static void ValidarContenidoCsv(ReadOnlySpan<byte> sniff)
     {
-        // Verifica dos cosas en un solo recorrido sobre los primeros bytes del archivo:
-        //   1. Que el delimitador sea la coma (rechaza ';', '|', '\t').
-        //   2. Que no haya bytes de control invalidos (distintos de \t, \n, \r).
+        // Verifica una sola cosa en un recorrido sobre los primeros bytes del archivo:
+        //   1. Que no haya bytes de control invalidos (distintos de \t, \n, \r).
+        // La validacion de delimitador ya no se hace aqui; se detecta en
+        // DetectarDelimitador y se rechaza tab/pipe que no esten soportados.
         for (int i = 0; i < sniff.Length; i++)
         {
             var b = sniff[i];
@@ -165,21 +184,15 @@ public class CsvFileParser : IFileParser
             // BOM UTF-8 -> ignorar
             if (b == 0xEF || b == 0xBB || b == 0xBF) continue;
 
-            // Delimitador alternativo -> rechazar.
-            // Importante: evaluar ANTES de tratar \t como "control valido".
-            if (b == (byte)';' || b == (byte)'|' || b == (byte)'\t')
-            {
-                throw new EstructuraInvalidaException(
-                    CodigoDelimitadorInvalido,
-                    "El delimitador del archivo CSV debe ser la coma (,). Se detecto un delimitador alternativo.");
-            }
+            // Caracteres de control validos en texto CSV (tabulador, salto de
+            // linea y retorno de carro). El tabulador NO es un delimitador
+            // soportado, pero pasa la validacion binaria; el rechazo final
+            // ocurre en DetectarDelimitador con un mensaje mas claro.
+            if (b == 0x09 || b == 0x0A || b == 0x0D) continue;
 
-            // Caracteres de control validos en texto CSV (salto de linea y retorno de carro).
-            if (b == 0x0A || b == 0x0D) continue;
-
-            // Printable ASCII o byte alto UTF-8 -> OK.
+            // Printable ASCII o byte alto (UTF-8 multibyte o Windows-1252) -> OK.
             if (b >= 0x20 && b <= 0x7E) continue;
-            if (b >= 0x80) continue; // byte alto: probablemente UTF-8 multibyte
+            if (b >= 0x80) continue;
 
             // Cualquier otro byte de control es invalido en CSV de texto.
             throw new EstructuraInvalidaException(
@@ -191,12 +204,13 @@ public class CsvFileParser : IFileParser
 
     private static Encoding DetectarEncoding(ReadOnlySpan<byte> sniff)
     {
-        // UTF-8 con BOM -> UTF-8
+        // UTF-8 con BOM -> UTF-8 con BOM.
         if (sniff.Length >= 3 && sniff[0] == 0xEF && sniff[1] == 0xBB && sniff[2] == 0xBF)
             return new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
 
-        // Sin BOM: intentamos UTF-8 estricto. Si falla la decodificacion,
-        // CsvHelper/StreamReader lanzara excepcion que capturamos en Parse.
+        // Sin BOM: intentamos UTF-8 estricto. Si falla, fallback a Windows-1252
+        // (superconjunto de ISO-8859-1; cubre acentos castellanos y se usa en
+        // la exportacion por defecto de Excel en espanol sobre Windows).
         try
         {
             // StrictMode = true (default en .NET 8) hace que bytes invalidos lancen.
@@ -206,9 +220,45 @@ public class CsvFileParser : IFileParser
         }
         catch (DecoderFallbackException)
         {
-            throw new EstructuraInvalidaException(
-                CodigoEncodingInvalido,
-                "El archivo CSV no esta codificado en UTF-8. Use UTF-8 con o sin BOM.");
+            // Verificamos que los bytes al menos sean texto (no binarios) antes
+            // de aceptar Windows-1252. La validacion de bytes de control ya se
+            // hizo en ValidarContenidoCsv.
+            return Encoding.GetEncoding("Windows-1252", EncoderFallback.ExceptionFallback, DecoderFallback.ReplacementFallback);
         }
+    }
+
+    /// <summary>
+    /// Detecta el delimitador del CSV contando las ocurrencias de ';' y ',' en
+    /// la primera linea del archivo (los headers). Reglas:
+    ///   - Si la primera linea tiene mas ';' que ',' -> ';'.
+    ///   - Si tiene mas ',' que ';' -> ','.
+    ///   - Si no tiene ninguno -> ';' por default (convencion del proyecto).
+    ///   - Si la primera linea tiene '\t' o '|' -> lanzar FORMATO_INVALIDO.
+    /// </summary>
+    private static char DetectarDelimitador(string primeraLinea)
+    {
+        // Consideramos solo la primera linea (sin el BOM que .NET ya remueve).
+        var idxSalto = primeraLinea.IndexOfAny(new[] { '\n', '\r' });
+        var linea = idxSalto < 0 ? primeraLinea : primeraLinea[..idxSalto];
+
+        // Rechazo temprano: tab y pipe no son soportados.
+        if (linea.Contains('\t'))
+            throw new EstructuraInvalidaException(
+                CodigoDelimitadorInvalido,
+                "El delimitador del archivo CSV no puede ser tabulador (\\t). Use ';' o ','.");
+        if (linea.Contains('|'))
+            throw new EstructuraInvalidaException(
+                CodigoDelimitadorInvalido,
+                "El delimitador del archivo CSV no puede ser pipe ('|'). Use ';' o ','.");
+
+        var countPuntoYComa = linea.Count(c => c == DelimitadorDefault);
+        var countComa = linea.Count(c => c == DelimitadorComa);
+
+        if (countPuntoYComa == 0 && countComa == 0)
+            return DelimitadorDefault; // Default del proyecto.
+
+        return countPuntoYComa >= countComa
+            ? DelimitadorDefault
+            : DelimitadorComa;
     }
 }
