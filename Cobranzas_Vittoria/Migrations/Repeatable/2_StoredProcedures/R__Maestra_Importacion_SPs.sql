@@ -149,96 +149,14 @@ GO
 
 
 -- -----------------------------------------------------------------------------
--- Material
--- Tabla destino: maestra.Material
---   (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo,
---    FechaCreacion, IdUnidadMedida, CodigoProveedor)
--- Validaciones:
---   - 50001: IdEspecialidad, Codigo, Descripcion, UnidadMedida obligatorios.
---   - 50002: Codigos duplicados dentro del archivo.
---   - 50003: Codigos que ya existen en BD.
---   - 50004: IdEspecialidad o IdUnidadMedida no existen en sus tablas.
--- NOTA: el SP autogenera Codigo si llega NULL (sigue patron de usp_Material_Upsert
---       en R__Maestra_SPs.sql: 'MAT-' + correlativo).
+-- Material v1: ELIMINADO en migracion V1_2_3.
+-- El SP maestra.usp_Material_CargaMasiva y su TVP maestra.TVP_Material
+-- fueron reemplazados completamente por la v2. Ver:
+--   - docs/diseno-importacion-materiales-v2.md (diseno)
+--   - V1_2_3__Maestra_Material_CargaMasiva_v1_Drop.sql (DROP)
+--   - V1_2_1__Maestra_Importacion_Tipos_v2.sql (introduccion de v2)
+-- Solo se conserva el SP v2 (usp_Material_CargaMasiva_v2) debajo.
 -- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [maestra].[usp_Material_CargaMasiva]
-    @Filas maestra.TVP_Material READONLY,
-    @Usuario VARCHAR(100) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        BEGIN TRAN;
-
-        -- Validacion 1: obligatoriedad
-        IF EXISTS (
-            SELECT 1 FROM @Filas
-            WHERE IdEspecialidad IS NULL
-               OR NULLIF(LTRIM(RTRIM(Codigo)), '') IS NULL
-               OR NULLIF(LTRIM(RTRIM(Descripcion)), '') IS NULL
-               OR NULLIF(LTRIM(RTRIM(UnidadMedida)), '') IS NULL
-        )
-            THROW 50001, 'CAMPO_OBLIGATORIO: IdEspecialidad, Codigo, Descripcion y UnidadMedida son requeridos.', 1;
-
-        -- Validacion 2: Codigos duplicados dentro del archivo
-        IF EXISTS (
-            SELECT Codigo FROM @Filas
-            GROUP BY Codigo
-            HAVING COUNT(*) > 1
-        )
-            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Codigo de Material repetido en el archivo.', 1;
-
-        -- Validacion 3: Codigos que ya existen en BD
-        IF EXISTS (
-            SELECT 1
-            FROM @Filas f
-            INNER JOIN maestra.Material m WITH (UPDLOCK, HOLDLOCK) ON m.Codigo = f.Codigo
-        )
-            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un Material con ese Codigo.', 1;
-
-        -- Validacion 4: FKs existentes
-        IF EXISTS (
-            SELECT 1 FROM @Filas f
-            WHERE NOT EXISTS (SELECT 1 FROM maestra.Especialidad e WHERE e.IdEspecialidad = f.IdEspecialidad)
-        )
-            THROW 50004, 'FK_NO_EXISTE: Alguna fila referencia un IdEspecialidad inexistente.', 1;
-
-        IF EXISTS (
-            SELECT 1 FROM @Filas f
-            WHERE f.IdUnidadMedida IS NOT NULL
-              AND NOT EXISTS (SELECT 1 FROM maestra.UnidadMedida u WHERE u.IdUnidadMedida = f.IdUnidadMedida)
-        )
-            THROW 50004, 'FK_NO_EXISTE: Alguna fila referencia un IdUnidadMedida inexistente.', 1;
-
-        -- Insert. Codigo es obligatorio en v2: ya no se autogenera, el SP lo
-        -- persiste tal cual llega (previamente trimeado por el processor).
-        DECLARE @RowCount INT = 0;
-        INSERT INTO maestra.Material
-            (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo, FechaCreacion, IdUnidadMedida, CodigoProveedor)
-        SELECT
-            f.IdEspecialidad,
-            LTRIM(RTRIM(f.Codigo)),
-            f.Descripcion,
-            f.UnidadMedida,
-            ISNULL(f.StockMinimo, 0),
-            ISNULL(f.Activo, 1),
-            GETDATE(),
-            f.IdUnidadMedida,
-            NULLIF(LTRIM(RTRIM(f.CodigoProveedor)), '')
-        FROM @Filas f;
-        SET @RowCount = @@ROWCOUNT;
-
-        COMMIT;
-        SELECT @RowCount AS FilasInsertadas;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK;
-        THROW;
-    END CATCH
-END;
-GO
 
 
 -- -----------------------------------------------------------------------------

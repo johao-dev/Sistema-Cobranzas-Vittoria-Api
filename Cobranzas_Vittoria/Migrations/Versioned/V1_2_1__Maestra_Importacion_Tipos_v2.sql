@@ -17,9 +17,11 @@
 --      sobre la que se crea el indice. SQL Server exige que las columnas de
 --      indices UNIQUE sean PERSISTED si son expresiones.
 --
---   3. El TVP viejo (TVP_Material) se conserva con su nombre historico
---      porque seguira siendo usado por la version v1 del endpoint mientras
---      conviven ambos. La v2 del SP usa TVP_Material_v2.
+--   3. El TVP viejo (TVP_Material) y el SP viejo (usp_Material_CargaMasiva)
+--      se conservaron con sus nombres historicos en esta migracion para
+--      mantener la convivenvia con v1. Posteriormente, en V1_2_3, ambos
+--      fueron dropeados al confirmarse que v1 era codigo muerto. La v2
+--      del SP usa TVP_Material_v2.
 --
 -- Convenciones:
 --   - Nombre: TVP_<Entidad>_v2 (sufijo _v2 para evitar colision con V1_1_2).
