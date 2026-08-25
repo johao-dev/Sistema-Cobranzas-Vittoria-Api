@@ -110,5 +110,6 @@ public interface IKardexInventarioService
     /// </returns>
     Task<byte[]> ExportarStockActualAsync(
         KardexStockFiltroInventarioDto filtro,
+        Boolean? incluirTotales,
         CancellationToken ct = default);
 }

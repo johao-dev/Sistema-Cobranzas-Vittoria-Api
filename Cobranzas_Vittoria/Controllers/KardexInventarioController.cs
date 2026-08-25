@@ -261,7 +261,8 @@ public class KardexInventarioController : ControllerBase
         [FromQuery] int? idProyecto,
         [FromQuery] DateOnly? fechaDesde,
         [FromQuery] DateOnly? fechaHasta,
-        CancellationToken ct)
+        [FromQuery] Boolean? incluirTotales,
+        CancellationToken ct = default)
     {
         var filtro = new KardexStockFiltroInventarioDto
         {
@@ -271,7 +272,7 @@ public class KardexInventarioController : ControllerBase
             FechaHasta = fechaHasta
         };
 
-        var bytes = await _service.ExportarStockActualAsync(filtro, ct);
+        var bytes = await _service.ExportarStockActualAsync(filtro, incluirTotales, ct);
 
         // Nombre del archivo: kardex-stock-{yyyyMMdd-HHmm}.xlsx. Esto permite
         // al usuario descargar multiples reportes en la misma sesion sin
