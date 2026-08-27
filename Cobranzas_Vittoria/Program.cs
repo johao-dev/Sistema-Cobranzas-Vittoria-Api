@@ -21,10 +21,58 @@ using DbUp;
 using DbUp.Helpers;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+// Configuración de autenticación JWT
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        string? jwtKey = builder.Configuration["Jwt:Key"];
+        string? jwtIssuer = builder.Configuration["Jwt:Issuer"];
+        string? jwtAudience = builder.Configuration["Jwt:Audience"];
+
+        if (string.IsNullOrWhiteSpace(jwtKey))
+            throw new InvalidOperationException("JWT Key is not configured.");
+        
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Cookies["access_token"];
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+// Configuración de autorización basada en roles
+builder.Services.AddAuthorization(options =>
+{
+    // Policies base
+    // TODO: Reemplazar por un sistema de códigos de permisos
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("ADMIN"));
+    options.AddPolicy("PuedeGestionarSeguridad", policy => policy.RequireRole("ADMIN"));
+});
 
 // ============================================================================
 // Dapper: registro de TypeHandlers globales
@@ -190,6 +238,8 @@ if (enableSwagger)
 }
 
 app.UseCors("AngularCors");
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseStaticFiles();
 app.MapControllers();
 app.Run();
