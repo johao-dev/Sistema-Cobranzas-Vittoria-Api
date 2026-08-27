@@ -29,7 +29,7 @@ namespace Cobranzas_Vittoria.Repositories
                 new
                 {
                     dto.IdRol,
-                    dto.NombreRol,
+                    dto.Nombre,
                     dto.Activo
                 },
                 commandType: CommandType.StoredProcedure

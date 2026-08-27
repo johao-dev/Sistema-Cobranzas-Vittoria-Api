@@ -7,7 +7,7 @@ BEGIN
     
     SELECT
     IdRol,
-    NombreRol,
+    Nombre, -- Refactor: se renombró desde NombreRol a Nombre
     Activo,
     FechaCreacion
 FROM
@@ -16,13 +16,13 @@ WHERE
     (@Activo IS NULL
         OR Activo = @Activo)
 ORDER BY
-    NombreRol;
+    Nombre; -- Refactor: se renombró desde NombreRol a Nombre
 END;
 GO
 
 CREATE OR ALTER PROCEDURE [seguridad].[usp_Rol_Upsert]
     @IdRol INT = NULL,
-    @NombreRol NVARCHAR(100),
+    @Nombre NVARCHAR(100), -- Refactor: se renombró desde @NombreRol a @Nombre para coherencia.
     @Activo BIT
 AS
 BEGIN
@@ -30,9 +30,9 @@ BEGIN
 NOCOUNT ON;
 
 SET
-@NombreRol = LTRIM(RTRIM(ISNULL(@NombreRol, '')));
+@Nombre = LTRIM(RTRIM(ISNULL(@Nombre, '')));
 
-IF @NombreRol = ''
+IF @Nombre = ''
         THROW 50001,
 'Debes ingresar el nombre del rol.',
 1;
@@ -43,7 +43,7 @@ SELECT
 FROM
     seguridad.Rol
 WHERE
-    NombreRol = @NombreRol
+    Nombre = @Nombre
     AND (@IdRol IS NULL
         OR IdRol <> @IdRol)
     )
@@ -56,10 +56,10 @@ OR @IdRol = 0
     BEGIN
         INSERT
     INTO
-    seguridad.Rol (NombreRol,
+    seguridad.Rol (Nombre,
     Activo,
     FechaCreacion)
-VALUES (@NombreRol,
+VALUES (@Nombre,
 @Activo,
 SYSDATETIME());
 
@@ -72,8 +72,8 @@ END
     UPDATE
     seguridad.Rol
 SET
-    NombreRol = @NombreRol,
-           Activo = @Activo
+    Nombre = @Nombre,
+    Activo = @Activo
 WHERE
     IdRol = @IdRol;
 
@@ -107,7 +107,7 @@ SELECT
     ur.IdUsuarioRol,
             ur.IdUsuario,
             ur.IdRol,
-            r.NombreRol
+            r.Nombre
 FROM
     seguridad.UsuarioRol ur
 INNER JOIN seguridad.Rol r ON
@@ -115,7 +115,7 @@ INNER JOIN seguridad.Rol r ON
 WHERE
     ur.IdUsuario = @IdUsuario
 ORDER BY
-    r.NombreRol;
+    r.Nombre;
 END;
 GO
 
@@ -137,8 +137,7 @@ SELECT
 FROM
     seguridad.Usuario u
 WHERE
-    (@Activo IS NULL
-        OR u.Activo = @Activo)
+    (@Activo IS NULL OR u.Activo = @Activo)
 ORDER BY
     u.Nombres,
     u.Apellidos;

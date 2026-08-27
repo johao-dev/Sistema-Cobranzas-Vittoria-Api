@@ -24,7 +24,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Seguridad;
 ///   contable / contable    (Id=4)
 ///
 /// Respuestas:
-///   - 200: { idUsuario, nombres, apellidos, correo, usuarioLogin, nombreRol }
+///   - 200: { idUsuario, nombres, apellidos, correo, usuarioLogin, nombre }
 ///   - 401: { message: "Usuario o contraseña incorrectos." }
 ///   - 400: ModelState invalido (body vacio, JSON malformado)
 /// </summary>
@@ -52,7 +52,7 @@ public class AuthControllerTests : IntegrationTestBase
         Assert.That(JsonHelpers.GetInt32(body, "idUsuario"), Is.EqualTo(SeedIds.AdminId));
         Assert.That(JsonHelpers.GetString(body, "usuarioLogin"), Is.EqualTo("admin"));
         Assert.That(JsonHelpers.GetString(body, "nombres"), Is.EqualTo("Administrador"));
-        Assert.That(JsonHelpers.GetString(body, "nombreRol"), Is.Not.Empty);
+        Assert.That(JsonHelpers.GetString(body, "nombre"), Is.Not.Empty);
     }
 
     [Test]

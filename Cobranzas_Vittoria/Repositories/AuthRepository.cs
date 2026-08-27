@@ -20,10 +20,10 @@ SELECT TOP 1
        u.Apellidos,
        u.Correo,
        u.UsuarioLogin,
-       r.NombreRol
+       r.Nombre AS NombreRol
 FROM seguridad.Usuario u
 OUTER APPLY (
-    SELECT TOP 1 r.NombreRol
+    SELECT TOP 1 r.Nombre
     FROM seguridad.UsuarioRol ur
     INNER JOIN seguridad.Rol r ON r.IdRol = ur.IdRol
     WHERE ur.IdUsuario = u.IdUsuario
