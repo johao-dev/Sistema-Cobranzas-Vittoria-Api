@@ -52,7 +52,7 @@ public class AuthControllerTests : IntegrationTestBase
         Assert.That(JsonHelpers.GetInt32(body, "idUsuario"), Is.EqualTo(SeedIds.AdminId));
         Assert.That(JsonHelpers.GetString(body, "usuarioLogin"), Is.EqualTo("admin"));
         Assert.That(JsonHelpers.GetString(body, "nombres"), Is.EqualTo("Administrador"));
-        Assert.That(JsonHelpers.GetString(body, "nombre"), Is.Not.Empty);
+        Assert.That(JsonHelpers.GetString(body, "nombreRol"), Is.Not.Empty);
     }
 
     [Test]
