@@ -87,6 +87,25 @@ public class KardexInventarioExportTests : IntegrationTestBase
         return workbook.GetSheetAt(0);
     }
 
+    private static int CountDataRows(ISheet sheet)
+    {
+        const int headerRowIndex = 6;
+
+        if (sheet.LastRowNum <= headerRowIndex)
+        {
+            return 0;
+        }
+
+        var lastRow = sheet.GetRow(sheet.LastRowNum);
+        var hasTotalsRow = string.Equals(
+            GetString(lastRow?.GetCell(0)),
+            "TOTAL",
+            StringComparison.OrdinalIgnoreCase);
+
+        var dataRows = sheet.LastRowNum - headerRowIndex - (hasTotalsRow ? 1 : 0);
+        return Math.Max(0, dataRows);
+    }
+
     // ============================================================================
     // Smoke tests del endpoint
     // ============================================================================
@@ -125,7 +144,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
         await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria2);
 
         // Act
-        var response = await _client.GetAsync("/api/almacen/kardex/stock-actual/exportar-excel");
+        var response = await _client.GetAsync("/api/almacen/kardex/stock-actual/exportar-excel?incluirTotales=true");
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -317,9 +336,9 @@ public class KardexInventarioExportTests : IntegrationTestBase
         var bytes = await exportResponse.Content.ReadAsByteArrayAsync();
         var sheet = GetSheet(bytes);
 
-        // Header en fila 6; datos en filas 7..(7+N-1); totales en fila 7+N.
-        var filasEnExcel = sheet.LastRowNum - 6 - 1; // -1 por totales
-        if (filasEnJson == 0) filasEnExcel = 0;
+        // Header en fila 6; datos en filas 7..(7+N-1).
+        // La fila TOTAL puede existir o no, dependiendo del query param incluirTotales.
+        var filasEnExcel = CountDataRows(sheet);
 
         // Assert
         Assert.That(filasEnExcel, Is.EqualTo(filasEnJson),
