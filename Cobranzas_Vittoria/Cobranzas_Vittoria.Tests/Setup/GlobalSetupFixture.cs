@@ -6,6 +6,10 @@ namespace Cobranzas_Vittoria.Tests;
 [SetUpFixture]
 public class GlobalSetupFixture
 {
+    private const string DefaultJwtKey = "integration-tests-super-secret-key-123456";
+    private const string DefaultJwtIssuer = "vittoria-api";
+    private const string DefaultJwtAudience = "vittoria-client";
+
     public static MsSqlContainer DbContainer { get; private set; } = null!;
     public static CustomWebApplicationFactory Factory { get; private set; } = null!;
     public static HttpClient Client { get; private set; } = null!;
@@ -21,6 +25,9 @@ public class GlobalSetupFixture
         await DbContainer.StartAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Default", DbContainer.GetConnectionString());
+        SetEnvIfMissing("Jwt__Key", DefaultJwtKey);
+        SetEnvIfMissing("Jwt__Issuer", DefaultJwtIssuer);
+        SetEnvIfMissing("Jwt__Audience", DefaultJwtAudience);
 
         Factory = new CustomWebApplicationFactory();
         Client =Factory.CreateClient();
@@ -34,6 +41,14 @@ public class GlobalSetupFixture
         if (DbContainer != null)
         {
             await DbContainer.DisposeAsync();
+        }
+    }
+
+    private static void SetEnvIfMissing(string key, string value)
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key)))
+        {
+            Environment.SetEnvironmentVariable(key, value);
         }
     }
 }
