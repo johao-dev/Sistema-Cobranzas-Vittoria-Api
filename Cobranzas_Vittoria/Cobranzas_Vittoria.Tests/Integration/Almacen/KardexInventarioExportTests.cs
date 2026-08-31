@@ -172,10 +172,11 @@ public class KardexInventarioExportTests : IntegrationTestBase
         Assert.That((decimal)dataRow1.GetCell(5).NumericCellValue, Is.EqualTo(10m));
         Assert.That((decimal)dataRow2.GetCell(5).NumericCellValue, Is.EqualTo(5m));
 
-        // La fila de totales es opcional; por defecto el endpoint no la incluye,
-        // asi que no hay totales en este escenario.
+        // Fila de totales (fila 9): se solicito explicitamente con incluirTotales=true.
         var totalsRow = sheet.GetRow(9);
-        Assert.That(totalsRow, Is.Null, "Sin incluirTotales=true no debe agregarse fila de totales.");
+        Assert.That(totalsRow, Is.Not.Null, "Con incluirTotales=true debe agregarse fila de totales.");
+        Assert.That(GetString(totalsRow!.GetCell(0)), Is.EqualTo("TOTAL"));
+        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(15m));
     }
 
     [Test]
