@@ -80,10 +80,9 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         {
             IdKardexSalida = null,
             IdEspecialidad = idEspecialidad ?? IdEspecialidadAlbanileria,
-            // IdProyecto por defecto igual al de las entradas de prueba: el
-            // kardex stock es por triada (IdMaterial, IdEspecialidad, IdProyecto)
-            // y en logica trivalente de SQL (10 = NULL = UNKNOWN) la salida no
-            // encontraria stock si la entrada lo registro con un proyecto.
+            // IdProyecto por defecto igual al de las entradas de prueba. A partir
+            // de V1_4_1 el stock es global por (IdMaterial, IdEspecialidad), asi que
+            // la salida consume del mismo stock independientemente del proyecto.
             IdProyecto = IdProyecto,
             NumeroDocumento = "S001-TEST",
             Fecha = new DateOnly(2026, 1, 16),
@@ -402,10 +401,9 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         // a la especialidad de la cabecera, por lo que no se pueden mezclar
         // especialidades en una misma salida.
         //
-        // IMPORTANTE: el kardex stock es por triada (IdMaterial, IdEspecialidad,
-        // IdProyecto). Las entradas de prueba usan IdProyecto=10 (Mayta Capac II),
-        // por lo que la salida DEBE usar el mismo IdProyecto; en logica trivalente
-        // de SQL (10 = NULL = UNKNOWN) el stock no se encontraria.
+        // El stock es global por (IdMaterial, IdEspecialidad). Las entradas de
+        // prueba usan IdProyecto=10 (Mayta Capac II), pero la salida puede usar
+        // cualquier proyecto (o ninguno) y consume del mismo stock global.
         await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria);
         await CrearEntradaAsync(cantidad: 5m, idMaterial: 3 /* PLASTICO AZUL */);
         var dto = new KardexSalidaCreateDto
@@ -452,6 +450,23 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.That(body.ValueKind, Is.EqualTo(JsonValueKind.Array));
         Assert.That(JsonHelpers.GetInt32(body[0], "idKardexSalida"), Is.GreaterThan(0));
+        Assert.That(await ObtenerStockAsync(IdMaterialAlbanileria), Is.EqualTo(6m));
+    }
+
+    [Test]
+    public async Task RegistrarSalida_DesdeOtroProyecto_ConsumeStockGlobal_Retorna200()
+    {
+        // Arrange: entrada con IdProyecto=10. El stock es global.
+        await CrearEntradaAsync(cantidad: 10m);
+
+        // Act: salida SIN proyecto (IdProyecto=null) debe poder consumir el mismo stock.
+        var dto = SalidaValida(cantidad: 4m);
+        dto.IdProyecto = null;
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+
+        // Assert
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Body: {await response.Content.ReadAsStringAsync()}");
         Assert.That(await ObtenerStockAsync(IdMaterialAlbanileria), Is.EqualTo(6m));
     }
 

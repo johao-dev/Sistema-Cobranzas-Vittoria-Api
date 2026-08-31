@@ -331,13 +331,11 @@ BEGIN
         );
         SET @NewId = SCOPE_IDENTITY();
 
-        -- ---------- Upsert KardexStock ----------
+        -- ---------- Upsert KardexStock (stock global por material + especialidad) ----------
         IF EXISTS (
             SELECT 1 FROM almacen.KardexStock
             WHERE IdMaterial = @IdMaterial
               AND IdEspecialidad = @IdEspecialidad
-              AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-                   OR IdProyecto = @IdProyecto)
         )
         BEGIN
             UPDATE almacen.KardexStock
@@ -345,17 +343,15 @@ BEGIN
                 Stock        = Stock        + @Cantidad,
                 FechaUltimaMovimiento = @Fecha
             WHERE IdMaterial = @IdMaterial
-              AND IdEspecialidad = @IdEspecialidad
-              AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-                   OR IdProyecto = @IdProyecto);
+              AND IdEspecialidad = @IdEspecialidad;
         END
         ELSE
         BEGIN
             INSERT INTO almacen.KardexStock (
-                IdMaterial, IdEspecialidad, IdProyecto,
+                IdMaterial, IdEspecialidad,
                 TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento
             ) VALUES (
-                @IdMaterial, @IdEspecialidad, @IdProyecto,
+                @IdMaterial, @IdEspecialidad,
                 @Cantidad, 0, @Cantidad, @Fecha
             );
         END
@@ -396,9 +392,9 @@ GO
 
 -- -----------------------------------------------------------------------------
 -- usp_KardexEntrada_Actualizar
---   Actualiza una entrada. Si cambia (IdMaterial, IdEspecialidad, IdProyecto)
---   se hace rollback del stock en la triada vieja y aplicacion en la nueva,
---   todo en la misma TX. Si la triada no cambia, se aplica un diff simple.
+--   Actualiza una entrada. Si cambia (IdMaterial, IdEspecialidad)
+--   se hace rollback del stock en la dupla vieja y aplicacion en la nueva,
+--   todo en la misma TX. Si la dupla no cambia, se aplica un diff simple.
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [almacen].[usp_KardexEntrada_Actualizar]
     @IdKardexEntrada INT,
@@ -469,41 +465,33 @@ BEGIN
             Observacion     = @Observacion
         WHERE IdKardexEntrada = @IdKardexEntrada;
 
-        -- ---------- Ajustar KardexStock ----------
+        -- ---------- Ajustar KardexStock (stock global por material + especialidad) ----------
         DECLARE @Diff DECIMAL(18,2) = @Cantidad - @OldCantidad;
 
-        IF (@OldIdMaterial     = @IdMaterial)
+        IF (@OldIdMaterial = @IdMaterial)
            AND (@OldIdEspecialidad = @IdEspecialidad)
-           AND ((@OldIdProyecto IS NULL AND @IdProyecto IS NULL)
-                OR @OldIdProyecto = @IdProyecto)
         BEGIN
-            -- Misma triada: diff simple.
+            -- Misma dupla material+especialidad: diff simple.
             UPDATE almacen.KardexStock
             SET TotalEntrada = TotalEntrada + @Diff,
                 Stock        = Stock        + @Diff,
                 FechaUltimaMovimiento = @Fecha
             WHERE IdMaterial = @IdMaterial
-              AND IdEspecialidad = @IdEspecialidad
-              AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-                   OR IdProyecto = @IdProyecto);
+              AND IdEspecialidad = @IdEspecialidad;
         END
         ELSE
         BEGIN
-            -- Triada cambio: rollback de la vieja + apply a la nueva.
+            -- Cambio de material o especialidad: rollback de la vieja + apply a la nueva.
             UPDATE almacen.KardexStock
             SET TotalEntrada = TotalEntrada - @OldCantidad,
                 Stock        = Stock        - @OldCantidad
             WHERE IdMaterial = @OldIdMaterial
-              AND IdEspecialidad = @OldIdEspecialidad
-              AND ((IdProyecto IS NULL AND @OldIdProyecto IS NULL)
-                   OR IdProyecto = @OldIdProyecto);
+              AND IdEspecialidad = @OldIdEspecialidad;
 
             IF EXISTS (
                 SELECT 1 FROM almacen.KardexStock
                 WHERE IdMaterial = @IdMaterial
                   AND IdEspecialidad = @IdEspecialidad
-                  AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-                       OR IdProyecto = @IdProyecto)
             )
             BEGIN
                 UPDATE almacen.KardexStock
@@ -511,17 +499,15 @@ BEGIN
                     Stock        = Stock        + @Cantidad,
                     FechaUltimaMovimiento = @Fecha
                 WHERE IdMaterial = @IdMaterial
-                  AND IdEspecialidad = @IdEspecialidad
-                  AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-                       OR IdProyecto = @IdProyecto);
+                  AND IdEspecialidad = @IdEspecialidad;
             END
             ELSE
             BEGIN
                 INSERT INTO almacen.KardexStock (
-                    IdMaterial, IdEspecialidad, IdProyecto,
+                    IdMaterial, IdEspecialidad,
                     TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento
                 ) VALUES (
-                    @IdMaterial, @IdEspecialidad, @IdProyecto,
+                    @IdMaterial, @IdEspecialidad,
                     @Cantidad, 0, @Cantidad, @Fecha
                 );
             END
@@ -581,11 +567,10 @@ BEGIN
         IF @IdKardexEntrada IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idKardexEntrada', 1;
 
-        DECLARE @IdMaterial INT, @IdEspecialidad INT, @IdProyecto INT, @Cantidad DECIMAL(18,2);
+        DECLARE @IdMaterial INT, @IdEspecialidad INT, @Cantidad DECIMAL(18,2);
         SELECT
             @IdMaterial     = IdMaterial,
             @IdEspecialidad = IdEspecialidad,
-            @IdProyecto     = IdProyecto,
             @Cantidad       = Cantidad
         FROM almacen.KardexEntrada
         WHERE IdKardexEntrada = @IdKardexEntrada;
@@ -598,9 +583,7 @@ BEGIN
         SELECT @StockActual = Stock
         FROM almacen.KardexStock
         WHERE IdMaterial = @IdMaterial
-          AND IdEspecialidad = @IdEspecialidad
-          AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-               OR IdProyecto = @IdProyecto);
+          AND IdEspecialidad = @IdEspecialidad;
 
         IF @StockActual IS NOT NULL AND @StockActual - @Cantidad < 0
         BEGIN
@@ -618,9 +601,7 @@ BEGIN
         SET TotalEntrada = TotalEntrada - @Cantidad,
             Stock        = Stock        - @Cantidad
         WHERE IdMaterial = @IdMaterial
-          AND IdEspecialidad = @IdEspecialidad
-          AND ((IdProyecto IS NULL AND @IdProyecto IS NULL)
-               OR IdProyecto = @IdProyecto);
+          AND IdEspecialidad = @IdEspecialidad;
 
         COMMIT;
     END TRY
@@ -735,9 +716,8 @@ BEGIN
             THROW 51101, 'FK_NO_EXISTE: items contiene idMaterial que no existe en maestra.Material', 1;
 
         -- ---------- Validar stock para cada item ----------
-        -- El match de stock es por (IdMaterial, IdEspecialidad, IdProyecto).
-        -- Si la salida no especifica IdProyecto, se busca la fila con IdProyecto NULL
-        -- (la convencion de KardexStock: NULL significa "global/sin proyecto").
+        -- El stock es GLOBAL por (IdMaterial, IdEspecialidad). El IdProyecto
+        -- de la salida solo es una etiqueta informativa; no segmenta stock.
         DECLARE @Insuficientes TABLE (
             IdMaterial INT,
             Solicitado DECIMAL(18,2),
@@ -753,8 +733,6 @@ BEGIN
         LEFT JOIN almacen.KardexStock ks
             ON  ks.IdMaterial     = i.IdMaterial
             AND ks.IdEspecialidad = @IdEspecialidad
-            AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-                 OR ks.IdProyecto = @IdProyecto)
         WHERE ISNULL(ks.Stock, 0) < i.Cantidad;
 
         IF EXISTS (SELECT 1 FROM @Insuficientes)
@@ -788,13 +766,11 @@ BEGIN
         SELECT @NewId, i.IdMaterial, i.Cantidad, i.Observacion
         FROM @Items i;
 
-        -- ---------- Actualizar KardexStock por triada ----------
-        -- Agrupamos por triada para hacer un solo UPDATE por triada.
+        -- ---------- Actualizar KardexStock (stock global por material + especialidad) ----------
         ;WITH StockUpdate AS (
             SELECT
                 i.IdMaterial,
                 @IdEspecialidad  AS IdEspecialidad,
-                @IdProyecto      AS IdProyecto,
                 SUM(i.Cantidad)  AS TotalCantidad
             FROM @Items i
             GROUP BY i.IdMaterial
@@ -806,9 +782,7 @@ BEGIN
         FROM almacen.KardexStock ks
         INNER JOIN StockUpdate su
             ON  su.IdMaterial     = ks.IdMaterial
-            AND su.IdEspecialidad = ks.IdEspecialidad
-            AND ((su.IdProyecto IS NULL AND ks.IdProyecto IS NULL)
-                 OR su.IdProyecto = ks.IdProyecto);
+            AND su.IdEspecialidad = ks.IdEspecialidad;
 
         COMMIT;
 
@@ -848,9 +822,9 @@ GO
 
 -- -----------------------------------------------------------------------------
 -- usp_KardexSalida_Actualizar
---   Reemplaza cabecera + items en TX. Calcula el diff por triada y lo
---   aplica a KardexStock. Antes valida que con la nueva lista ningun
---   item deje el stock por debajo de lo ya consumido.
+--   Reemplaza cabecera + items en TX. Calcula el diff por dupla
+--   (IdMaterial, IdEspecialidad) y lo aplica a KardexStock. Antes valida
+--   que con la nueva lista ningun item deje el stock por debajo de lo ya consumido.
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [almacen].[usp_KardexSalida_Actualizar]
     @IdKardexSalida  INT,
@@ -904,7 +878,7 @@ BEGIN
         )
             THROW 51101, 'FK_NO_EXISTE: items contiene idMaterial que no existe en maestra.Material', 1;
 
-        -- ---------- Calcular diff por triada (IdMaterial, IdEspecialidad, IdProyecto) ----------
+        -- ---------- Calcular diff por dupla (IdMaterial, IdEspecialidad) ----------
         -- diff > 0: la nueva salida pide MAS que la vieja -> hay que validar stock.
         -- diff < 0: la nueva salida pide MENOS -> el stock se repone automaticamente.
         -- Usamos una tabla temporal porque necesitamos reutilizar el diff en dos
@@ -932,15 +906,13 @@ BEGIN
         FROM NewItems n
         FULL OUTER JOIN OldItems o ON o.IdMaterial = n.IdMaterial;
 
-        -- Validar que para los diffs positivos haya stock suficiente.
+        -- Validar que para los diffs positivos haya stock suficiente (stock global).
         IF EXISTS (
             SELECT 1
             FROM @Diff d
             LEFT JOIN almacen.KardexStock ks
                 ON  ks.IdMaterial     = d.IdMaterial
                 AND ks.IdEspecialidad = @IdEspecialidad
-                AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-                     OR ks.IdProyecto = @IdProyecto)
             WHERE d.Cantidad > 0
               AND ISNULL(ks.Stock, 0) < d.Cantidad
         )
@@ -954,8 +926,6 @@ BEGIN
             LEFT JOIN almacen.KardexStock ks
                 ON  ks.IdMaterial     = d.IdMaterial
                 AND ks.IdEspecialidad = @IdEspecialidad
-                AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-                     OR ks.IdProyecto = @IdProyecto)
             WHERE d.Cantidad > 0
               AND ISNULL(ks.Stock, 0) < d.Cantidad;
             DECLARE @MsgStockInsuficienteUpd NVARCHAR(1500) =
@@ -1000,8 +970,6 @@ BEGIN
         INNER JOIN @Diff d
             ON  d.IdMaterial     = ks.IdMaterial
             AND ks.IdEspecialidad = @IdEspecialidad
-            AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-                 OR ks.IdProyecto = @IdProyecto)
         WHERE d.Cantidad <> 0;
 
         COMMIT;
@@ -1067,7 +1035,7 @@ BEGIN
         IF @IdEspecialidad IS NULL
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;
 
-        -- Calcular el total a reponer por triada.
+        -- Calcular el total a reponer en el stock global.
         ;WITH Reponer AS (
             SELECT ksd.IdMaterial, SUM(ksd.Cantidad) AS Cantidad
             FROM almacen.KardexSalidaDetalle ksd
@@ -1079,9 +1047,7 @@ BEGIN
             Stock        = ks.Stock       + r.Cantidad
         FROM almacen.KardexStock ks
         INNER JOIN Reponer r ON r.IdMaterial = ks.IdMaterial
-        WHERE ks.IdEspecialidad = @IdEspecialidad
-          AND ((ks.IdProyecto IS NULL AND @IdProyecto IS NULL)
-               OR ks.IdProyecto = @IdProyecto);
+        WHERE ks.IdEspecialidad = @IdEspecialidad;
 
         -- CASCADE borra los detalles.
         DELETE FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida;
@@ -1100,18 +1066,19 @@ GO
 -- usp_Kardex_StockActual_Listar
 --   Lee el inventario consolidado (almacen.KardexStock) con los joins
 --   a maestra para que el front reciba CodigoMaterial, Nombre, UnidadMedida
---   y los nombres legibles. No usa la vista vw_Kardex_StockActual_v2
---   para mantener este SP autocontenido y orden-independiente.
+--   y los nombres legibles. El stock es global por (IdMaterial, IdEspecialidad);
+--   el parametro @IdProyecto se mantiene por compatibilidad del API pero se
+--   ignora en el filtrado.
 --
 --   Filtros (todos opcionales):
 --     @IdEspecialidad : por especialidad del kardex
---     @IdProyecto     : por proyecto (NULL = incluye globales y por proyecto)
+--     @IdProyecto     : ignorado (compatibilidad de API)
 --     @FechaDesde     : FechaUltimaMovimiento >= @FechaDesde
 --     @FechaHasta     : FechaUltimaMovimiento <= @FechaHasta
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_StockActual_Listar]
     @IdEspecialidad INT  = NULL,
-    @IdProyecto     INT  = NULL,
+    @IdProyecto     INT  = NULL,  -- mantenido por compatibilidad; no filtra
     @FechaDesde     DATE = NULL,
     @FechaHasta     DATE = NULL
 AS
@@ -1126,8 +1093,8 @@ BEGIN
         m.UnidadMedida,
         ks.IdEspecialidad,
         e.Nombre          AS Especialidad,
-        ks.IdProyecto,
-        pr.NombreProyecto AS Proyecto,
+        NULL              AS IdProyecto,
+        NULL              AS Proyecto,
         ks.TotalEntrada,
         ks.TotalSalida,
         ks.Stock,
@@ -1135,10 +1102,7 @@ BEGIN
     FROM almacen.KardexStock ks
     INNER JOIN maestra.Material      m  ON m.IdMaterial     = ks.IdMaterial
     INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ks.IdEspecialidad
-    LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ks.IdProyecto
     WHERE (@IdEspecialidad IS NULL OR ks.IdEspecialidad = @IdEspecialidad)
-      AND (@IdProyecto     IS NULL OR ks.IdProyecto     = @IdProyecto
-           OR (@IdProyecto IS NULL AND ks.IdProyecto IS NULL))
       AND (@FechaDesde IS NULL OR ks.FechaUltimaMovimiento >= @FechaDesde)
       AND (@FechaHasta IS NULL OR ks.FechaUltimaMovimiento <= @FechaHasta)
     ORDER BY

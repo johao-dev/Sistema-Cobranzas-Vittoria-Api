@@ -34,9 +34,9 @@ public sealed record KardexStockFiltroInventarioDto
     public int? IdEspecialidad { get; init; }
 
     /// <summary>
-    /// Filtra por proyecto. NULL = traer tanto las filas con proyecto asignado
-    /// como las globales (IdProyecto NULL en KardexStock). Esto refleja la
-    /// regla de negocio "el stock global es visible en todos los proyectos".
+    /// DEPRECADO: se mantiene por compatibilidad del API pero ya no filtra.
+    /// El stock de Kardex es global por (IdMaterial, IdEspecialidad); el
+    /// proyecto solo es una etiqueta informativa en entradas/salidas.
     /// </summary>
     public int? IdProyecto { get; init; }
 

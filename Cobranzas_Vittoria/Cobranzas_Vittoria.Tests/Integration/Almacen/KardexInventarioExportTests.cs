@@ -27,9 +27,8 @@ namespace Cobranzas_Vittoria.Tests.Integration.Almacen;
 /// <para>
 /// <b>Patron de setup</b>: se siguen las mismas convenciones que
 /// <c>KardexInventarioControllerTests</c> (entradas via API, IdMaterial=2 de
-/// la seed para Albañileria). El KardexStock es por triada
-/// (IdMaterial, IdEspecialidad, IdProyecto), por lo que todas las entradas
-/// de prueba usan <c>IdProyecto=10</c> (Mayta Capac II).
+/// la seed para Albañileria). A partir de V1_2_1 el KardexStock es global por
+/// (IdMaterial, IdEspecialidad); el proyecto es solo una etiqueta informativa.
 /// </para>
 /// </summary>
 public class KardexInventarioExportTests : IntegrationTestBase
@@ -160,7 +159,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
                 $"Header en columna {c} no coincide.");
         }
 
-        // 2 filas de datos (filas 7 y 8). Como KardexStock es por triada
+        // 2 filas de datos (filas 7 y 8). El KardexStock es global por
         // (IdMaterial, IdEspecialidad, IdProyecto), cada material aparece
         // en una fila propia.
         var dataRow1 = sheet.GetRow(7);

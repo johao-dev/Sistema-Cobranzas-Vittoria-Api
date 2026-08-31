@@ -52,7 +52,8 @@ public interface IKardexSalidaRepository
 
     /// <summary>
     /// Actualiza una salida existente: reemplaza cabecera + items en TX.
-    /// Calcula el diff por triada antes de aplicarlo a KardexStock.
+    /// Calcula el diff por dupla (IdMaterial, IdEspecialidad) antes de
+    /// aplicarlo al stock global.
     /// </summary>
     /// <param name="dto">Datos actualizados. <c>IdKardexSalida</c> es obligatorio.</param>
     /// <param name="ct">Token de cancelacion.</param>
@@ -62,7 +63,7 @@ public interface IKardexSalidaRepository
 
     /// <summary>
     /// Elimina una salida. CASCADE borra sus detalles. El SP repone el stock
-    /// agrupando por triada (IdMaterial, IdEspecialidad, IdProyecto).
+    /// global por (IdMaterial, IdEspecialidad).
     /// </summary>
     /// <param name="idKardexSalida">PK de la salida a eliminar.</param>
     /// <param name="ct">Token de cancelacion.</param>

@@ -205,11 +205,10 @@ GO
 --     - Stock                  TotalEntrada - TotalSalida (default 0, >= 0)
 --     - FechaUltimaMovimiento  fecha del ultimo INSERT/UPDATE en KardexStock
 --
---   UNIQUE (IdMaterial, IdEspecialidad, IdProyecto): una sola fila por triada.
---   Esto permite que KardexStock.IdProyecto sea parte de la clave natural: si
---   una entrada/salida no especifica IdProyecto, se agrupa con la fila que
---   tampoco lo tiene (NULL). Si una lo especifica y otra no, son dos filas
---   distintas (semantica esperada para el endpoint de stock-actual).
+--   UNIQUE (IdMaterial, IdEspecialidad, IdProyecto): una sola fila por triada
+--   (semantica historica; reemplazada por stock global en V1_4_1).
+--   A partir de V1_4_1 KardexStock ya no tiene IdProyecto y el stock es
+--   global por (IdMaterial, IdEspecialidad).
 --
 --   Invariante:
 --     Stock = TotalEntrada - TotalSalida

@@ -25,11 +25,10 @@ namespace Cobranzas_Vittoria.Application.Inventario.Persistence;
 ///
 /// <para>
 /// <b>Filtros soportados por el SP</b>: <c>IdEspecialidad</c>,
-/// <c>IdProyecto</c>, <c>FechaDesde</c> y <c>FechaHasta</c>. Si
-/// <c>IdProyecto</c> es NULL, se incluyen tanto las filas con proyecto
-/// como las globales (IdProyecto NULL en KardexStock) para que el front
-/// vea el inventario completo. Si <c>FechaDesde</c> o <c>FechaHasta</c>
-/// son NULL, no se filtra por ese extremo (rango abierto).
+/// <c>FechaDesde</c> y <c>FechaHasta</c>. El parametro <c>IdProyecto</c>
+/// se mantiene por compatibilidad del API pero se ignora: el stock de
+/// Kardex es global por (IdMaterial, IdEspecialidad). Si <c>FechaDesde</c>
+/// o <c>FechaHasta</c> son NULL, no se filtra por ese extremo (rango abierto).
 /// </para>
 /// </summary>
 public interface IKardexStockRepository

@@ -28,14 +28,10 @@ namespace Cobranzas_Vittoria.Infrastructure.Repositories.Inventario;
 /// </para>
 ///
 /// <para>
-/// <b>Filtros soportados</b>: <c>IdEspecialidad</c>, <c>IdProyecto</c>,
-/// <c>FechaDesde</c> y <c>FechaHasta</c>. El comportamiento del SP
-/// frente a filtros nulos esta documentado en
-/// <see cref="IKardexStockRepository"/>. Importante: cuando
-/// <c>IdProyecto</c> es NULL, el SP devuelve TANTO las filas con
-/// proyecto asignado como las globales (IdProyecto NULL en KardexStock),
-/// siguiendo la regla de negocio "el stock global es visible desde
-/// cualquier proyecto".
+/// <b>Filtros soportados</b>: <c>IdEspecialidad</c>, <c>FechaDesde</c> y
+/// <c>FechaHasta</c>. El parametro <c>IdProyecto</c> se mantiene por
+/// compatibilidad del API pero el SP lo ignora: el stock es global por
+/// (IdMaterial, IdEspecialidad).
 /// </para>
 ///
 /// <para>
