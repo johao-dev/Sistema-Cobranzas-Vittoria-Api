@@ -29,7 +29,7 @@ public sealed class KardexSalidaCreateDto
     /// <summary>FK a maestra.Especialidad (REQUERIDO).</summary>
     public int IdEspecialidad { get; set; }
 
-    /// <summary>FK a maestra.Proyecto (OPCIONAL).</summary>
+    /// <summary>FK a maestra.Proyecto (REQUERIDO). Etiqueta informativa; no segmenta stock.</summary>
     public int? IdProyecto { get; set; }
 
     /// <summary>Numero de documento soporte, ej: "S001-12345" (OPCIONAL, max 50 chars).</summary>

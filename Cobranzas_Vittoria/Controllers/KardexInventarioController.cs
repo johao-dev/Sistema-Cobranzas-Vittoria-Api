@@ -213,14 +213,13 @@ public class KardexInventarioController : ControllerBase
     // ============================================================================
 
     /// <summary>
-    /// Lista el stock actual consolidado por (material, especialidad, proyecto).
-    /// Filtros: idEspecialidad, idProyecto, fechaDesde, fechaHasta
+    /// Lista el stock actual consolidado por (material, especialidad).
+    /// Filtros: idEspecialidad, fechaDesde, fechaHasta
     /// (filtran sobre <c>FechaUltimaMovimiento</c>, no sobre la fecha del movimiento).
     /// </summary>
     [HttpGet("stock-actual")]
     public async Task<IActionResult> ListarStockActual(
         [FromQuery] int? idEspecialidad,
-        [FromQuery] int? idProyecto,
         [FromQuery] DateOnly? fechaDesde,
         [FromQuery] DateOnly? fechaHasta,
         CancellationToken ct)
@@ -228,7 +227,6 @@ public class KardexInventarioController : ControllerBase
         var filtro = new KardexStockFiltroInventarioDto
         {
             IdEspecialidad = idEspecialidad,
-            IdProyecto = idProyecto,
             FechaDesde = fechaDesde,
             FechaHasta = fechaHasta
         };
@@ -258,7 +256,6 @@ public class KardexInventarioController : ControllerBase
     [HttpGet("stock-actual/exportar-excel")]
     public async Task<IActionResult> ExportarStockActual(
         [FromQuery] int? idEspecialidad,
-        [FromQuery] int? idProyecto,
         [FromQuery] DateOnly? fechaDesde,
         [FromQuery] DateOnly? fechaHasta,
         [FromQuery] Boolean? incluirTotales,
@@ -267,7 +264,6 @@ public class KardexInventarioController : ControllerBase
         var filtro = new KardexStockFiltroInventarioDto
         {
             IdEspecialidad = idEspecialidad,
-            IdProyecto = idProyecto,
             FechaDesde = fechaDesde,
             FechaHasta = fechaHasta
         };

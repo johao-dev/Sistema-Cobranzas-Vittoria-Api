@@ -316,8 +316,9 @@ BEGIN
         IF @IdProveedor IS NOT NULL
            AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
             THROW 51101, 'FK_NO_EXISTE: idProveedor', 1;
-        IF @IdProyecto IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
+        IF @IdProyecto IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
         -- ---------- Insert en KardexEntrada ----------
@@ -435,8 +436,9 @@ BEGIN
         IF @IdProveedor IS NOT NULL
            AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
             THROW 51101, 'FK_NO_EXISTE: idProveedor', 1;
-        IF @IdProyecto IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
+        IF @IdProyecto IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
         -- ---------- Leer valores viejos ----------
@@ -695,8 +697,9 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
             THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
-        IF @IdProyecto IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
+        IF @IdProyecto IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
         -- ---------- Validar items: idMaterial existe, cantidad valida ----------
@@ -860,8 +863,9 @@ BEGIN
 
         IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
             THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
-        IF @IdProyecto IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
+        IF @IdProyecto IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
         -- ---------- Validar items ----------
@@ -1067,18 +1071,15 @@ GO
 --   Lee el inventario consolidado (almacen.KardexStock) con los joins
 --   a maestra para que el front reciba CodigoMaterial, Nombre, UnidadMedida
 --   y los nombres legibles. El stock es global por (IdMaterial, IdEspecialidad);
---   el parametro @IdProyecto se mantiene por compatibilidad del API pero se
---   ignora en el filtrado.
+--   no hay filtro por proyecto porque el proyecto no segmenta el stock.
 --
 --   Filtros (todos opcionales):
 --     @IdEspecialidad : por especialidad del kardex
---     @IdProyecto     : ignorado (compatibilidad de API)
 --     @FechaDesde     : FechaUltimaMovimiento >= @FechaDesde
 --     @FechaHasta     : FechaUltimaMovimiento <= @FechaHasta
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_StockActual_Listar]
     @IdEspecialidad INT  = NULL,
-    @IdProyecto     INT  = NULL,  -- mantenido por compatibilidad; no filtra
     @FechaDesde     DATE = NULL,
     @FechaHasta     DATE = NULL
 AS
@@ -1093,8 +1094,6 @@ BEGIN
         m.UnidadMedida,
         ks.IdEspecialidad,
         e.Nombre          AS Especialidad,
-        NULL              AS IdProyecto,
-        NULL              AS Proyecto,
         ks.TotalEntrada,
         ks.TotalSalida,
         ks.Stock,

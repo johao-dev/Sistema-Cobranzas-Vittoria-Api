@@ -33,13 +33,6 @@ public sealed record KardexStockFiltroInventarioDto
     /// <summary>Filtra por especialidad (ej: "Estructuras", "Instalaciones electricas").</summary>
     public int? IdEspecialidad { get; init; }
 
-    /// <summary>
-    /// DEPRECADO: se mantiene por compatibilidad del API pero ya no filtra.
-    /// El stock de Kardex es global por (IdMaterial, IdEspecialidad); el
-    /// proyecto solo es una etiqueta informativa en entradas/salidas.
-    /// </summary>
-    public int? IdProyecto { get; init; }
-
     /// <summary>Fecha minima de ultima actualizacion del stock (inclusive).</summary>
     public DateOnly? FechaDesde { get; init; }
 

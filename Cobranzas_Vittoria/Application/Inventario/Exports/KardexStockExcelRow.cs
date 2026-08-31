@@ -12,15 +12,14 @@ namespace Cobranzas_Vittoria.Application.Inventario.Exports;
 /// <b>Mapeo a columnas del Excel</b> (orden, encabezado, formato):
 /// <code>
 ///   1. N°              Numero              (int,  0, sin formato)
-///   2. Proyecto        Proyecto            (text, sin formato)
-///   3. Especialidad    Especialidad        (text, sin formato)
-///   4. Cód. Material   CodigoMaterial      (text, sin formato)
-///   5. Nombre          Nombre              (text, sin formato)
-///   6. Unidad Medida   UnidadMedida        (text, sin formato)
-///   7. Entrada         Entrada             (decimal, totals, #,##0.00)
-///   8. Salida          Salida              (decimal, totals, #,##0.00)
-///   9. Stock           Stock               (decimal, totals, #,##0.00)
-///  10. Fecha           Fecha               (DateOnly, dd/MM/yyyy)
+///   2. Especialidad    Especialidad        (text, sin formato)
+///   3. Cód. Material   CodigoMaterial      (text, sin formato)
+///   4. Nombre          Nombre              (text, sin formato)
+///   5. Unidad Medida   UnidadMedida        (text, sin formato)
+///   6. Entrada         Entrada             (decimal, totals, #,##0.00)
+///   7. Salida          Salida              (decimal, totals, #,##0.00)
+///   8. Stock           Stock               (decimal, totals, #,##0.00)
+///   9. Fecha           Fecha               (DateOnly, dd/MM/yyyy)
 /// </code>
 /// </para>
 ///
@@ -49,30 +48,27 @@ public sealed class KardexStockExcelRow
     [ExcelColumn(Header = "N°", Order = 0)]
     public int? Numero { get; set; }
 
-    [ExcelColumn(Header = "Proyecto", Order = 1)]
-    public string? Proyecto { get; set; }
-
-    [ExcelColumn(Header = "Especialidad", Order = 2)]
+    [ExcelColumn(Header = "Especialidad", Order = 1)]
     public string? Especialidad { get; set; }
 
-    [ExcelColumn(Header = "Cód. Material", Order = 3)]
+    [ExcelColumn(Header = "Cód. Material", Order = 2)]
     public string? CodigoMaterial { get; set; }
 
-    [ExcelColumn(Header = "Nombre", Order = 4)]
+    [ExcelColumn(Header = "Nombre", Order = 3)]
     public string? Nombre { get; set; }
 
-    [ExcelColumn(Header = "Unidad Medida", Order = 5)]
+    [ExcelColumn(Header = "Unidad Medida", Order = 4)]
     public string? UnidadMedida { get; set; }
 
-    [ExcelColumn(Header = "Entrada", Order = 6, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Entrada", Order = 5, Format = "#,##0.00", IncludeInTotals = true)]
     public decimal? Entrada { get; set; }
 
-    [ExcelColumn(Header = "Salida", Order = 7, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Salida", Order = 6, Format = "#,##0.00", IncludeInTotals = true)]
     public decimal? Salida { get; set; }
 
-    [ExcelColumn(Header = "Stock", Order = 8, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Stock", Order = 7, Format = "#,##0.00", IncludeInTotals = true)]
     public decimal? Stock { get; set; }
 
-    [ExcelColumn(Header = "Fecha", Order = 9, Format = "dd/MM/yyyy")]
+    [ExcelColumn(Header = "Fecha", Order = 8, Format = "dd/MM/yyyy")]
     public DateOnly? Fecha { get; set; }
 }

@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Cobranzas_Vittoria.Application.Inventario.Dtos;
+using Cobranzas_Vittoria.Tests;
 using Cobranzas_Vittoria.Tests.Integration.Common;
+using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Almacen;
 
@@ -80,7 +82,7 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         {
             IdKardexSalida = null,
             IdEspecialidad = idEspecialidad ?? IdEspecialidadAlbanileria,
-            // IdProyecto por defecto igual al de las entradas de prueba. A partir
+            // IdProyecto obligatorio para entradas y salidas (etiqueta). A partir
             // de V1_4_1 el stock es global por (IdMaterial, IdEspecialidad), asi que
             // la salida consume del mismo stock independientemente del proyecto.
             IdProyecto = IdProyecto,
@@ -459,15 +461,51 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         // Arrange: entrada con IdProyecto=10. El stock es global.
         await CrearEntradaAsync(cantidad: 10m);
 
-        // Act: salida SIN proyecto (IdProyecto=null) debe poder consumir el mismo stock.
+        // Creamos un segundo proyecto valido para la salida. El seed solo trae
+        // el proyecto 10, y el validador exige que el proyecto de la salida exista.
+        // IdProyecto es IDENTITY, asi que usamos IDENTITY_INSERT para forzar el id 20.
+        await using (var connection = new SqlConnection(GlobalSetupFixture.DbContainer.GetConnectionString()))
+        {
+            await connection.OpenAsync();
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+                IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = 20)
+                BEGIN
+                    SET IDENTITY_INSERT maestra.Proyecto ON;
+                    INSERT INTO maestra.Proyecto (IdProyecto, NombreProyecto, Descripcion, Activo, FechaCreacion, CotizacionGeneral)
+                    VALUES (20, N'Proyecto Test Secundario', N'Solo para tests', 1, GETDATE(), 0.00);
+                    SET IDENTITY_INSERT maestra.Proyecto OFF;
+                END";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Act: salida con OTRO proyecto (IdProyecto=20) debe poder consumir el mismo stock.
         var dto = SalidaValida(cantidad: 4m);
-        dto.IdProyecto = null;
+        dto.IdProyecto = 20;
         var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Body: {await response.Content.ReadAsStringAsync()}");
         Assert.That(await ObtenerStockAsync(IdMaterialAlbanileria), Is.EqualTo(6m));
+    }
+
+    [Test]
+    public async Task RegistrarSalida_SinProyecto_Retorna422CampoRequerido()
+    {
+        // Act: salida sin proyecto debe fallar (el proyecto es obligatorio).
+        var dto = SalidaValida(cantidad: 4m);
+        dto.IdProyecto = null;
+        var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
+
+        // Assert
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(JsonHelpers.GetString(body, "error"), Is.EqualTo("DATOS_INVALIDOS"));
+        var codigos = body.GetProperty("errores").EnumerateArray()
+            .Select(e => JsonHelpers.GetString(e, "codigoError"))
+            .ToList();
+        Assert.That(codigos, Does.Contain("CAMPO_REQUERIDO"));
     }
 
     [Test]

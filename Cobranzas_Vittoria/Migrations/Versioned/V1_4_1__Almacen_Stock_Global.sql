@@ -15,8 +15,9 @@
 --   - almacen.vw_Kardex_StockActual_v2 : se elimina (no tenia consumidores).
 --
 -- Regla de negocio resultante:
---   El stock es GLOBAL por material + especialidad. Cualquier entrada o
---   salida, con o sin proyecto, afecta la misma fila de KardexStock.
+--   El stock es GLOBAL por material + especialidad. Tanto entradas como
+--   salidas REQUIEREN IdProyecto (etiqueta informativa en sus tablas
+--   respectivas), pero ese proyecto NO afecta ni segmenta KardexStock.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------

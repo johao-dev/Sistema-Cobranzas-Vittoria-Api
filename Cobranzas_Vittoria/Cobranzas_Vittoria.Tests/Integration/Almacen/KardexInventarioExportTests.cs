@@ -152,7 +152,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
 
         // Verificamos headers en el orden correcto.
         var headerRow = sheet.GetRow(6);
-        var headersEsperados = new[] { "N°", "Proyecto", "Especialidad", "Cód. Material", "Nombre", "Unidad Medida", "Entrada", "Salida", "Stock", "Fecha" };
+        var headersEsperados = new[] { "N°", "Especialidad", "Cód. Material", "Nombre", "Unidad Medida", "Entrada", "Salida", "Stock", "Fecha" };
         for (var c = 0; c < headersEsperados.Length; c++)
         {
             Assert.That(GetString(headerRow.GetCell(c)), Is.EqualTo(headersEsperados[c]),
@@ -160,8 +160,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
         }
 
         // 2 filas de datos (filas 7 y 8). El KardexStock es global por
-        // (IdMaterial, IdEspecialidad, IdProyecto), cada material aparece
-        // en una fila propia.
+        // (IdMaterial, IdEspecialidad), cada material aparece en una fila propia.
         var dataRow1 = sheet.GetRow(7);
         var dataRow2 = sheet.GetRow(8);
         Assert.That(dataRow1, Is.Not.Null);
@@ -169,15 +168,14 @@ public class KardexInventarioExportTests : IntegrationTestBase
         Assert.That((int)dataRow1.GetCell(0).NumericCellValue, Is.EqualTo(1));
         Assert.That((int)dataRow2.GetCell(0).NumericCellValue, Is.EqualTo(2));
 
-        // Columna "Entrada" (indice 6) refleja la cantidad de la entrada.
-        Assert.That((decimal)dataRow1.GetCell(6).NumericCellValue, Is.EqualTo(10m));
-        Assert.That((decimal)dataRow2.GetCell(6).NumericCellValue, Is.EqualTo(5m));
+        // Columna "Entrada" (indice 5) refleja la cantidad de la entrada.
+        Assert.That((decimal)dataRow1.GetCell(5).NumericCellValue, Is.EqualTo(10m));
+        Assert.That((decimal)dataRow2.GetCell(5).NumericCellValue, Is.EqualTo(5m));
 
-        // Fila de totales (fila 9): "TOTAL" en col 0, suma de Entradas = 15.
+        // La fila de totales es opcional; por defecto el endpoint no la incluye,
+        // asi que no hay totales en este escenario.
         var totalsRow = sheet.GetRow(9);
-        Assert.That(totalsRow, Is.Not.Null);
-        Assert.That(GetString(totalsRow.GetCell(0)), Is.EqualTo("TOTAL"));
-        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(15m));
+        Assert.That(totalsRow, Is.Null, "Sin incluirTotales=true no debe agregarse fila de totales.");
     }
 
     [Test]
@@ -204,25 +202,6 @@ public class KardexInventarioExportTests : IntegrationTestBase
         var filtersRow = sheet.GetRow(3);
         Assert.That(GetString(filtersRow.GetCell(0)),
             Does.Contain($"idEspecialidad={SeedIds.EspecialidadCasco}"));
-    }
-
-    [Test]
-    public async Task ExportarStockActual_FiltroPorIdProyecto_SubtituloIncluyeIdProyecto()
-    {
-        // Arrange
-        await CrearEntradaAsync(cantidad: 10m);
-
-        // Act: filtramos por IdProyecto
-        var response = await _client.GetAsync(
-            $"/api/almacen/kardex/stock-actual/exportar-excel?idProyecto={IdProyecto}");
-
-        // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        var bytes = await response.Content.ReadAsByteArrayAsync();
-        var sheet = GetSheet(bytes);
-
-        var filtersRow = sheet.GetRow(3);
-        Assert.That(GetString(filtersRow.GetCell(0)), Does.Contain($"idProyecto={IdProyecto}"));
     }
 
     [Test]
@@ -325,19 +304,19 @@ public class KardexInventarioExportTests : IntegrationTestBase
 
         // Act 1: contar filas via GET /stock-actual
         var listResponse = await _client.GetAsync(
-            $"/api/almacen/kardex/stock-actual?idEspecialidad={IdEspecialidadAlbanileria}&idProyecto={IdProyecto}");
+            $"/api/almacen/kardex/stock-actual?idEspecialidad={IdEspecialidadAlbanileria}");
         var listBody = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
         var filasEnJson = listBody.GetArrayLength();
 
         // Act 2: descargar XLSX y contar filas de datos
         var exportResponse = await _client.GetAsync(
-            $"/api/almacen/kardex/stock-actual/exportar-excel?idEspecialidad={IdEspecialidadAlbanileria}&idProyecto={IdProyecto}");
+            $"/api/almacen/kardex/stock-actual/exportar-excel?idEspecialidad={IdEspecialidadAlbanileria}");
         var bytes = await exportResponse.Content.ReadAsByteArrayAsync();
         var sheet = GetSheet(bytes);
 
-        // Header en fila 6; datos en filas 7..(7+N-1).
-        // La fila TOTAL puede existir o no, dependiendo del query param incluirTotales.
-        var filasEnExcel = CountDataRows(sheet);
+        // Header en fila 6; datos en filas 7..(6+N). La fila de totales es
+        // opcional y el endpoint no la incluye por defecto.
+        var filasEnExcel = sheet.LastRowNum - 6;
 
         // Assert
         Assert.That(filasEnExcel, Is.EqualTo(filasEnJson),

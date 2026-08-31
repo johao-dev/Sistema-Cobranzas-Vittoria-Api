@@ -85,6 +85,10 @@ public sealed class KardexInventarioValidator
             errores.Add(Error("idMaterial", CodigosErrorInventario.Validacion.CampoRequerido,
                 "El campo idMaterial es obligatorio y debe ser mayor a 0."));
 
+        if (!dto.IdProyecto.HasValue || dto.IdProyecto.Value <= 0)
+            errores.Add(Error("idProyecto", CodigosErrorInventario.Validacion.CampoRequerido,
+                "El campo idProyecto es obligatorio y debe ser mayor a 0."));
+
         // ---------- Cantidad ----------
         if (dto.Cantidad < 0m)
             errores.Add(Error("cantidad", CodigosErrorInventario.Validacion.CantidadInvalida,
@@ -138,6 +142,10 @@ public sealed class KardexInventarioValidator
         if (dto.IdEspecialidad <= 0)
             errores.Add(Error("idEspecialidad", CodigosErrorInventario.Validacion.CampoRequerido,
                 "El campo idEspecialidad es obligatorio y debe ser mayor a 0."));
+
+        if (!dto.IdProyecto.HasValue || dto.IdProyecto.Value <= 0)
+            errores.Add(Error("idProyecto", CodigosErrorInventario.Validacion.CampoRequerido,
+                "El campo idProyecto es obligatorio y debe ser mayor a 0."));
 
         if (string.IsNullOrWhiteSpace(dto.Solicitante))
             errores.Add(Error("solicitante", CodigosErrorInventario.Validacion.CampoRequerido,

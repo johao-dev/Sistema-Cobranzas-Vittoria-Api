@@ -513,8 +513,6 @@ public class KardexInventarioServiceUnitTests
                 UnidadMedida = "BOL",
                 IdEspecialidad = 2,
                 Especialidad = "Albañilería",
-                IdProyecto = 10,
-                Proyecto = "Mayta Capac II",
                 TotalEntrada = 50m,
                 TotalSalida = 3m,
                 Stock = 47m,
@@ -524,8 +522,7 @@ public class KardexInventarioServiceUnitTests
 
         var filtro = new KardexStockFiltroInventarioDto
         {
-            IdEspecialidad = 2,
-            IdProyecto = 10
+            IdEspecialidad = 2
         };
 
         // Act
@@ -536,7 +533,6 @@ public class KardexInventarioServiceUnitTests
         Assert.That(exporter.Llamadas, Is.EqualTo(1), "Debe invocarse el exporter exactamente una vez.");
         Assert.That(stockRepo.LlamadasListar, Has.Count.EqualTo(1), "Debe consultarse el stock repo una vez.");
         Assert.That(stockRepo.LlamadasListar[0].IdEspecialidad, Is.EqualTo(2));
-        Assert.That(stockRepo.LlamadasListar[0].IdProyecto, Is.EqualTo(10));
     }
 
     [Test]
@@ -553,7 +549,6 @@ public class KardexInventarioServiceUnitTests
         // Assert
         Assert.That(stockRepo.LlamadasListar, Has.Count.EqualTo(1));
         Assert.That(stockRepo.LlamadasListar[0].IdEspecialidad, Is.Null);
-        Assert.That(stockRepo.LlamadasListar[0].IdProyecto, Is.Null);
     }
 
     [Test]

@@ -39,7 +39,7 @@ public sealed class KardexEntradaCreateDto
     /// <summary>FK a maestra.Proveedor (OPCIONAL).</summary>
     public int? IdProveedor { get; set; }
 
-    /// <summary>FK a maestra.Proyecto (OPCIONAL). Deriva del front aunque el payload original no lo exija.</summary>
+    /// <summary>FK a maestra.Proyecto (REQUERIDO). Etiqueta informativa; no segmenta stock.</summary>
     public int? IdProyecto { get; set; }
 
     /// <summary>Numero de documento soporte, ej: "F001-12345" (OPCIONAL, max 50 chars).</summary>

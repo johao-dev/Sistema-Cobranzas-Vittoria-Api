@@ -146,15 +146,14 @@ public class NpoiExcelExporterTests
 
         // Assert: el orden debe ser el declarado por [ExcelColumn(Order = N)]
         Assert.That(GetString(headerRow.GetCell(0)), Is.EqualTo("N°"));
-        Assert.That(GetString(headerRow.GetCell(1)), Is.EqualTo("Proyecto"));
-        Assert.That(GetString(headerRow.GetCell(2)), Is.EqualTo("Especialidad"));
-        Assert.That(GetString(headerRow.GetCell(3)), Is.EqualTo("Cód. Material"));
-        Assert.That(GetString(headerRow.GetCell(4)), Is.EqualTo("Nombre"));
-        Assert.That(GetString(headerRow.GetCell(5)), Is.EqualTo("Unidad Medida"));
-        Assert.That(GetString(headerRow.GetCell(6)), Is.EqualTo("Entrada"));
-        Assert.That(GetString(headerRow.GetCell(7)), Is.EqualTo("Salida"));
-        Assert.That(GetString(headerRow.GetCell(8)), Is.EqualTo("Stock"));
-        Assert.That(GetString(headerRow.GetCell(9)), Is.EqualTo("Fecha"));
+        Assert.That(GetString(headerRow.GetCell(1)), Is.EqualTo("Especialidad"));
+        Assert.That(GetString(headerRow.GetCell(2)), Is.EqualTo("Cód. Material"));
+        Assert.That(GetString(headerRow.GetCell(3)), Is.EqualTo("Nombre"));
+        Assert.That(GetString(headerRow.GetCell(4)), Is.EqualTo("Unidad Medida"));
+        Assert.That(GetString(headerRow.GetCell(5)), Is.EqualTo("Entrada"));
+        Assert.That(GetString(headerRow.GetCell(6)), Is.EqualTo("Salida"));
+        Assert.That(GetString(headerRow.GetCell(7)), Is.EqualTo("Stock"));
+        Assert.That(GetString(headerRow.GetCell(8)), Is.EqualTo("Fecha"));
     }
 
     [Test]
@@ -211,7 +210,6 @@ public class NpoiExcelExporterTests
             new KardexStockExcelRow
             {
                 Numero = 1,
-                Proyecto = "Mayta Capac II",
                 Especialidad = "Albañilería",
                 CodigoMaterial = "MAT-0001",
                 Nombre = "MORTERO LISTO",
@@ -236,17 +234,16 @@ public class NpoiExcelExporterTests
 
         // Assert
         Assert.That((int)dataRow.GetCell(0).NumericCellValue, Is.EqualTo(1));
-        Assert.That(GetString(dataRow.GetCell(1)), Is.EqualTo("Mayta Capac II"));
-        Assert.That(GetString(dataRow.GetCell(2)), Is.EqualTo("Albañilería"));
-        Assert.That(GetString(dataRow.GetCell(3)), Is.EqualTo("MAT-0001"));
-        Assert.That(GetString(dataRow.GetCell(4)), Is.EqualTo("MORTERO LISTO"));
-        Assert.That(GetString(dataRow.GetCell(5)), Is.EqualTo("BOL"));
-        Assert.That((decimal)dataRow.GetCell(6).NumericCellValue, Is.EqualTo(50m));
-        Assert.That((decimal)dataRow.GetCell(7).NumericCellValue, Is.EqualTo(3m));
-        Assert.That((decimal)dataRow.GetCell(8).NumericCellValue, Is.EqualTo(47m));
+        Assert.That(GetString(dataRow.GetCell(1)), Is.EqualTo("Albañilería"));
+        Assert.That(GetString(dataRow.GetCell(2)), Is.EqualTo("MAT-0001"));
+        Assert.That(GetString(dataRow.GetCell(3)), Is.EqualTo("MORTERO LISTO"));
+        Assert.That(GetString(dataRow.GetCell(4)), Is.EqualTo("BOL"));
+        Assert.That((decimal)dataRow.GetCell(5).NumericCellValue, Is.EqualTo(50m));
+        Assert.That((decimal)dataRow.GetCell(6).NumericCellValue, Is.EqualTo(3m));
+        Assert.That((decimal)dataRow.GetCell(7).NumericCellValue, Is.EqualTo(47m));
         // La fecha se serializa como DateTime (NPOI no soporta DateOnly nativamente).
-        Assert.That(dataRow.GetCell(9).CellType, Is.EqualTo(CellType.Numeric));
-        Assert.That(dataRow.GetCell(9).DateCellValue, Is.EqualTo(new DateTime(2026, 1, 16)));
+        Assert.That(dataRow.GetCell(8).CellType, Is.EqualTo(CellType.Numeric));
+        Assert.That(dataRow.GetCell(8).DateCellValue, Is.EqualTo(new DateTime(2026, 1, 16)));
     }
 
     [Test]
@@ -264,7 +261,7 @@ public class NpoiExcelExporterTests
         // Assert
         Assert.That((int)dataRow.GetCell(0).NumericCellValue, Is.EqualTo(1));
         // Las celdas siguientes existen pero estan en blanco.
-        for (var c = 1; c < 10; c++)
+        for (var c = 1; c < 9; c++)
         {
             Assert.That(dataRow.GetCell(c), Is.Not.Null,
                 $"Celda {c} debe existir aunque este en blanco.");
@@ -298,11 +295,11 @@ public class NpoiExcelExporterTests
         // Assert
         Assert.That(GetString(totalsRow.GetCell(0)), Is.EqualTo("TOTAL"),
             "La primera columna no-total debe contener la etiqueta 'TOTAL'.");
-        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(60m),
+        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(60m),
             "Suma de Entrada: 10 + 20 + 30.");
-        Assert.That((decimal)totalsRow.GetCell(7).NumericCellValue, Is.EqualTo(14m),
+        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(14m),
             "Suma de Salida: 2 + 5 + 7.");
-        Assert.That((decimal)totalsRow.GetCell(8).NumericCellValue, Is.EqualTo(46m),
+        Assert.That((decimal)totalsRow.GetCell(7).NumericCellValue, Is.EqualTo(46m),
             "Suma de Stock: 8 + 15 + 23.");
     }
 
@@ -323,9 +320,9 @@ public class NpoiExcelExporterTests
         var totalsRow = sheet.GetRow(9);
 
         // Assert
-        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(10m));
+        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(10m));
+        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(5m));
         Assert.That((decimal)totalsRow.GetCell(7).NumericCellValue, Is.EqualTo(5m));
-        Assert.That((decimal)totalsRow.GetCell(8).NumericCellValue, Is.EqualTo(5m));
     }
 
     [Test]
@@ -378,7 +375,7 @@ public class NpoiExcelExporterTests
         var bytes = _exporter.ExportToXlsx(rows, config);
         var sheet = GetSheet(bytes);
         var dataRow = sheet.GetRow(7);
-        var cell = dataRow.GetCell(6);
+        var cell = dataRow.GetCell(5);
 
         // Assert
         var dataFormat = cell.CellStyle.GetDataFormatString();
@@ -396,7 +393,7 @@ public class NpoiExcelExporterTests
         var bytes = _exporter.ExportToXlsx(rows, config);
         var sheet = GetSheet(bytes);
         var dataRow = sheet.GetRow(7);
-        var cell = dataRow.GetCell(9);
+        var cell = dataRow.GetCell(8);
 
         // Assert
         var dataFormat = cell.CellStyle.GetDataFormatString();

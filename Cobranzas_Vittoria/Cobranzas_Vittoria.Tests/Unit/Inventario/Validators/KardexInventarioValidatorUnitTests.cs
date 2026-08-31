@@ -496,13 +496,28 @@ public class KardexInventarioValidatorUnitTests
     }
 
     [Test]
-    public void ValidarEntrada_ProyectoOpcional_NoLanzaSiEsNull()
+    public void ValidarEntrada_ProyectoRequerido_LanzaSiEsNull()
     {
         var validator = CrearValidatorConDatosValidos();
         var dto = EntradaValida();
         dto.IdProyecto = null;
 
-        Assert.DoesNotThrowAsync(async () =>
-            await validator.ValidarEntradaAsync(dto));
+        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
+            await validator.ValidarEntradaAsync(dto))!;
+
+        Assert.That(ex.Errores.Any(e => e.Campo == "idProyecto"), Is.True);
+    }
+
+    [Test]
+    public void ValidarSalida_ProyectoRequerido_LanzaSiEsNull()
+    {
+        var validator = CrearValidatorConDatosValidos();
+        var dto = SalidaValida();
+        dto.IdProyecto = null;
+
+        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
+            await validator.ValidarSalidaAsync(dto))!;
+
+        Assert.That(ex.Errores.Any(e => e.Campo == "idProyecto"), Is.True);
     }
 }

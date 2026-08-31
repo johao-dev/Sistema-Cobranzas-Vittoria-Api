@@ -259,8 +259,8 @@ public sealed class KardexInventarioService : IKardexInventarioService
         filtro ??= new KardexStockFiltroInventarioDto();
 
         _logger.LogDebug(
-            "Listando stock actual de Kardex. idEspecialidad={IdEspecialidad} idProyecto={IdProyecto} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
-            filtro.IdEspecialidad, filtro.IdProyecto, filtro.FechaDesde, filtro.FechaHasta);
+            "Listando stock actual de Kardex. idEspecialidad={IdEspecialidad} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
+            filtro.IdEspecialidad, filtro.FechaDesde, filtro.FechaHasta);
 
         var resultado = await EjecutarAsync(
             () => _stockRepository.ListarAsync(filtro, ct),
@@ -276,8 +276,8 @@ public sealed class KardexInventarioService : IKardexInventarioService
         filtro ??= new KardexStockFiltroInventarioDto();
 
         _logger.LogDebug(
-            "Exportando stock actual de Kardex a Excel. idEspecialidad={IdEspecialidad} idProyecto={IdProyecto} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
-            filtro.IdEspecialidad, filtro.IdProyecto, filtro.FechaDesde, filtro.FechaHasta);
+            "Exportando stock actual de Kardex a Excel. idEspecialidad={IdEspecialidad} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
+            filtro.IdEspecialidad, filtro.FechaDesde, filtro.FechaHasta);
 
         // 1. Obtener datos via el mismo metodo que GET /stock-actual. Asi el
         //    reporte refleja exactamente la misma vista que el JSON.
@@ -291,7 +291,6 @@ public sealed class KardexInventarioService : IKardexInventarioService
             .Select((s, i) => new KardexStockExcelRow
             {
                 Numero = i + 1,
-                Proyecto = s.Proyecto,
                 Especialidad = s.Especialidad,
                 CodigoMaterial = s.CodigoMaterial,
                 Nombre = s.Nombre,
@@ -322,7 +321,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
 
     /// <summary>
     /// Construye el subtitulo de filtros para el reporte. Formato:
-    ///   - Con filtros: "Filtros: idEspecialidad=2, idProyecto=10, fecha=2026-01-01..2026-12-31"
+    ///   - Con filtros: "Filtros: idEspecialidad=2, fecha=2026-01-01..2026-12-31"
     ///   - Sin filtros: "Filtros: (sin filtros)"
     /// </summary>
     private static string BuildFiltersSubtitle(KardexStockFiltroInventarioDto filtro)
@@ -331,10 +330,6 @@ public sealed class KardexInventarioService : IKardexInventarioService
         if (filtro.IdEspecialidad.HasValue)
         {
             parts.Add($"idEspecialidad={filtro.IdEspecialidad.Value}");
-        }
-        if (filtro.IdProyecto.HasValue)
-        {
-            parts.Add($"idProyecto={filtro.IdProyecto.Value}");
         }
         if (filtro.FechaDesde.HasValue || filtro.FechaHasta.HasValue)
         {

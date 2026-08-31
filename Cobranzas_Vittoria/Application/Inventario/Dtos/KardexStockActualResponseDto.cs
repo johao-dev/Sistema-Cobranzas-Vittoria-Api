@@ -34,8 +34,6 @@ public sealed class KardexStockActualResponseDto
     public string? UnidadMedida { get; set; }
     public int IdEspecialidad { get; set; }
     public string? Especialidad { get; set; }
-    public int? IdProyecto { get; set; }
-    public string? Proyecto { get; set; }
     public decimal TotalEntrada { get; set; }
     public decimal TotalSalida { get; set; }
     public decimal Stock { get; set; }

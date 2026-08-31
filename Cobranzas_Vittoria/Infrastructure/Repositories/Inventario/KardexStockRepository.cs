@@ -29,9 +29,8 @@ namespace Cobranzas_Vittoria.Infrastructure.Repositories.Inventario;
 ///
 /// <para>
 /// <b>Filtros soportados</b>: <c>IdEspecialidad</c>, <c>FechaDesde</c> y
-/// <c>FechaHasta</c>. El parametro <c>IdProyecto</c> se mantiene por
-/// compatibilidad del API pero el SP lo ignora: el stock es global por
-/// (IdMaterial, IdEspecialidad).
+/// <c>FechaHasta</c>. El stock es global por (IdMaterial, IdEspecialidad);
+/// no hay filtro por proyecto.
 /// </para>
 ///
 /// <para>
@@ -69,7 +68,6 @@ public sealed class KardexStockRepository : RepositoryBase, IKardexStockReposito
                 parameters: new
                 {
                     IdEspecialidad = filtro.IdEspecialidad,
-                    IdProyecto = filtro.IdProyecto,
                     FechaDesde = filtro.FechaDesde?.ToDateTime(TimeOnly.MinValue),
                     FechaHasta = filtro.FechaHasta?.ToDateTime(TimeOnly.MinValue)
                 },
