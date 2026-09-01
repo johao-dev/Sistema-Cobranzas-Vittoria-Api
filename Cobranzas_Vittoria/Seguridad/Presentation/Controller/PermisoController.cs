@@ -4,6 +4,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Eliminar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
 
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
@@ -15,6 +16,7 @@ public class PermisoController : ControllerBase
     private readonly ListarPermisoHandler _listarPermisoHandler;
     private readonly UpdatePermisoHandler _updatePermisoHandler;
     private readonly DeletePermisoHandler _deletePermisoHandler;
+    private readonly ObtenerPorIdHandler _obtenerPorIdHandler;
     private readonly ILogger<PermisoController> _logger;
 
     public PermisoController(
@@ -22,12 +24,14 @@ public class PermisoController : ControllerBase
         ListarPermisoHandler listarPermisoHandler,
         UpdatePermisoHandler updatePermisoHandler,
         DeletePermisoHandler deletePermisoHandler,
+        ObtenerPorIdHandler obtenerPorIdHandler,
         ILogger<PermisoController> logger)
     {
         _createPermisoHandler = createPermisoHandler;
         _listarPermisoHandler = listarPermisoHandler;
         _updatePermisoHandler = updatePermisoHandler;
         _deletePermisoHandler = deletePermisoHandler;
+        _obtenerPorIdHandler = obtenerPorIdHandler;
         _logger = logger;
     }
 
@@ -36,9 +40,8 @@ public class PermisoController : ControllerBase
     {
         _logger.LogInformation("Consultando permiso por IdPermiso={IdPermiso}", idPermiso);
 
-        var query = new ListarPermisoQuery(true);
-        var todos = await _listarPermisoHandler.HandleAsync(query);
-        var permiso = todos.FirstOrDefault(p => p.IdPermiso == idPermiso);
+        ObtenerPorIdQuery query = new ObtenerPorIdQuery(idPermiso);
+        ObtenerPorIdResult permiso = await _obtenerPorIdHandler.HandleAsync(query);
 
         if (permiso is null)
         {
@@ -46,7 +49,16 @@ public class PermisoController : ControllerBase
             return NotFound();
         }
 
-        return Ok(permiso);
+        PermisoResponse response = new PermisoResponse(
+            permiso.IdPermiso,
+            permiso.Codigo,
+            permiso.Nombre,
+            permiso.Descripcion,
+            permiso.Activo,
+            permiso.FechaCreacion,
+            permiso.UsuarioCreacion);
+
+        return Ok(response);
     }
 
     [HttpGet]
@@ -55,8 +67,18 @@ public class PermisoController : ControllerBase
         _logger.LogDebug("Listando permisos. Filtro activo={Activo}", activo ?? true);
 
         var query = new ListarPermisoQuery(activo ?? true);
-        var permisos = await _listarPermisoHandler.HandleAsync(query);
-        return Ok(permisos);
+        IEnumerable<PermisoDto> permisos = await _listarPermisoHandler.HandleAsync(query);
+        ListarPermisoResponse response = new ListarPermisoResponse(
+            permisos.Select(p => new PermisoResponse(
+                p.IdPermiso,
+                p.Codigo,
+                p.Nombre,
+                p.Descripcion,
+                p.Activo,
+                p.FechaCreacion,
+                p.UsuarioCreacion)).ToList());
+
+        return Ok(response);
     }
 
     [HttpPost]
@@ -71,7 +93,7 @@ public class PermisoController : ControllerBase
             request.Descripcion);
 
         CreatePermisoResult result = await _createPermisoHandler.HandleAsync(command);
-        CreatePermisoResponse response = new CreatePermisoResponse(
+        PermisoResponse response = new PermisoResponse(
             result.IdPermiso,
             result.Codigo,
             result.Nombre,

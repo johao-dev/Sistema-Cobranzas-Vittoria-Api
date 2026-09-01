@@ -1,6 +1,6 @@
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 
-public sealed record CreatePermisoResponse
+public sealed record PermisoResponse
 (
     int IdPermiso,
     string Codigo,

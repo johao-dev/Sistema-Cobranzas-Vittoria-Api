@@ -29,6 +29,7 @@ using DbUp;
 using DbUp.Helpers;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
 // using Microsoft.AspNetCore.Authentication.JwtBearer;
 // using Microsoft.IdentityModel.Tokens;
 // using System.Text;
@@ -128,6 +129,7 @@ builder.Services.AddScoped<IPermisoRepository, PermisoRepository>();
 builder.Services.AddSingleton<IUsuarioActualService, UsuarioActualService>();
 builder.Services.AddScoped<CreatePermisoHandler>();
 builder.Services.AddScoped<ListarPermisoHandler>();
+builder.Services.AddScoped<ObtenerPorIdHandler>();
 builder.Services.AddScoped<UpdatePermisoHandler>();
 builder.Services.AddScoped<DeletePermisoHandler>();
 
