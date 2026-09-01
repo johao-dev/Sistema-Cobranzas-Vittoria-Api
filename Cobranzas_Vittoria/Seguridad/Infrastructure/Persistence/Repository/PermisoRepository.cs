@@ -13,20 +13,25 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
 {
     public PermisoRepository(IDbConnectionFactory factory) : base(factory) { }
 
-
     public async Task<Permiso?> GetByIdAsync(int idPermiso)
     {
         using IDbConnection db = Open();
-        PermisoEntity? permisoEntity = await db.QueryFirstOrDefaultAsync<PermisoEntity>
-            ("SELECT * FROM Permiso WHERE IdPermiso = @IdPermiso", new { IdPermiso = idPermiso });
-        return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity); // TODO: Reemplazar retorno null por excepcion
+        PermisoEntity? permisoEntity = await db.QueryFirstOrDefaultAsync<PermisoEntity>(
+            "seguridad.usp_Permiso_GetById",
+            new { IdPermiso = idPermiso },
+            commandType: CommandType.StoredProcedure);
+
+        return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity);
     }
 
     public async Task<IEnumerable<Permiso>> GetAllAsync(bool activo = true)
     {
         using IDbConnection db = Open();
-        IEnumerable<PermisoEntity> permisosEntities = await db.QueryAsync<PermisoEntity>
-            ("SELECT * FROM Permiso WHERE Activo = @Activo", new { Activo = activo });
+        IEnumerable<PermisoEntity> permisosEntities = await db.QueryAsync<PermisoEntity>(
+            "seguridad.usp_Permiso_List",
+            new { Activo = activo },
+            commandType: CommandType.StoredProcedure);
+
         return permisosEntities.Select(PermisoMapper.ToDomain);
     }
 
@@ -35,9 +40,14 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
         using IDbConnection db = Open();
         PermisoEntity entity = await db.QueryFirstAsync<PermisoEntity>(
             "seguridad.usp_Permiso_Insert",
-            new { permiso.Codigo, permiso.Nombre, permiso.Descripcion },
-            commandType: CommandType.StoredProcedure
-        );
+            new
+            {
+                permiso.Codigo,
+                permiso.Nombre,
+                permiso.Descripcion,
+                permiso.UsuarioCreacion
+            },
+            commandType: CommandType.StoredProcedure);
 
         return PermisoMapper.ToDomain(entity);
     }
@@ -45,20 +55,18 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
     public async Task<Permiso> UpdateAsync(Permiso permiso)
     {
         using IDbConnection db = Open();
-        PermisoEntity permisoEntity = PermisoMapper.ToEntity(permiso);
         await db.ExecuteAsync(
-            "UPDATE Permiso SET Codigo = @Codigo, Nombre = @Nombre, Descripcion = @Descripcion, Activo = @Activo, FechaModificacion = @FechaModificacion, UsuarioModificacion = @UsuarioModificacion " +
-            "WHERE IdPermiso = @IdPermiso",
+            "seguridad.usp_Permiso_Update",
             new
             {
-                IdPermiso = permisoEntity.IdPermiso,
-                Codigo = permisoEntity.Codigo,
-                Nombre = permisoEntity.Nombre,
-                Descripcion = permisoEntity.Descripcion,
-                Activo = permisoEntity.Activo,
-                FechaModificacion = permisoEntity.FechaModificacion,
-                UsuarioModificacion = permisoEntity.UsuarioModificacion
-            });
+                permiso.IdPermiso,
+                permiso.Nombre,
+                permiso.Descripcion,
+                permiso.Activo,
+                permiso.FechaModificacion,
+                permiso.UsuarioModificacion
+            },
+            commandType: CommandType.StoredProcedure);
 
         return permiso;
     }
@@ -67,7 +75,8 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
     {
         using IDbConnection db = Open();
         await db.ExecuteAsync(
-            "DELETE FROM Permiso WHERE IdPermiso = @IdPermiso",
-            new { IdPermiso = idPermiso });
+            "seguridad.usp_Permiso_Delete",
+            new { IdPermiso = idPermiso },
+            commandType: CommandType.StoredProcedure);
     }
 }

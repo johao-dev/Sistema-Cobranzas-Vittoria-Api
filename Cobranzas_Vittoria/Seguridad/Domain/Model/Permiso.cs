@@ -1,3 +1,6 @@
+using Cobranzas_Vittoria.Application.Common.Excepciones;
+using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
+
 namespace Cobranzas_Vittoria.Seguridad.Domain.Model;
 
 /// <summary>
@@ -19,19 +22,13 @@ public class Permiso
     private Permiso() { }
 
     /// <summary>
-    /// Crea un permiso valido y lanza excepciones de
-    /// aplicacion si se violan las reglas de negocio basicas.
+    /// Crea un permiso valido y lanza una excepcion de dominio si se violan
+    /// las reglas de negocio basicas.
     /// </summary>
     public static Permiso Crear(string codigo, string nombre, string descripcion)
     {
-        if (string.IsNullOrWhiteSpace(codigo))
-            throw new ArgumentException("El codigo del permiso es requerido.", nameof(codigo));
-
-        if (codigo.Contains(' '))
-            throw new ArgumentException("El codigo del permiso no puede contener espacios.", nameof(codigo));
-
-        if (string.IsNullOrWhiteSpace(nombre))
-            throw new ArgumentException("El nombre del permiso es requerido.", nameof(nombre));
+        ValidarCodigo(codigo);
+        ValidarNombre(nombre);
 
         return new Permiso
         {
@@ -43,16 +40,36 @@ public class Permiso
     }
 
     /// <summary>
-    /// Permite actualizar datos editables del permiso.
+    /// Actualiza solo los campos editables del permiso: Nombre y Descripcion.
+    /// El Codigo no se puede cambiar una vez creado.
     /// </summary>
     public void ActualizarDatos(string nombre, string descripcion)
     {
-        if (string.IsNullOrWhiteSpace(nombre))
-            throw new ArgumentException("El nombre del permiso es requerido.", nameof(nombre));
+        ValidarNombre(nombre);
 
         Nombre = nombre.Trim();
         Descripcion = descripcion?.Trim() ?? string.Empty;
         FechaModificacion = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Establece el usuario y fecha de creacion. Se invoca desde el caso de uso
+    /// justo antes de persistir.
+    /// </summary>
+    public void EstablecerAuditoriaCreacion(string usuarioCreacion)
+    {
+        FechaCreacion = DateTime.UtcNow;
+        UsuarioCreacion = usuarioCreacion;
+    }
+
+    /// <summary>
+    /// Establece el usuario y fecha de modificacion. Se invoca desde el caso de uso
+    /// justo antes de persistir.
+    /// </summary>
+    public void EstablecerAuditoriaModificacion(string usuarioModificacion)
+    {
+        FechaModificacion = DateTime.UtcNow;
+        UsuarioModificacion = usuarioModificacion;
     }
 
     public void Desactivar()
@@ -69,7 +86,7 @@ public class Permiso
 
     /// <summary>
     /// Reconstruye la entidad desde persistencia sin revalidar.
-    /// 
+    ///
     /// <para>
     /// <b>Nota:</b> Usar solo en mappers/repositorios.
     /// </para>
@@ -97,5 +114,35 @@ public class Permiso
             FechaModificacion = fechaModificacion,
             UsuarioModificacion = usuarioModificacion
         };
+    }
+
+    private static void ValidarCodigo(string codigo)
+    {
+        if (string.IsNullOrWhiteSpace(codigo))
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(Codigo),
+                "PERMISO_CODIGO_REQUERIDO",
+                "El codigo del permiso es requerido.");
+        }
+
+        if (codigo.Contains(' '))
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(Codigo),
+                "PERMISO_CODIGO_ESPACIOS",
+                "El codigo del permiso no puede contener espacios.");
+        }
+    }
+
+    private static void ValidarNombre(string nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre))
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(Nombre),
+                "PERMISO_NOMBRE_REQUERIDO",
+                "El nombre del permiso es requerido.");
+        }
     }
 }

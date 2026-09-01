@@ -6,5 +6,7 @@ public sealed record CreatePermisoResponse
     string Codigo,
     string Nombre,
     string Descripcion,
-    bool Activo
+    bool Activo,
+    DateTime? FechaCreacion,
+    string? UsuarioCreacion
 );

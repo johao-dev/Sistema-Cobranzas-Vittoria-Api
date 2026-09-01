@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Eliminar;
 
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
@@ -9,29 +12,59 @@ namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 public class PermisoController : ControllerBase
 {
     private readonly CreatePermisoHandler _createPermisoHandler;
+    private readonly ListarPermisoHandler _listarPermisoHandler;
+    private readonly UpdatePermisoHandler _updatePermisoHandler;
+    private readonly DeletePermisoHandler _deletePermisoHandler;
+    private readonly ILogger<PermisoController> _logger;
 
-    public PermisoController(CreatePermisoHandler createPermisoHandler)
+    public PermisoController(
+        CreatePermisoHandler createPermisoHandler,
+        ListarPermisoHandler listarPermisoHandler,
+        UpdatePermisoHandler updatePermisoHandler,
+        DeletePermisoHandler deletePermisoHandler,
+        ILogger<PermisoController> logger)
     {
         _createPermisoHandler = createPermisoHandler;
+        _listarPermisoHandler = listarPermisoHandler;
+        _updatePermisoHandler = updatePermisoHandler;
+        _deletePermisoHandler = deletePermisoHandler;
+        _logger = logger;
     }
 
     [HttpGet("{idPermiso}")]
-    public IActionResult GetById(int idPermiso)
+    public async Task<IActionResult> GetById(int idPermiso)
     {
-        // TODO: Implementar la lógica para obtener un permiso por su ID
-        return Ok();
+        _logger.LogInformation("Consultando permiso por IdPermiso={IdPermiso}", idPermiso);
+
+        var query = new ListarPermisoQuery(true);
+        var todos = await _listarPermisoHandler.HandleAsync(query);
+        var permiso = todos.FirstOrDefault(p => p.IdPermiso == idPermiso);
+
+        if (permiso is null)
+        {
+            _logger.LogWarning("Permiso no encontrado: IdPermiso={IdPermiso}", idPermiso);
+            return NotFound();
+        }
+
+        return Ok(permiso);
     }
 
     [HttpGet]
-    public IActionResult GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] bool? activo)
     {
-        // TODO: Implementar la lógica para obtener todos los permisos
-        return Ok();
+        _logger.LogDebug("Listando permisos. Filtro activo={Activo}", activo ?? true);
+
+        var query = new ListarPermisoQuery(activo ?? true);
+        var permisos = await _listarPermisoHandler.HandleAsync(query);
+        return Ok(permisos);
     }
 
     [HttpPost]
     public async Task<IActionResult> Add([FromBody] CreatePermisoRequest request)
     {
+        _logger.LogInformation("Solicitud de creacion de permiso recibida");
+        _logger.LogDebug("Request de creacion: {@Request}", request);
+
         CreatePermisoCommand command = new CreatePermisoCommand(
             request.Codigo,
             request.Nombre,
@@ -39,27 +72,47 @@ public class PermisoController : ControllerBase
 
         CreatePermisoResult result = await _createPermisoHandler.HandleAsync(command);
         CreatePermisoResponse response = new CreatePermisoResponse(
-            result.Id,
+            result.IdPermiso,
             result.Codigo,
             result.Nombre,
             result.Descripcion,
-            result.Activo
-        );
+            result.Activo,
+            result.FechaCreacion,
+            result.UsuarioCreacion);
 
-        return Ok(response);
+        _logger.LogInformation(
+            "Permiso creado desde controller: IdPermiso={IdPermiso}, Codigo={Codigo}",
+            response.IdPermiso,
+            response.Codigo);
+
+        return StatusCode(StatusCodes.Status201Created, response);
     }
 
     [HttpPut("{idPermiso}")]
-    public IActionResult Update(int idPermiso, [FromBody] UpdatePermisoRequest request)
+    public async Task<IActionResult> Update(int idPermiso, [FromBody] UpdatePermisoRequest request)
     {
-        // TODO: Implementar la lógica para actualizar un permiso existente
-        return Ok();
+        _logger.LogInformation(
+            "Solicitud de actualizacion de permiso: IdPermiso={IdPermiso}",
+            idPermiso);
+        _logger.LogDebug("Request de actualizacion: {@Request}", request);
+
+        var command = new UpdatePermisoCommand(
+            idPermiso,
+            request.Nombre,
+            request.Descripcion);
+
+        await _updatePermisoHandler.HandleAsync(command);
+        return NoContent();
     }
 
     [HttpDelete("{idPermiso}")]
-    public IActionResult Delete(int idPermiso)
+    public async Task<IActionResult> Delete(int idPermiso)
     {
-        // TODO: Implementar la lógica para eliminar un permiso por su ID
-        return Ok();
+        _logger.LogWarning(
+            "Solicitud de eliminacion de permiso: IdPermiso={IdPermiso}",
+            idPermiso);
+
+        await _deletePermisoHandler.HandleAsync(new DeletePermisoCommand(idPermiso));
+        return NoContent();
     }
 }

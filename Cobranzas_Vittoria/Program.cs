@@ -16,9 +16,14 @@ using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Services;
+using Cobranzas_Vittoria.Seguridad.Application.Common;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Eliminar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
+using Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
 using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
@@ -115,8 +120,17 @@ builder.Services.AddScoped<IRolRepository, RolRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IUsuarioRolRepository, UsuarioRolRepository>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+
+// ============================================================================
+// Feature: Modulo Seguridad - Permisos
+// ============================================================================
 builder.Services.AddScoped<IPermisoRepository, PermisoRepository>();
+builder.Services.AddSingleton<IUsuarioActualService, UsuarioActualService>();
 builder.Services.AddScoped<CreatePermisoHandler>();
+builder.Services.AddScoped<ListarPermisoHandler>();
+builder.Services.AddScoped<UpdatePermisoHandler>();
+builder.Services.AddScoped<DeletePermisoHandler>();
+
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();
 builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();

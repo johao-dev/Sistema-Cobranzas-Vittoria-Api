@@ -1,9 +1,11 @@
 namespace Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
 
 public sealed record CreatePermisoResult(
-    int Id,
+    int IdPermiso,
     string Codigo,
     string Nombre,
     string Descripcion,
-    bool Activo
+    bool Activo,
+    DateTime? FechaCreacion,
+    string? UsuarioCreacion
 );
