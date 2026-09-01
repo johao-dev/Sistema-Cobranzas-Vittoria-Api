@@ -15,7 +15,7 @@ public class ListarPermisoHandler
         _logger = logger;
     }
 
-    public async Task<IEnumerable<PermisoDto>> HandleAsync(ListarPermisoQuery query)
+    public async Task<IEnumerable<ListarPermisoResult>> HandleAsync(ListarPermisoQuery query)
     {
         _logger.LogInformation("Listando permisos con estado activo={Activo}", query.Activo);
 
@@ -25,7 +25,7 @@ public class ListarPermisoHandler
         _logger.LogInformation("Se encontraron {Cantidad} permisos", resultado.Count);
         _logger.LogDebug("Permisos listados: {@Permisos}", resultado);
 
-        return resultado.Select(p => new PermisoDto(
+        return resultado.Select(p => new ListarPermisoResult(
             p.IdPermiso,
             p.Codigo,
             p.Nombre,

@@ -20,7 +20,7 @@ public class UpdatePermisoHandler
         _logger = logger;
     }
 
-    public async Task HandleAsync(UpdatePermisoCommand command)
+    public async Task<UpdatePermisoResult> HandleAsync(UpdatePermisoCommand command)
     {
         _logger.LogInformation(
             "Iniciando actualizacion del permiso IdPermiso={IdPermiso}",
@@ -42,10 +42,19 @@ public class UpdatePermisoHandler
         permiso.ActualizarDatos(nombre, descripcion);
         permiso.EstablecerAuditoriaModificacion(_usuarioActualService.ObtenerUsuarioActual());
 
-        await _permisoRepository.UpdateAsync(permiso);
+        Domain.Model.Permiso actualizado = await _permisoRepository.UpdateAsync(permiso);
 
         _logger.LogInformation(
             "Permiso actualizado exitosamente: IdPermiso={IdPermiso}",
-            permiso.IdPermiso);
+            actualizado.IdPermiso);
+
+        return new UpdatePermisoResult(
+            actualizado.IdPermiso,
+            actualizado.Codigo,
+            actualizado.Nombre,
+            actualizado.Descripcion,
+            actualizado.Activo,
+            actualizado.FechaModificacion,
+            actualizado.UsuarioModificacion);
     }
 }

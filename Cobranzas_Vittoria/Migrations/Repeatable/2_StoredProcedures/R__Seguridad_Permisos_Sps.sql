@@ -96,6 +96,19 @@ BEGIN
         FechaModificacion = ISNULL(@FechaModificacion, GETUTCDATE()),
         UsuarioModificacion = @UsuarioModificacion
     WHERE IdPermiso = @IdPermiso;
+
+    SELECT
+        IdPermiso,
+        Codigo,
+        Nombre,
+        Descripcion,
+        Activo,
+        FechaCreacion,
+        UsuarioCreacion,
+        FechaModificacion,
+        UsuarioModificacion
+    FROM seguridad.Permiso
+    WHERE IdPermiso = @IdPermiso;
 END;
 GO
 

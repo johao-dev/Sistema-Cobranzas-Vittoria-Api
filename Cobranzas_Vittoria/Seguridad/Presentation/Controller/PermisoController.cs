@@ -43,6 +43,8 @@ public class PermisoController : ControllerBase
         ObtenerPorIdQuery query = new ObtenerPorIdQuery(idPermiso);
         ObtenerPorIdResult permiso = await _obtenerPorIdHandler.HandleAsync(query);
 
+        //TODO: El handler no retorna null. El controlador no debe tomar decisiones, solo delegar,
+        // la captura de NotFound debe ir en el middleware.
         if (permiso is null)
         {
             _logger.LogWarning("Permiso no encontrado: IdPermiso={IdPermiso}", idPermiso);
@@ -66,8 +68,8 @@ public class PermisoController : ControllerBase
     {
         _logger.LogDebug("Listando permisos. Filtro activo={Activo}", activo ?? true);
 
-        var query = new ListarPermisoQuery(activo ?? true);
-        IEnumerable<PermisoDto> permisos = await _listarPermisoHandler.HandleAsync(query);
+        ListarPermisoQuery query = new ListarPermisoQuery(activo ?? true);
+        IEnumerable<ListarPermisoResult> permisos = await _listarPermisoHandler.HandleAsync(query);
         ListarPermisoResponse response = new ListarPermisoResponse(
             permisos.Select(p => new PermisoResponse(
                 p.IdPermiso,

@@ -55,7 +55,7 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
     public async Task<Permiso> UpdateAsync(Permiso permiso)
     {
         using IDbConnection db = Open();
-        await db.ExecuteAsync(
+        PermisoEntity entity = await db.QueryFirstAsync<PermisoEntity>(
             "seguridad.usp_Permiso_Update",
             new
             {
@@ -68,7 +68,7 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
             },
             commandType: CommandType.StoredProcedure);
 
-        return permiso;
+        return PermisoMapper.ToDomain(entity);
     }
 
     public async Task DeleteAsync(int idPermiso)

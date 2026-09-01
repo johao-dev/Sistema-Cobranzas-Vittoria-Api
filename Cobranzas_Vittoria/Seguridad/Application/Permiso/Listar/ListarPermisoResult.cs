@@ -3,7 +3,7 @@ namespace Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
 /// <summary>
 /// DTO de lectura que representa un permiso en la capa de aplicacion.
 /// </summary>
-public sealed record PermisoDto(
+public sealed record ListarPermisoResult(
     int IdPermiso,
     string Codigo,
     string Nombre,
