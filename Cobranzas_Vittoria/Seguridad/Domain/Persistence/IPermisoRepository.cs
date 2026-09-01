@@ -1,4 +1,4 @@
-using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Entity;
+using Cobranzas_Vittoria.Seguridad.Domain.Model;
 
 namespace Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 
@@ -6,13 +6,13 @@ public interface IPermisoRepository
 {
     // Operaciones CRUD por el momento.
 
-    Task<PermisoEntity> GetByIdAsync(int idPermiso);
+    Task<Permiso?> GetByIdAsync(int idPermiso);
 
-    Task<IEnumerable<PermisoEntity>> GetAllAsync();
+    Task<IEnumerable<Permiso>> GetAllAsync();
+    
+    Task AddAsync(Permiso permiso);
 
-    Task AddAsync(PermisoEntity permiso);
-
-    Task UpdateAsync(PermisoEntity permiso);
+    Task UpdateAsync(Permiso permiso);
 
     Task DeleteAsync(int idPermiso);
 }
