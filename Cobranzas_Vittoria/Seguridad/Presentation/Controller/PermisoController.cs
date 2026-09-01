@@ -43,14 +43,6 @@ public class PermisoController : ControllerBase
         ObtenerPorIdQuery query = new ObtenerPorIdQuery(idPermiso);
         ObtenerPorIdResult permiso = await _obtenerPorIdHandler.HandleAsync(query);
 
-        //TODO: El handler no retorna null. El controlador no debe tomar decisiones, solo delegar,
-        // la captura de NotFound debe ir en el middleware.
-        if (permiso is null)
-        {
-            _logger.LogWarning("Permiso no encontrado: IdPermiso={IdPermiso}", idPermiso);
-            return NotFound();
-        }
-
         PermisoResponse response = new PermisoResponse(
             permiso.IdPermiso,
             permiso.Codigo,
@@ -58,7 +50,9 @@ public class PermisoController : ControllerBase
             permiso.Descripcion,
             permiso.Activo,
             permiso.FechaCreacion,
-            permiso.UsuarioCreacion);
+            permiso.UsuarioCreacion,
+            permiso.FechaModificacion,
+            permiso.UsuarioModificacion);
 
         return Ok(response);
     }
@@ -78,7 +72,9 @@ public class PermisoController : ControllerBase
                 p.Descripcion,
                 p.Activo,
                 p.FechaCreacion,
-                p.UsuarioCreacion)).ToList());
+                p.UsuarioCreacion,
+                p.FechaModificacion,
+                p.UsuarioModificacion)).ToList());
 
         return Ok(response);
     }
@@ -102,7 +98,9 @@ public class PermisoController : ControllerBase
             result.Descripcion,
             result.Activo,
             result.FechaCreacion,
-            result.UsuarioCreacion);
+            result.UsuarioCreacion,
+            null,
+            null);
 
         _logger.LogInformation(
             "Permiso creado desde controller: IdPermiso={IdPermiso}, Codigo={Codigo}",

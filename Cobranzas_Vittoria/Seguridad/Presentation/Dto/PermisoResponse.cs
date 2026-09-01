@@ -8,5 +8,7 @@ public sealed record PermisoResponse
     string Descripcion,
     bool Activo,
     DateTime? FechaCreacion,
-    string? UsuarioCreacion
+    string? UsuarioCreacion,
+    DateTime? FechaModificacion,
+    string? UsuarioModificacion
 );

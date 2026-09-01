@@ -21,6 +21,7 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - PlantillaNoDisponibleException  -> 404 NotFound   (codigo "PLANTILLA_NO_DISPONIBLE")
     ///   - IdRutaInconsistenteException    -> 400 BadRequest (codigo "ID_RUTA_INCONSISTENTE"; PUT con idRuta != idCuerpo)
     ///   - KardexNoEncontradoException     -> 404 NotFound   (codigo "KARDEX_NO_ENCONTRADO"; id de kardex inexistente)
+    ///   - KeyNotFoundException            -> 404 NotFound   (codigo "RECURSO_NO_ENCONTRADO"; entidad solicitada no existe)
     ///   - SqlException                    -> 500 SQL_ERROR        (deuda tecnica documentada)
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
     ///
@@ -184,6 +185,21 @@ namespace Cobranzas_Vittoria.Middleware
                     context,
                     StatusCodes.Status404NotFound,
                     KardexNoEncontradoException.CodigoError,
+                    ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                // Recurso no encontrado. Los handlers de aplicacion pueden lanzar
+                // KeyNotFoundException cuando una entidad no existe. Se mapea a 404
+                // para evitar devolver 500 en casos controlados de "no encontrado".
+                _logger.LogWarning(
+                    "Rechazo 404 ({Tipo}) en {Method} {Path}: {Mensaje}",
+                    nameof(KeyNotFoundException), context.Request.Method, context.Request.Path,
+                    ex.Message);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status404NotFound,
+                    "RECURSO_NO_ENCONTRADO",
                     ex.Message);
             }
             catch (SqlException ex)
