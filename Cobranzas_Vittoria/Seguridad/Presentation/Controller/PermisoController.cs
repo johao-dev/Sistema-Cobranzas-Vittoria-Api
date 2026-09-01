@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
 
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
@@ -7,6 +8,13 @@ namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 [Route("api/seguridad/permisos")]
 public class PermisoController : ControllerBase
 {
+    private readonly CreatePermisoHandler _createPermisoHandler;
+
+    public PermisoController(CreatePermisoHandler createPermisoHandler)
+    {
+        _createPermisoHandler = createPermisoHandler;
+    }
+
     [HttpGet("{idPermiso}")]
     public IActionResult GetById(int idPermiso)
     {
@@ -22,10 +30,23 @@ public class PermisoController : ControllerBase
     }
 
     [HttpPost]
-    public IActionResult Add([FromBody] CreatePermisoRequest request)
+    public async Task<IActionResult> Add([FromBody] CreatePermisoRequest request)
     {
-        // TODO: Implementar la lógica para agregar un nuevo permiso
-        return Ok();
+        CreatePermisoCommand command = new CreatePermisoCommand(
+            request.Codigo,
+            request.Nombre,
+            request.Descripcion);
+
+        CreatePermisoResult result = await _createPermisoHandler.HandleAsync(command);
+        CreatePermisoResponse response = new CreatePermisoResponse(
+            result.Id,
+            result.Codigo,
+            result.Nombre,
+            result.Descripcion,
+            result.Activo
+        );
+
+        return Ok(response);
     }
 
     [HttpPut("{idPermiso}")]

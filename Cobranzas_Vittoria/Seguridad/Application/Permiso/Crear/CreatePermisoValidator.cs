@@ -4,15 +4,13 @@ public sealed class CreatePermisoValidator
 {
     public static void ValidarCreate(CreatePermisoCommand command)
     {
-        // TODO: Reemplazar por excepciones específicas
-        if (string.IsNullOrWhiteSpace(command.Codigo))
-        {
-            throw new ArgumentException("El código no puede estar vacío ni contener espacios.");
-        }
+        if (command is null)
+            throw new ArgumentNullException(nameof(command));
+
+        if (string.IsNullOrWhiteSpace(command.Codigo) || command.Codigo.Contains(' '))
+            throw new ArgumentException("El codigo es requerido y no puede contener espacios.", nameof(command.Codigo));
 
         if (string.IsNullOrWhiteSpace(command.Nombre))
-        {
-            throw new ArgumentException("El nombre no puede estar vacío ni contener espacios.");
-        }
+            throw new ArgumentException("El nombre es requerido.", nameof(command.Nombre));
     }
 }

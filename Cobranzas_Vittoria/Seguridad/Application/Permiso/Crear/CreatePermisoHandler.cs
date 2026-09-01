@@ -15,15 +15,13 @@ public class CreatePermisoHandler
     {
         CreatePermisoValidator.ValidarCreate(command);
 
-        var permiso = new Domain.Model.Permiso
-        {
-            Codigo = command.Codigo,
-            Nombre = command.Nombre,
-            Descripcion = command.Descripcion
-        };
+        Domain.Model.Permiso permiso = Domain.Model.Permiso.Crear(
+            command.Codigo,
+            command.Nombre,
+            command.Descripcion);
 
         Domain.Model.Permiso permisoCreado = await _permisoRepository.AddAsync(permiso);
-        
+
         return new CreatePermisoResult(
             permisoCreado.IdPermiso,
             permisoCreado.Codigo,

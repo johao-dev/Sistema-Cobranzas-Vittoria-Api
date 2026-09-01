@@ -22,16 +22,15 @@ public static class PermisoMapper
 
     public static Permiso ToDomain(PermisoEntity entity)
     {
-        return new Permiso
-        {
-            IdPermiso = entity.IdPermiso,
-            Codigo = entity.Codigo,
-            Nombre = entity.Nombre,
-            Descripcion = entity.Descripcion,
-            FechaCreacion = entity.FechaCreacion,
-            UsuarioCreacion = entity.UsuarioCreacion,
-            FechaModificacion = entity.FechaModificacion,
-            UsuarioModificacion = entity.UsuarioModificacion
-        };
+        return Permiso.Reconstruir(
+            entity.IdPermiso,
+            entity.Codigo,
+            entity.Nombre,
+            entity.Descripcion,
+            entity.Activo,
+            entity.FechaCreacion,
+            entity.UsuarioCreacion,
+            entity.FechaModificacion,
+            entity.UsuarioModificacion);
     }
 }

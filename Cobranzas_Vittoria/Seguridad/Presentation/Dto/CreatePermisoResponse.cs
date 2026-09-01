@@ -5,5 +5,6 @@ public sealed record CreatePermisoResponse
     int IdPermiso,
     string Codigo,
     string Nombre,
-    string Descripcion
+    string Descripcion,
+    bool Activo
 );
