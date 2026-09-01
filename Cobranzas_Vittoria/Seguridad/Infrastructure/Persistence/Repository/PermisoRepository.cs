@@ -30,26 +30,19 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
         return permisosEntities.Select(PermisoMapper.ToDomain);
     }
 
-
-    public async Task AddAsync(Permiso permiso)
+    public async Task<Permiso> AddAsync(Permiso permiso)
     {
         using IDbConnection db = Open();
-        PermisoEntity permisoEntity = PermisoMapper.ToEntity(permiso);
-        await db.ExecuteAsync(
-            "INSERT INTO Permiso (Codigo, Nombre, Descripcion, Activo, FechaCreacion, UsuarioCreacion) " +
-            "VALUES (@Codigo, @Nombre, @Descripcion, @Activo, @FechaCreacion, @UsuarioCreacion)",
-            new
-            {
-                Codigo = permisoEntity.Codigo,
-                Nombre = permisoEntity.Nombre,
-                Descripcion = permisoEntity.Descripcion,
-                Activo = permisoEntity.Activo,
-                FechaCreacion = permisoEntity.FechaCreacion,
-                UsuarioCreacion = permisoEntity.UsuarioCreacion
-            });
+        PermisoEntity entity = await db.QueryFirstAsync<PermisoEntity>(
+            "seguridad.usp_Permiso_Insert",
+            new { permiso.Codigo, permiso.Nombre, permiso.Descripcion },
+            commandType: CommandType.StoredProcedure
+        );
+
+        return PermisoMapper.ToDomain(entity);
     }
 
-    public async Task UpdateAsync(Permiso permiso)
+    public async Task<Permiso> UpdateAsync(Permiso permiso)
     {
         using IDbConnection db = Open();
         PermisoEntity permisoEntity = PermisoMapper.ToEntity(permiso);
@@ -66,6 +59,8 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
                 FechaModificacion = permisoEntity.FechaModificacion,
                 UsuarioModificacion = permisoEntity.UsuarioModificacion
             });
+
+        return permiso;
     }
 
     public async Task DeleteAsync(int idPermiso)

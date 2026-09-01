@@ -10,9 +10,9 @@ public interface IPermisoRepository
 
     Task<IEnumerable<Permiso>> GetAllAsync(bool activo = true);
     
-    Task AddAsync(Permiso permiso);
+    Task<Permiso> AddAsync(Permiso permiso);
 
-    Task UpdateAsync(Permiso permiso);
+    Task<Permiso> UpdateAsync(Permiso permiso);
 
     Task DeleteAsync(int idPermiso);
 }
