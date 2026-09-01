@@ -1,0 +1,1 @@
+// matriz de permisos base del sistema + los dinámicos
