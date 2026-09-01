@@ -27,7 +27,7 @@ public class UpdatePermisoHandler
             command.IdPermiso);
         _logger.LogDebug("Datos recibidos para actualizar permiso: {@Command}", command);
 
-        UpdatePermisoValidator.ValidarUpdate(command);
+        PermisoValidator.ValidarUpdate(command);
 
         Domain.Model.Permiso? permiso = await _permisoRepository.GetByIdAsync(command.IdPermiso)
             ?? throw new ValidacionNegocioSeguridadException(

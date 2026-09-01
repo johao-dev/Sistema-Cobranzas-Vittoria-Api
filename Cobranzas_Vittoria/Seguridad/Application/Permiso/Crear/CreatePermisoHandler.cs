@@ -24,7 +24,7 @@ public class CreatePermisoHandler
         _logger.LogInformation("Iniciando creacion de permiso con codigo {Codigo}", command.Codigo);
         _logger.LogDebug("Datos recibidos para crear permiso: {@Command}", command);
 
-        CreatePermisoValidator.ValidarCreate(command);
+        PermisoValidator.ValidarCreate(command);
 
         Domain.Model.Permiso permiso = Domain.Model.Permiso.Crear(
             command.Codigo,
