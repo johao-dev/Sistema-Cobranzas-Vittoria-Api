@@ -20,6 +20,28 @@ BEGIN
 END;
 GO
 
+-- Procedimiento para obtener un permiso por su código.
+CREATE OR ALTER PROCEDURE seguridad.usp_Permiso_GetByCodigo
+    @Codigo NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        IdPermiso,
+        Codigo,
+        Nombre,
+        Descripcion,
+        Activo,
+        FechaCreacion,
+        UsuarioCreacion,
+        FechaModificacion,
+        UsuarioModificacion
+    FROM seguridad.Permiso
+    WHERE Codigo = @Codigo;
+END;
+GO
+
 -- Procedimiento para listar permisos filtrados por estado activo.
 CREATE OR ALTER PROCEDURE seguridad.usp_Permiso_List
     @Activo BIT = 1

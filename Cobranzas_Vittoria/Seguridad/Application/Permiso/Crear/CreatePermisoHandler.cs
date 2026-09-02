@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Seguridad.Application.Common;
+using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 
 namespace Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
@@ -25,6 +26,11 @@ public class CreatePermisoHandler
         _logger.LogDebug("Datos recibidos para crear permiso: {@Command}", command);
 
         PermisoValidator.ValidarCreate(command);
+        if (await _permisoRepository.GetByCodigoAsync(command.Codigo.Trim()) is not null)
+            throw new ValidacionNegocioSeguridadException(
+                nameof(command.Codigo),
+                "PERMISO_CODIGO_DUPLICADO",
+                $"Ya existe un permiso con el codigo {command.Codigo}");
 
         Domain.Model.Permiso permiso = Domain.Model.Permiso.Crear(
             command.Codigo,

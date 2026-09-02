@@ -24,6 +24,17 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
         return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity);
     }
 
+    public async Task<Permiso?> GetByCodigoAsync(string codigo)
+    {
+        using IDbConnection db = Open();
+        PermisoEntity? permisoEntity = await db.QueryFirstOrDefaultAsync<PermisoEntity>(
+            "seguridad.usp_Permiso_GetByCodigo",
+            new { Codigo = codigo },
+            commandType: CommandType.StoredProcedure);
+
+        return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity);
+    }
+
     public async Task<IEnumerable<Permiso>> GetAllAsync(bool activo = true)
     {
         using IDbConnection db = Open();
