@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cobranzas_Vittoria", "Cobranzas_Vittoria.csproj", "{6D6F97FF-263A-4C7C-8E28-4DB859C16645}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cobranzas_Vittoria.Tests", "Cobranzas_Vittoria.Tests\Cobranzas_Vittoria.Tests.csproj", "{7E0F7F7E-DC7A-426C-ACA2-97594D4093A3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6D6F97FF-263A-4C7C-8E28-4DB859C16645}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D6F97FF-263A-4C7C-8E28-4DB859C16645}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D6F97FF-263A-4C7C-8E28-4DB859C16645}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D6F97FF-263A-4C7C-8E28-4DB859C16645}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E0F7F7E-DC7A-426C-ACA2-97594D4093A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E0F7F7E-DC7A-426C-ACA2-97594D4093A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E0F7F7E-DC7A-426C-ACA2-97594D4093A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E0F7F7E-DC7A-426C-ACA2-97594D4093A3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B045A61D-3821-415D-8098-B28298A07E76}
+	EndGlobalSection
+EndGlobal
