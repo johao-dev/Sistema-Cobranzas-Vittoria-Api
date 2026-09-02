@@ -1,4 +1,3 @@
-using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 
 namespace Cobranzas_Vittoria.Seguridad.Domain.Model;
@@ -6,7 +5,7 @@ namespace Cobranzas_Vittoria.Seguridad.Domain.Model;
 /// <summary>
 /// Representa un permiso del sistema.
 /// </summary>
-public class Permiso
+public class Permiso : IEquatable<Permiso>
 {
     public int IdPermiso { get; private set; }
     public string Codigo { get; private set; } = string.Empty;
@@ -144,5 +143,25 @@ public class Permiso
                 "PERMISO_NOMBRE_REQUERIDO",
                 "El nombre del permiso es requerido.");
         }
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return Equals(obj as Permiso);
+    }
+
+    public bool Equals(Permiso? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+
+        return string.Equals(Codigo, other.Codigo, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override int GetHashCode()
+    {
+        return Codigo is null
+            ? 0
+            : StringComparer.OrdinalIgnoreCase.GetHashCode(Codigo);
     }
 }
