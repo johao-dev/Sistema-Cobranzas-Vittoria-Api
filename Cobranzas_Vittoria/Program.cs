@@ -21,6 +21,10 @@ using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Eliminar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
@@ -133,6 +137,15 @@ builder.Services.AddScoped<ObtenerPorIdHandler>();
 builder.Services.AddScoped<UpdatePermisoHandler>();
 builder.Services.AddScoped<DeletePermisoHandler>();
 
+// ============================================================================
+// Feature: Modulo Seguridad - Roles
+// ============================================================================
+builder.Services.AddScoped<IRolRepository, RolRepository>();
+builder.Services.AddScoped<CreateRolHandler>();
+builder.Services.AddScoped<ListarRolHandler>();
+builder.Services.AddScoped<ObtenerRolHandler>();
+builder.Services.AddScoped<ActualizarRolHandler>();
+
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();
 builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();
@@ -150,7 +163,6 @@ builder.Services.AddScoped<IProveedorTerrenoRepository, ProveedorTerrenoReposito
 builder.Services.AddScoped<IGastoProyectoRepository, GastoProyectoRepository>();
 
 // Services
-builder.Services.AddScoped<IRolService, RolService>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<IUsuarioRolService, UsuarioRolService>();
 builder.Services.AddScoped<IAuthService, AuthService>();

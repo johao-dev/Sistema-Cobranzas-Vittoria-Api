@@ -139,6 +139,24 @@ public class Rol
     }
 
     /// <summary>
+    /// Activa el rol y registra la fecha de modificación.
+    /// </summary>
+    public void Activar()
+    {
+        Activo = true;
+        FechaModificacion = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Desactiva el rol y registra la fecha de modificación.
+    /// </summary>
+    public void Desactivar()
+    {
+        Activo = false;
+        FechaModificacion = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Establece la información de auditoría de creación del rol.
     /// </summary>
     /// <param name="usuarioCreacion">El usuario que creó el rol.</param>
