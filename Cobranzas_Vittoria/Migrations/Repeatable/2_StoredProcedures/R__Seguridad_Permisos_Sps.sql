@@ -1,3 +1,9 @@
+-- =============================================
+-- Author:      Johao Bravo
+-- Create date: 2026-09-03
+-- Description: Procedimientos almacenados para la gestión de permisos en el sistema.
+-- =============================================
+
 -- Procedimiento para obtener un permiso por su identificador.
 CREATE OR ALTER PROCEDURE seguridad.usp_Permiso_GetById
     @IdPermiso INT
