@@ -6,7 +6,7 @@ public class Rol
 {
     public int IdRol { get; private set; }
     public string Nombre { get; private set; } = string.Empty;
-    public string? Descripcion { get; private set; } = string.Empty;
+    public string Descripcion { get; private set; } = string.Empty;
     public bool Activo { get; private set; }
     
     public DateTime? FechaCreacion { get; private set; }
