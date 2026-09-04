@@ -94,7 +94,7 @@ public class ApiExceptionMiddlewareTests : IntegrationTestBase
         using var content = new StringContent(string.Empty, Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _client.PostAsync("/api/auth/login", content);
+        var response = await _client.PostAsync("/api/seguridad/permisos", content);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
@@ -107,7 +107,7 @@ public class ApiExceptionMiddlewareTests : IntegrationTestBase
         using var content = new StringContent("{", Encoding.UTF8, "application/json");
 
         // Act
-        var response = await _client.PostAsync("/api/auth/login", content);
+        var response = await _client.PostAsync("/api/seguridad/permisos", content);
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));

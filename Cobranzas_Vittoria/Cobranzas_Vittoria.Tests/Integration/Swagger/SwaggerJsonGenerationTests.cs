@@ -75,12 +75,6 @@ public class SwaggerJsonGenerationTests
         // con documentacion de errores tipados. Verificamos que aparece.
         Assert.That(body, Does.Contain("/api/import"),
             "El endpoint /api/import debe estar documentado en swagger.json");
-
-        // AuthController y UnidadMedidaController son controllers legacy que
-        // tambien deben aparecer (smoke test de que NO se cae la generacion
-        // por controllers sin [ProducesResponseType]).
-        Assert.That(body, Does.Contain("/api/auth"),
-            "AuthController debe aparecer en swagger.json");
     }
 
     [Test]
