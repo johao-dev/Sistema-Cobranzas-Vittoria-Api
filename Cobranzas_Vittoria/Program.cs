@@ -25,6 +25,12 @@ using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.Actualizar;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.AsignarRoles;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.Crear;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.Listar;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.Obtener;
+using Cobranzas_Vittoria.Seguridad.Application.Usuario.QuitarRol;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
@@ -143,6 +149,17 @@ builder.Services.AddScoped<CreateRolHandler>();
 builder.Services.AddScoped<ListarRolHandler>();
 builder.Services.AddScoped<ObtenerRolHandler>();
 builder.Services.AddScoped<ActualizarRolHandler>();
+
+// ============================================================================
+// Feature: Modulo Seguridad - Usuarios
+// ============================================================================
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+builder.Services.AddScoped<CreateUsuarioHandler>();
+builder.Services.AddScoped<ListarUsuarioHandler>();
+builder.Services.AddScoped<ObtenerUsuarioHandler>();
+builder.Services.AddScoped<ActualizarUsuarioHandler>();
+builder.Services.AddScoped<AsignarRolesHandler>();
+builder.Services.AddScoped<QuitarRolHandler>();
 
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();

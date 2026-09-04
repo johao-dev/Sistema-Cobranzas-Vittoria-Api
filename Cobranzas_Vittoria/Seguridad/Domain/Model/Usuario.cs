@@ -64,7 +64,7 @@ public class Usuario
         }
     }
 
-    private void AsignarCredenciales(string usuarioLogin, string passwordHash)
+    public void AsignarCredenciales(string usuarioLogin, string passwordHash)
     {
         if (string.IsNullOrWhiteSpace(usuarioLogin))
         {
@@ -84,6 +84,19 @@ public class Usuario
 
         UsuarioLogin = usuarioLogin.Trim();
         PasswordHash = passwordHash;
+    }
+
+    public void ActualizarDatos(string nombres, string apellidos)
+    {
+        ValidarNombreCompleto(nombres, apellidos);
+
+        Nombres = nombres.Trim();
+        Apellidos = apellidos.Trim();
+    }
+
+    public void ActualizarCorreo(string correo)
+    {
+        Correo = new Email(correo);
     }
 
     public void EstablecerAuditoriaCreacion(string usuarioCreacion)
