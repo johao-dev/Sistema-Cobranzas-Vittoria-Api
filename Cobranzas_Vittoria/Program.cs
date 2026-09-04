@@ -123,8 +123,6 @@ builder.Services.AddTransient<ApiExceptionMiddleware>();
 // Repositories
 builder.Services.AddScoped<IRolRepository, RolRepository>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
-builder.Services.AddScoped<IUsuarioRolRepository, UsuarioRolRepository>();
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 
 // ============================================================================
 // Feature: Modulo Seguridad - Permisos
@@ -163,9 +161,6 @@ builder.Services.AddScoped<IProveedorTerrenoRepository, ProveedorTerrenoReposito
 builder.Services.AddScoped<IGastoProyectoRepository, GastoProyectoRepository>();
 
 // Services
-builder.Services.AddScoped<IUsuarioService, UsuarioService>();
-builder.Services.AddScoped<IUsuarioRolService, UsuarioRolService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEspecialidadService, EspecialidadService>();
 builder.Services.AddScoped<IProyectoService, ProyectoService>();
 builder.Services.AddScoped<IProveedorService, ProveedorService>();
