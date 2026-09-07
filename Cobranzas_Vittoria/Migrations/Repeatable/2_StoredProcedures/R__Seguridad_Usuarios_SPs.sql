@@ -162,6 +162,19 @@ BEGIN
         @Activo,
         GETDATE(),
         @UsuarioCreacion);
+
+    SELECT
+        IdUsuario,
+        Nombres,
+        Apellidos,
+        Correo,
+        UsuarioLogin,
+        PasswordHash,
+        Activo,
+        FechaCreacion,
+        UsuarioCreacion
+    FROM seguridad.Usuario
+    WHERE IdUsuario = SCOPE_IDENTITY();
 END;
 GO
 
