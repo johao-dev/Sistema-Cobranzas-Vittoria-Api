@@ -88,9 +88,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
     {
         // Policies base
-        // TODO: Reemplazar por un sistema de códigos de permisos
-        options.AddPolicy("AdminOnly", policy => policy.RequireRole("ADMIN"));
-        options.AddPolicy("PuedeGestionarSeguridad", policy => policy.RequireRole("ADMIN"));
     });
 
 // ============================================================================
