@@ -16,6 +16,8 @@ namespace Cobranzas_Vittoria.Tests.Integration.Seguridad;
 /// </summary>
 public class RolControllerTests : IntegrationTestBase
 {
+    private const string BaseUrl = "/api/seguridad/roles";
+
     [Test]
     public async Task List_RetornaLosRolesDelSeed()
     {
@@ -118,5 +120,72 @@ public class RolControllerTests : IntegrationTestBase
             "SELECT Activo FROM seguridad.Rol WHERE IdRol = @id",
             new { id = created.IdRol });
         Assert.That(activoEnBd, Is.False);
+    }
+
+    [Test]
+    public async Task AsignarPermisos_ConDatosValidos_Retorna204YPersisteSinDuplicados()
+    {
+        RolResponse rol = await CrearRolAsync("ASIG-PERM");
+        PermisoResponse permiso = await CrearPermisoAsync("asig-perm");
+
+        var response = await _client.PostAsJsonAsync(
+            $"{BaseUrl}/{rol.IdRol}/permisos",
+            new AsignarPermisosRequest(new[] { permiso.IdPermiso, permiso.IdPermiso }));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        var asociaciones = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM seguridad.PermisoRol WHERE IdRol = @idRol AND IdPermiso = @idPermiso",
+            new { idRol = rol.IdRol, idPermiso = permiso.IdPermiso });
+        Assert.That(asociaciones, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AsignarPermisos_SinPermisos_Retorna422()
+    {
+        RolResponse rol = await CrearRolAsync("SIN-PERM");
+
+        var response = await _client.PostAsJsonAsync(
+            $"{BaseUrl}/{rol.IdRol}/permisos",
+            new AsignarPermisosRequest(Array.Empty<int>()));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+    }
+
+    [Test]
+    public async Task QuitarPermiso_ConAsociacionExistente_Retorna204YLaElimina()
+    {
+        RolResponse rol = await CrearRolAsync("QUIT-PERM");
+        PermisoResponse permiso = await CrearPermisoAsync("quit-perm");
+        await _client.PostAsJsonAsync(
+            $"{BaseUrl}/{rol.IdRol}/permisos",
+            new AsignarPermisosRequest(new[] { permiso.IdPermiso }));
+
+        var response = await _client.DeleteAsync(
+            $"{BaseUrl}/{rol.IdRol}/permisos/{permiso.IdPermiso}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        var asociaciones = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM seguridad.PermisoRol WHERE IdRol = @idRol AND IdPermiso = @idPermiso",
+            new { idRol = rol.IdRol, idPermiso = permiso.IdPermiso });
+        Assert.That(asociaciones, Is.Zero);
+    }
+
+    private async Task<RolResponse> CrearRolAsync(string prefijo)
+    {
+        var request = new CreateRolRequest($"{prefijo}-{Guid.NewGuid():N}"[..20], "Rol de prueba");
+        var response = await _client.PostAsJsonAsync(BaseUrl, request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<RolResponse>())!;
+    }
+
+    private async Task<PermisoResponse> CrearPermisoAsync(string prefijo)
+    {
+        var request = new CreatePermisoRequest(
+            $"{prefijo}-{Guid.NewGuid():N}",
+            "Permiso de prueba",
+            "");
+        var response = await _client.PostAsJsonAsync("/api/seguridad/permisos", request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<PermisoResponse>())!;
     }
 }

@@ -14,6 +14,8 @@ public sealed class StubRolRepository : IRolRepository
     public Func<Rol, Task<Rol>>? OnAddAsync { get; set; }
     public Func<Rol, Task<Rol>>? OnUpdateAsync { get; set; }
     public Func<int, Task>? OnDeleteAsync { get; set; }
+    public Func<int, IEnumerable<int>, string, Task>? OnAsignarPermisosAsync { get; set; }
+    public Func<int, int, Task>? OnQuitarPermisoAsync { get; set; }
 
     public Task<Rol?> GetByIdAsync(int idRol)
         => Task.FromResult(Roles.FirstOrDefault(r => r.IdRol == idRol));
@@ -21,6 +23,8 @@ public sealed class StubRolRepository : IRolRepository
     public Task<Rol?> GetByNombreAsync(string nombre)
         => Task.FromResult(Roles.FirstOrDefault(r =>
             string.Equals(r.Nombre, nombre, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<Rol?> GetByIdWithPermisosAsync(int idRol) => GetByIdAsync(idRol);
 
     public Task<IEnumerable<Rol>> GetAllAsync(bool? activo = true)
     {
@@ -71,6 +75,12 @@ public sealed class StubRolRepository : IRolRepository
 
         return Task.CompletedTask;
     }
+
+    public Task AsignarPermisosAsync(int idRol, IEnumerable<int> idPermisos, string usuarioCreacion)
+        => OnAsignarPermisosAsync?.Invoke(idRol, idPermisos, usuarioCreacion) ?? Task.CompletedTask;
+
+    public Task QuitarPermisoAsync(int idRol, int idPermiso)
+        => OnQuitarPermisoAsync?.Invoke(idRol, idPermiso) ?? Task.CompletedTask;
 
     public void Add(int idRol, string nombre, string descripcion = "", bool activo = true)
         => Roles.Add(Rol.Reconstruir(idRol, nombre, descripcion, activo));

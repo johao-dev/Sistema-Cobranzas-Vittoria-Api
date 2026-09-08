@@ -25,6 +25,8 @@ using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.AsignarPermisos;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.QuitarPermiso;
 using Cobranzas_Vittoria.Seguridad.Application.Usuario.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Usuario.AsignarRoles;
 using Cobranzas_Vittoria.Seguridad.Application.Usuario.Crear;
@@ -148,6 +150,8 @@ builder.Services.AddScoped<CreateRolHandler>();
 builder.Services.AddScoped<ListarRolHandler>();
 builder.Services.AddScoped<ObtenerRolHandler>();
 builder.Services.AddScoped<ActualizarRolHandler>();
+builder.Services.AddScoped<AsignarPermisosHandler>();
+builder.Services.AddScoped<QuitarPermisoHandler>();
 
 // ============================================================================
 // Feature: Modulo Seguridad - Usuarios

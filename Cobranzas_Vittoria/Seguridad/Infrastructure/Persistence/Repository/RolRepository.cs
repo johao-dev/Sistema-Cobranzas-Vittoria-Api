@@ -35,6 +35,29 @@ public class RolRepository : RepositoryBase, IRolRepository
         return rolEntity is null ? null : RolMapper.ToDomain(rolEntity);
     }
 
+    public async Task<Rol?> GetByIdWithPermisosAsync(int idRol)
+    {
+        using IDbConnection db = Open();
+        const string sql = @"
+            SELECT IdRol, Nombre, Descripcion, Activo, FechaCreacion, UsuarioCreacion, FechaModificacion, UsuarioModificacion
+            FROM seguridad.Rol WHERE IdRol = @IdRol;
+
+            SELECT p.IdPermiso, p.Codigo, p.Nombre, p.Descripcion, p.Activo, p.FechaCreacion, p.UsuarioCreacion, p.FechaModificacion, p.UsuarioModificacion
+            FROM seguridad.Permiso p
+            INNER JOIN seguridad.PermisoRol pr ON pr.IdPermiso = p.IdPermiso
+            WHERE pr.IdRol = @IdRol;";
+
+        using SqlMapper.GridReader multi = await db.QueryMultipleAsync(sql, new { IdRol = idRol });
+        RolEntity? rolEntity = await multi.ReadSingleOrDefaultAsync<RolEntity>();
+        if (rolEntity is null)
+            return null;
+
+        Rol rol = RolMapper.ToDomain(rolEntity);
+        IEnumerable<PermisoEntity> permisos = await multi.ReadAsync<PermisoEntity>();
+        rol.EstablecerPermisos(permisos.Select(PermisoMapper.ToDomain));
+        return rol;
+    }
+
     public async Task<IEnumerable<Rol>> GetAllAsync(bool? activo = true)
     {
         using IDbConnection db = Open();
@@ -88,6 +111,29 @@ public class RolRepository : RepositoryBase, IRolRepository
         await db.ExecuteAsync(
             "seguridad.usp_Rol_Delete",
             new { IdRol = idRol },
+            commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task AsignarPermisosAsync(int idRol, IEnumerable<int> idPermisos, string usuarioCreacion)
+    {
+        using IDbConnection db = Open();
+        await db.ExecuteAsync(
+            "seguridad.usp_Rol_AsignarPermisos",
+            new
+            {
+                IdRol = idRol,
+                Permisos = string.Join(',', idPermisos),
+                UsuarioCreacion = usuarioCreacion
+            },
+            commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task QuitarPermisoAsync(int idRol, int idPermiso)
+    {
+        using IDbConnection db = Open();
+        await db.ExecuteAsync(
+            "seguridad.usp_Rol_QuitarPermiso",
+            new { IdRol = idRol, IdPermiso = idPermiso },
             commandType: CommandType.StoredProcedure);
     }
 }

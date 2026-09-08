@@ -150,6 +150,23 @@ public class RolRepositoryTests : IntegrationTestBase
         Assert.That(enBd, Is.Null);
     }
 
+    [Test]
+    public async Task GetByIdWithPermisosAsync_ConPermisoAsignado_RetornaLaAsociacion()
+    {
+        var roles = CrearRepository();
+        var permisos = new PermisoRepository(new TestConnectionFactory());
+        var rol = await roles.AddAsync(CrearRol("repo.permisos", "Permisos"));
+        var permiso = Permiso.Crear("repo.permisos.ver", "Ver permisos", "");
+        permiso.EstablecerAuditoriaCreacion("test");
+        permiso = await permisos.AddAsync(permiso);
+
+        await roles.AsignarPermisosAsync(rol.IdRol, new[] { permiso.IdPermiso }, "test");
+        var obtenido = await roles.GetByIdWithPermisosAsync(rol.IdRol);
+
+        Assert.That(obtenido, Is.Not.Null);
+        Assert.That(obtenido!.Permisos.Select(p => p.IdPermiso), Contains.Item(permiso.IdPermiso));
+    }
+
     // =====================================================================
     // Helpers
     // =====================================================================

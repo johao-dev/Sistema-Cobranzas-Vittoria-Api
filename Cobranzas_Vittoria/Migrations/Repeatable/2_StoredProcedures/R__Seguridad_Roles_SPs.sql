@@ -186,3 +186,59 @@ BEGIN
     WHERE IdRol = @IdRol;
 END;
 GO
+
+-- Asigna permisos a un rol. La operación es idempotente: las asociaciones
+-- existentes no se duplican y los IDs repetidos se descartan.
+CREATE OR ALTER PROCEDURE seguridad.usp_Rol_AsignarPermisos
+    @IdRol INT,
+    @Permisos NVARCHAR(MAX),
+    @UsuarioCreacion NVARCHAR(100) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @IdRol IS NULL OR @Permisos IS NULL OR LTRIM(RTRIM(@Permisos)) = ''
+        RETURN;
+
+    IF NOT EXISTS (SELECT 1 FROM seguridad.Rol WHERE IdRol = @IdRol)
+        THROW 50001, 'El rol especificado no existe.', 1;
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        WITH PermisosParsed AS (
+            SELECT DISTINCT TRY_CAST(TRIM(value) AS INT) AS IdPermiso
+            FROM STRING_SPLIT(@Permisos, ',')
+            WHERE TRIM(value) <> ''
+        )
+        INSERT INTO seguridad.PermisoRol (IdPermiso, IdRol, FechaCreacion, UsuarioCreacion)
+        SELECT pp.IdPermiso, @IdRol, SYSDATETIME(), @UsuarioCreacion
+        FROM PermisosParsed pp
+        INNER JOIN seguridad.Permiso p ON p.IdPermiso = pp.IdPermiso
+        WHERE pp.IdPermiso IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM seguridad.PermisoRol pr
+              WHERE pr.IdPermiso = pp.IdPermiso AND pr.IdRol = @IdRol
+          );
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
+END;
+GO
+
+-- Quitar una asociación inexistente también es exitoso, igual que UsuarioRol.
+CREATE OR ALTER PROCEDURE seguridad.usp_Rol_QuitarPermiso
+    @IdRol INT,
+    @IdPermiso INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DELETE FROM seguridad.PermisoRol
+    WHERE IdRol = @IdRol AND IdPermiso = @IdPermiso;
+END;
+GO

@@ -5,6 +5,8 @@ using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.AsignarPermisos;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.QuitarPermiso;
 
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
@@ -17,6 +19,8 @@ public class RolController : ControllerBase
     private readonly ListarRolHandler _listarRolHandler;
     private readonly ActualizarRolHandler _actualizarRolHandler;
     private readonly ObtenerRolHandler _obtenerRolHandler;
+    private readonly AsignarPermisosHandler _asignarPermisosHandler;
+    private readonly QuitarPermisoHandler _quitarPermisoHandler;
     private readonly ILogger<RolController> _logger;
 
     public RolController(
@@ -24,12 +28,16 @@ public class RolController : ControllerBase
         ListarRolHandler listarRolHandler,
         ActualizarRolHandler actualizarRolHandler,
         ObtenerRolHandler obtenerRolHandler,
+        AsignarPermisosHandler asignarPermisosHandler,
+        QuitarPermisoHandler quitarPermisoHandler,
         ILogger<RolController> logger)
     {
         _createRolHandler = createRolHandler;
         _listarRolHandler = listarRolHandler;
         _actualizarRolHandler = actualizarRolHandler;
         _obtenerRolHandler = obtenerRolHandler;
+        _asignarPermisosHandler = asignarPermisosHandler;
+        _quitarPermisoHandler = quitarPermisoHandler;
         _logger = logger;
     }
 
@@ -119,6 +127,23 @@ public class RolController : ControllerBase
             request.Activo);
 
         await _actualizarRolHandler.HandleAsync(command);
+        return NoContent();
+    }
+
+    [HttpPost("{idRol}/permisos")]
+    public async Task<IActionResult> AsignarPermisos(
+        int idRol,
+        [FromBody] AsignarPermisosRequest request)
+    {
+        await _asignarPermisosHandler.HandleAsync(
+            new AsignarPermisosCommand(idRol, request.IdPermisos));
+        return NoContent();
+    }
+
+    [HttpDelete("{idRol}/permisos/{idPermiso}")]
+    public async Task<IActionResult> QuitarPermiso(int idRol, int idPermiso)
+    {
+        await _quitarPermisoHandler.HandleAsync(new QuitarPermisoCommand(idRol, idPermiso));
         return NoContent();
     }
 }
