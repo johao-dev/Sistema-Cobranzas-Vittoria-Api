@@ -1,7 +1,7 @@
 namespace Cobranzas_Vittoria.Seguridad.Domain.Model;
 
 /// <summary>Refresh token persistido únicamente mediante su hash SHA-256.</summary>
-public sealed class RefreshToken // TODO: Esto debería ir en Persistence/Entity para no mezclar Domain con Persistence.
+public sealed class RefreshToken
 {
     public int IdRefreshToken { get; init; }
     public int IdUsuario { get; init; }

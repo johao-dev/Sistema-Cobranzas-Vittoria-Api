@@ -16,6 +16,10 @@ public sealed class QuitarPermisoHandler
 
     public async Task HandleAsync(QuitarPermisoCommand command)
     {
+        _logger.LogInformation(
+            "Iniciando eliminación del permiso IdPermiso={IdPermiso} del rol IdRol={IdRol}.",
+            command.IdPermiso,
+            command.IdRol);
         _ = await _rolRepository.GetByIdAsync(command.IdRol)
             ?? throw new ValidacionNegocioSeguridadException(
                 nameof(command.IdRol),

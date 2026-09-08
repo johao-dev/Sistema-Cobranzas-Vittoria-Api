@@ -29,22 +29,17 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        _logger.LogInformation("Solicitud HTTP de inicio de sesión recibida.");
         LoginCommand command = new(request.UsernameOrEmail, request.Password);
-        try
-        {
-            LoginResult result = await _loginHandler.HandleAsync(command);
-            return Ok(new LoginResponse(result.Token, result.Expiration, result.RefreshToken));
-        }
-        catch (UnauthorizedAccessException) // TODO: Migrar este catch y los otros al ApiExceptionMiddleware.
-        {
-            return Unauthorized();
-        }
+        LoginResult result = await _loginHandler.HandleAsync(command);
+        return Ok(new LoginResponse(result.Token, result.Expiration, result.RefreshToken));
     }
 
     [HttpPost("logout")]
     [AllowAnonymous]
     public async Task<IActionResult> Logout([FromBody] RefreshRequest request)
     {
+        _logger.LogInformation("Solicitud HTTP de cierre de sesión recibida.");
         await _logoutHandler.HandleAsync(request.RefreshToken);
         return NoContent();
     }
@@ -53,14 +48,8 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        try
-        {
-            LoginResult result = await _refreshHandler.HandleAsync(new RefreshCommand(request.RefreshToken));
-            return Ok(new LoginResponse(result.Token, result.Expiration, result.RefreshToken));
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized();
-        }
+        _logger.LogInformation("Solicitud HTTP de renovación de token recibida.");
+        LoginResult result = await _refreshHandler.HandleAsync(new RefreshCommand(request.RefreshToken));
+        return Ok(new LoginResponse(result.Token, result.Expiration, result.RefreshToken));
     }
 }

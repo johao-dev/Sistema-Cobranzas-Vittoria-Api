@@ -22,6 +22,8 @@ public sealed class AsignarPermisosHandler
 
     public async Task HandleAsync(AsignarPermisosCommand command)
     {
+        _logger.LogInformation("Iniciando asignación de permisos al rol IdRol={IdRol}.", command.IdRol);
+        _logger.LogDebug("Permisos solicitados: {@IdPermisos}", command.IdPermisos);
         _ = await _rolRepository.GetByIdAsync(command.IdRol)
             ?? throw new ValidacionNegocioSeguridadException(
                 nameof(command.IdRol),
@@ -31,6 +33,7 @@ public sealed class AsignarPermisosHandler
         var permisos = command.IdPermisos.Distinct().ToList();
         if (permisos.Count == 0)
         {
+            _logger.LogWarning("Asignación rechazada: el rol IdRol={IdRol} no recibió permisos.", command.IdRol);
             throw new ValidacionNegocioSeguridadException(
                 nameof(command.IdPermisos),
                 "ROL_PERMISOS_REQUERIDOS",
@@ -42,6 +45,6 @@ public sealed class AsignarPermisosHandler
             permisos,
             _usuarioActualService.ObtenerUsuarioActual());
 
-        _logger.LogInformation("Permisos asignados al rol IdRol={IdRol}", command.IdRol);
+        _logger.LogInformation("Permisos asignados exitosamente al rol IdRol={IdRol}.", command.IdRol);
     }
 }

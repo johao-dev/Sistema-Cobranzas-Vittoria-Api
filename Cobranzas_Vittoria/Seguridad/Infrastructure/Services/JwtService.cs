@@ -4,25 +4,22 @@ using System.Text;
 using Cobranzas_Vittoria.Seguridad.Application.Common;
 using Cobranzas_Vittoria.Seguridad.Domain.Model;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 
 namespace Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
 
 public sealed class JwtService : IJwtService
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _options;
 
-    public JwtService(IConfiguration configuration) => _configuration = configuration;
+    public JwtService(IOptions<JwtOptions> options) => _options = options.Value;
 
     public JwtToken GenerarToken(Usuario usuario, IEnumerable<Rol> roles)
     {
-        // TODO: Esto está repitiendose también en Program.cs, habría que ver si se puede centralizar de alguna manera.
-        string key = _configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException("JWT Key is not configured.");
-        string issuer = _configuration["Jwt:Issuer"]
-            ?? throw new InvalidOperationException("JWT Issuer is not configured.");
-        string audience = _configuration["Jwt:Audience"]
-            ?? throw new InvalidOperationException("JWT Audience is not configured.");
-        int minutos = _configuration.GetValue<int?>("Jwt:ExpireMinutes") ?? 60;
+        string key = _options.Key;
+        string issuer = _options.Issuer;
+        string audience = _options.Audience;
+        int minutos = _options.ExpireMinutes;
 
         List<Rol> rolesActivos = roles.Where(r => r.Activo).ToList();
         var claims = new List<Claim>

@@ -54,26 +54,31 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 
+JwtOptions jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+if (string.IsNullOrWhiteSpace(jwtOptions.Key) ||
+    string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
+    string.IsNullOrWhiteSpace(jwtOptions.Audience) ||
+    jwtOptions.ExpireMinutes <= 0 ||
+    jwtOptions.RefreshExpireDays <= 0)
+{
+    throw new InvalidOperationException("JWT configuration is incomplete or invalid.");
+}
+builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptions<JwtOptions>>(
+    Microsoft.Extensions.Options.Options.Create(jwtOptions));
+
 // Configuración de autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        string? jwtKey = builder.Configuration["Jwt:Key"];
-        string? jwtIssuer = builder.Configuration["Jwt:Issuer"];
-        string? jwtAudience = builder.Configuration["Jwt:Audience"];
-
-        if (string.IsNullOrWhiteSpace(jwtKey))
-            throw new InvalidOperationException("JWT Key is not configured.");
-        
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
         };
 
         options.Events = new JwtBearerEvents

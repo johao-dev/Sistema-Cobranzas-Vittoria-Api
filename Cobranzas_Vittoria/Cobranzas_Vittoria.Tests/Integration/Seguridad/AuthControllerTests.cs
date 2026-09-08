@@ -48,6 +48,8 @@ public class AuthControllerTests : IntegrationTestBase
             $"{BaseUrl}/login", new LoginRequest("admin", "contrasena-invalida"));
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        var body = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.That(body.GetProperty("error").GetString(), Is.EqualTo("CREDENCIALES_INVALIDAS"));
     }
 
     [Test]
@@ -70,6 +72,8 @@ public class AuthControllerTests : IntegrationTestBase
         var tokenAnterior = await _client.PostAsJsonAsync(
             $"{BaseUrl}/refresh", new RefreshRequest(login.RefreshToken));
         Assert.That(tokenAnterior.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        var body = await tokenAnterior.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.That(body.GetProperty("error").GetString(), Is.EqualTo("CREDENCIALES_INVALIDAS"));
     }
 
     [Test]

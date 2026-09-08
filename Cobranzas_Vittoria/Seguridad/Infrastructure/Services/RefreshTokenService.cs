@@ -1,14 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 using Cobranzas_Vittoria.Seguridad.Application.Common;
+using Microsoft.Extensions.Options;
 
 namespace Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
 
 public sealed class RefreshTokenService : IRefreshTokenService
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _options;
 
-    public RefreshTokenService(IConfiguration configuration) => _configuration = configuration;
+    public RefreshTokenService(IOptions<JwtOptions> options) => _options = options.Value;
 
     public string GenerarToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
 
@@ -16,7 +17,6 @@ public sealed class RefreshTokenService : IRefreshTokenService
 
     public DateTime ObtenerExpiracionUtc()
     {
-        int dias = _configuration.GetValue<int?>("Jwt:RefreshExpireDays") ?? 7;
-        return DateTime.UtcNow.AddDays(dias);
+        return DateTime.UtcNow.AddDays(_options.RefreshExpireDays);
     }
 }

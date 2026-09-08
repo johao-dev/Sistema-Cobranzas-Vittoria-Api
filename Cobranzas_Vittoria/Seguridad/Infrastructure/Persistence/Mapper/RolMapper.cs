@@ -33,6 +33,4 @@ public static class RolMapper
             entity.UsuarioModificacion
         );
     }
-
-    // TODO: Quiza se necesite reconstruir los permisos tambien
 }

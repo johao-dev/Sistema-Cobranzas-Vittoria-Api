@@ -3,11 +3,11 @@ using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Seguridad.Domain.Model;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
+using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Entity;
+using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Mapper;
 using Dapper;
 
 namespace Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
-
-// TODO: Agregar RefreshTokenEntity y RefreshTokenMapper para asegurar coherencia con el código existente.
 
 public sealed class RefreshTokenRepository : RepositoryBase, IRefreshTokenRepository
 {
@@ -16,14 +16,15 @@ public sealed class RefreshTokenRepository : RepositoryBase, IRefreshTokenReposi
     public async Task AddAsync(RefreshToken refreshToken)
     {
         using IDbConnection db = Open();
+        RefreshTokenEntity entity = RefreshTokenMapper.ToEntity(refreshToken);
         await db.ExecuteAsync(
             "seguridad.usp_RefreshToken_Insert",
             new
             {
-                refreshToken.IdUsuario,
-                refreshToken.TokenHash,
-                refreshToken.FechaExpiracionUtc,
-                refreshToken.FechaCreacionUtc
+                entity.IdUsuario,
+                entity.TokenHash,
+                entity.FechaExpiracionUtc,
+                entity.FechaCreacionUtc
             },
             commandType: CommandType.StoredProcedure);
     }
@@ -31,10 +32,11 @@ public sealed class RefreshTokenRepository : RepositoryBase, IRefreshTokenReposi
     public async Task<RefreshToken?> GetByTokenHashAsync(string tokenHash)
     {
         using IDbConnection db = Open();
-        return await db.QueryFirstOrDefaultAsync<RefreshToken>(
+        RefreshTokenEntity? entity = await db.QueryFirstOrDefaultAsync<RefreshTokenEntity>(
             "seguridad.usp_RefreshToken_GetByHash",
             new { TokenHash = tokenHash },
             commandType: CommandType.StoredProcedure);
+        return entity is null ? null : RefreshTokenMapper.ToDomain(entity);
     }
 
     public async Task RevokeAsync(int idRefreshToken, DateTime fechaRevocacionUtc, string? reemplazadoPorHash = null)

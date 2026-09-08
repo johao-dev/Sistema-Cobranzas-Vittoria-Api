@@ -1,6 +1,7 @@
 using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
+using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Middleware
@@ -58,6 +59,18 @@ namespace Cobranzas_Vittoria.Middleware
             try
             {
                 await next(context);
+            }
+            catch (AutenticacionException ex)
+            {
+                _logger.LogWarning(
+                    "Rechazo 401 ({Tipo}) en {Method} {Path}: {Codigo}",
+                    nameof(AutenticacionException), context.Request.Method, context.Request.Path,
+                    AutenticacionException.CodigoError);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status401Unauthorized,
+                    AutenticacionException.CodigoError,
+                    ex.Message);
             }
             catch (ArchivoInvalidoException ex) when (ex.Codigo == "TAMANIO_EXCEDIDO")
             {
