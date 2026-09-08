@@ -16,6 +16,7 @@ public class CreateUsuarioHandlerTests
 {
     private StubUsuarioRepository _repository = null!;
     private StubUsuarioActualService _usuarioActual = null!;
+    private StubPasswordHasher _passwordHasher = null!;
     private CreateUsuarioHandler _handler = null!;
 
     [SetUp]
@@ -23,9 +24,12 @@ public class CreateUsuarioHandlerTests
     {
         _repository = new StubUsuarioRepository();
         _usuarioActual = new StubUsuarioActualService { UsuarioActual = "admin-test" };
+        _passwordHasher = new StubPasswordHasher();
+        
         _handler = new CreateUsuarioHandler(
             _repository,
             _usuarioActual,
+            _passwordHasher,
             NullLogger<CreateUsuarioHandler>.Instance);
     }
 

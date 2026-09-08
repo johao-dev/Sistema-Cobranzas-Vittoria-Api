@@ -18,5 +18,5 @@ public sealed record CreateUsuarioRequest
     string UsuarioLogin,
 
     [Required(ErrorMessage = "La contraseña es obligatoria")]
-    string PasswordHash
+    string Password
 );

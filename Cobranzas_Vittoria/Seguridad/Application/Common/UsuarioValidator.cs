@@ -49,11 +49,11 @@ public sealed class UsuarioValidator
                 "El usuario de login es requerido."));
         }
 
-        if (string.IsNullOrWhiteSpace(command.PasswordHash))
+        if (string.IsNullOrWhiteSpace(command.Password))
         {
             errores.Add(new DetalleErrorValidacion(
                 null,
-                nameof(command.PasswordHash),
+                nameof(command.Password),
                 "USUARIO_PASSWORD_REQUERIDO",
                 "La contraseña es requerida."));
         }

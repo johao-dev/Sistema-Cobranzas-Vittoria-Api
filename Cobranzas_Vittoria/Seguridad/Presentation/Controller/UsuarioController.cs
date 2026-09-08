@@ -92,7 +92,7 @@ public class UsuarioController : ControllerBase
             request.Apellidos,
             request.Correo,
             request.UsuarioLogin,
-            request.PasswordHash);
+            request.Password);
 
         CreateUsuarioResult result = await _createUsuarioHandler.HandleAsync(command);
         UsuarioResponse response = new UsuarioResponse(

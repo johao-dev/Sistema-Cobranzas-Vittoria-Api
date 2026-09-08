@@ -135,6 +135,7 @@ builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 // ============================================================================
 builder.Services.AddScoped<IPermisoRepository, PermisoRepository>();
 builder.Services.AddSingleton<IUsuarioActualService, UsuarioActualService>();
+builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<CreatePermisoHandler>();
 builder.Services.AddScoped<ListarPermisoHandler>();
 builder.Services.AddScoped<ObtenerPorIdHandler>();

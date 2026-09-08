@@ -8,15 +8,18 @@ public class CreateUsuarioHandler
 {
     private readonly IUsuarioRepository _usuarioRepository;
     private readonly IUsuarioActualService _usuarioActualService;
+    private readonly IPasswordHasher _passwordHasher;
     private readonly ILogger<CreateUsuarioHandler> _logger;
 
     public CreateUsuarioHandler(
         IUsuarioRepository usuarioRepository,
         IUsuarioActualService usuarioActualService,
+        IPasswordHasher passwordHasher,
         ILogger<CreateUsuarioHandler> logger)
     {
         _usuarioRepository = usuarioRepository;
         _usuarioActualService = usuarioActualService;
+        _passwordHasher = passwordHasher;
         _logger = logger;
     }
 
@@ -40,7 +43,7 @@ public class CreateUsuarioHandler
             command.Apellidos,
             command.Correo,
             command.UsuarioLogin,
-            command.PasswordHash,
+            _passwordHasher.Hash(command.Password),
             _usuarioActualService.ObtenerUsuarioActual());
 
         Domain.Model.Usuario usuarioCreado = await _usuarioRepository.AddAsync(usuario);

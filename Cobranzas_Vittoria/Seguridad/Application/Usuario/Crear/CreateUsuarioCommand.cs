@@ -5,4 +5,4 @@ public sealed record CreateUsuarioCommand(
     string Apellidos,
     string Correo,
     string UsuarioLogin,
-    string PasswordHash);
+    string Password);
