@@ -17,9 +17,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Seguridad;
 ///   POST   /api/seguridad/usuarios/{id}/roles
 ///   DELETE /api/seguridad/usuarios/{id}/roles/{idRol}
 ///
-/// Estas pruebas son ligeras: verifican codigos HTTP, forma del body y
-/// persistencia basica. No cubren autorizacion/RBAC (pendiente de fase
-/// futura).
+/// Las solicitudes se realizan con el JWT configurado por el fixture global.
 /// </summary>
 public class UsuarioControllerTests : IntegrationTestBase
 {
@@ -122,6 +120,8 @@ public class UsuarioControllerTests : IntegrationTestBase
         Assert.That(id, Is.GreaterThan(0));
         Assert.That(JsonHelpers.GetString(body, "nombres"), Is.EqualTo(request.Nombres));
         Assert.That(JsonHelpers.GetString(body, "usuarioLogin"), Is.EqualTo(request.UsuarioLogin));
+        Assert.That(JsonHelpers.GetString(body, "usuarioCreacion"),
+            Is.EqualTo(JwtTestTokenFactory.UsuarioLogin));
 
         // Assert - BD
         var loginEnBd = await DbHelpers.QueryScalarAsync<string>(

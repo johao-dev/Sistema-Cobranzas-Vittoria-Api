@@ -1,5 +1,7 @@
 using Testcontainers.MsSql;
 using Cobranzas_Vittoria.Tests.Setup;
+using Cobranzas_Vittoria.Tests.Integration.Common;
+using System.Net.Http.Headers;
 
 namespace Cobranzas_Vittoria.Tests;
 
@@ -31,6 +33,8 @@ public class GlobalSetupFixture
 
         Factory = new CustomWebApplicationFactory();
         Client =Factory.CreateClient();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", JwtTestTokenFactory.CrearToken());
     }
 
     [OneTimeTearDown]

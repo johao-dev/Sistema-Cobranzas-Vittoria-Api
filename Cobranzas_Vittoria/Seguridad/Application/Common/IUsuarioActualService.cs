@@ -5,5 +5,10 @@ namespace Cobranzas_Vittoria.Seguridad.Application.Common;
 /// </summary>
 public interface IUsuarioActualService
 {
+    int? IdUsuario { get; }
+    string? UsuarioLogin { get; }
+    string? Correo { get; }
+    bool EstaAutenticado { get; }
+
     string ObtenerUsuarioActual();
 }

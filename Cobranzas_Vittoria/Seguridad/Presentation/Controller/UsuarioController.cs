@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 using Cobranzas_Vittoria.Seguridad.Application.Usuario.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Usuario.Listar;
@@ -10,6 +11,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Usuario.QuitarRol;
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
 [ApiController]
+[Authorize]
 [Route("api/seguridad/usuarios")]
 public class UsuarioController : ControllerBase
 {

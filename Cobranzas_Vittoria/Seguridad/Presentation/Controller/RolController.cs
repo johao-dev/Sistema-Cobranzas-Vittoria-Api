@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
@@ -8,6 +9,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
 [ApiController]
+[Authorize]
 [Route("api/seguridad/roles")]
 public class RolController : ControllerBase
 {

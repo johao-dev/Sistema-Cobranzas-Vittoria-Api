@@ -47,6 +47,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
 
 // Configuración de autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -131,7 +132,7 @@ builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 // Feature: Modulo Seguridad - Permisos
 // ============================================================================
 builder.Services.AddScoped<IPermisoRepository, PermisoRepository>();
-builder.Services.AddSingleton<IUsuarioActualService, UsuarioActualService>();
+builder.Services.AddScoped<IUsuarioActualService, UsuarioActualService>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<CreatePermisoHandler>();
 builder.Services.AddScoped<ListarPermisoHandler>();
