@@ -38,17 +38,14 @@ public class RolRepository : RepositoryBase, IRolRepository
     public async Task<Rol?> GetByIdWithPermisosAsync(int idRol)
     {
         using IDbConnection db = Open();
-        const string sql = @"
-            SELECT IdRol, Nombre, Descripcion, Activo, FechaCreacion, UsuarioCreacion, FechaModificacion, UsuarioModificacion
-            FROM seguridad.Rol WHERE IdRol = @IdRol;
 
-            SELECT p.IdPermiso, p.Codigo, p.Nombre, p.Descripcion, p.Activo, p.FechaCreacion, p.UsuarioCreacion, p.FechaModificacion, p.UsuarioModificacion
-            FROM seguridad.Permiso p
-            INNER JOIN seguridad.PermisoRol pr ON pr.IdPermiso = p.IdPermiso
-            WHERE pr.IdRol = @IdRol;";
+        using SqlMapper.GridReader multi = await db.QueryMultipleAsync(
+            "seguridad.usp_Rol_GetByIdWithPermisos",
+            new { IdRol = idRol },
+            commandType: CommandType.StoredProcedure);
 
-        using SqlMapper.GridReader multi = await db.QueryMultipleAsync(sql, new { IdRol = idRol });
         RolEntity? rolEntity = await multi.ReadSingleOrDefaultAsync<RolEntity>();
+        
         if (rolEntity is null)
             return null;
 

@@ -22,6 +22,10 @@ IF OBJECT_ID('seguridad.usp_Rol_GetByNombre', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Rol_GetByNombre;
 GO
 
+IF OBJECT_ID('seguridad.usp_Rol_GetByIdWithPermisos', 'P') IS NOT NULL
+    DROP PROCEDURE seguridad.usp_Rol_GetByIdWithPermisos;
+GO
+
 IF OBJECT_ID('seguridad.usp_Rol_List', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Rol_List;
 GO
@@ -36,6 +40,14 @@ GO
 
 IF OBJECT_ID('seguridad.usp_Rol_Delete', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Rol_Delete;
+GO
+
+IF OBJECT_ID('seguridad.usp_Rol_AsignarPermisos', 'P') IS NOT NULL
+    DROP PROCEDURE seguridad.usp_Rol_AsignarPermisos;
+GO
+
+IF OBJECT_ID('seguridad.usp_Rol_QuitarPermiso', 'P') IS NOT NULL
+    DROP PROCEDURE seguridad.usp_Rol_QuitarPermiso;
 GO
 
 -- =============================================
@@ -83,6 +95,44 @@ BEGIN
         UsuarioModificacion
     FROM seguridad.Rol
     WHERE Nombre = @Nombre;
+END;
+GO
+
+-- Procedimiento para obtener un rol y los permisos asociados a ese rol por su identificador.
+CREATE OR ALTER PROCEDURE seguridad.usp_Rol_GetByIdWithPermisos
+    @IdRol INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- RS 1: Rol
+    SELECT
+        IdRol,
+        Nombre,
+        Descripcion,
+        Activo,
+        FechaCreacion,
+        UsuarioCreacion,
+        FechaModificacion,
+        UsuarioModificacion
+    FROM seguridad.Rol
+    WHERE IdRol = @IdRol;
+
+    -- RS 2: Permisos asociados al rol
+    SELECT
+        p.IdPermiso,
+        p.Codigo,
+        p.Nombre,
+        p.Descripcion,
+        p.Activo,
+        p.FechaCreacion,
+        p.UsuarioCreacion,
+        p.FechaModificacion,
+        p.UsuarioModificacion
+    FROM seguridad.Permiso p
+    INNER JOIN seguridad.PermisoRol pr ON p.IdPermiso = pr.IdPermiso
+    WHERE pr.IdRol = @IdRol
+    ORDER BY p.Nombre;
 END;
 GO
 

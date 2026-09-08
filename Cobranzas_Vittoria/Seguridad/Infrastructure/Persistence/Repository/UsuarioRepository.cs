@@ -26,26 +26,20 @@ public class UsuarioRepository : RepositoryBase, IUsuarioRepository
     public async Task<Usuario?> GetByIdWithRolesAsync(int idUsuario)
     {
         using IDbConnection db = Open();
-        const string sql = @"
-            SELECT u.IdUsuario, u.Nombres, u.Apellidos, u.Correo, u.UsuarioLogin, u.PasswordHash, u.Activo, u.FechaCreacion, u.UsuarioCreacion
-            FROM seguridad.Usuario u
-            WHERE u.IdUsuario = @UsuarioId;
 
-            SELECT r.IdRol, r.Nombre, r.Descripcion, r.Activo, r.FechaCreacion, r.UsuarioCreacion, r.FechaModificacion, r.UsuarioModificacion
-            FROM seguridad.Rol r
-            INNER JOIN seguridad.UsuarioRol ur ON ur.IdRol = r.IdRol
-            WHERE ur.IdUsuario = @UsuarioId;";
+        using SqlMapper.GridReader multi = await db.QueryMultipleAsync(
+            "seguridad.usp_Usuario_GetByIdWithRoles",
+            new { UsuarioId = idUsuario },
+            commandType: CommandType.StoredProcedure);
 
-        using SqlMapper.GridReader multi = await db.QueryMultipleAsync(sql, new { UsuarioId = idUsuario });
         UsuarioEntity? usuarioEntity = await multi.ReadSingleOrDefaultAsync<UsuarioEntity>();
 
         if (usuarioEntity is null)
             return null;
 
-        IEnumerable<RolEntity> rolesEntities = await multi.ReadAsync<RolEntity>();
-        Seguridad.Domain.Model.Usuario usuario = UsuarioMapper.ToDomain(usuarioEntity);
-        usuario.AsignarRoles(rolesEntities.Select(RolMapper.ToDomain));
-
+        Usuario usuario = UsuarioMapper.ToDomain(usuarioEntity);
+        IEnumerable<RolEntity> roles = await multi.ReadAsync<RolEntity>();
+        usuario.AsignarRoles(roles.Select(RolMapper.ToDomain));
         return usuario;
     }
 

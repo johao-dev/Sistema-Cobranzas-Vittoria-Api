@@ -41,6 +41,10 @@ IF OBJECT_ID('seguridad.usp_Usuario_GetByCorreo', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Usuario_GetByCorreo;
 GO
 
+IF OBJECT_ID('seguridad.usp_Usuario_GetByIdWithRoles', 'P') IS NOT NULL
+    DROP PROCEDURE seguridad.usp_Usuario_GetByIdWithRoles;
+GO
+
 IF OBJECT_ID('seguridad.usp_Usuario_List', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Usuario_List;
 GO
@@ -106,6 +110,41 @@ BEGIN
         UsuarioCreacion
     FROM seguridad.Usuario
     WHERE Correo = @Correo;
+END;
+GO
+
+-- Procedimiento para obtener un usuario por su ID junto con los roles asignados
+CREATE OR ALTER PROCEDURE seguridad.usp_Usuario_GetByIdWithRoles
+    @UsuarioId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        IdUsuario,
+        Nombres,
+        Apellidos,
+        Correo,
+        UsuarioLogin,
+        PasswordHash,
+        Activo,
+        FechaCreacion,
+        UsuarioCreacion
+    FROM seguridad.Usuario
+    WHERE IdUsuario = @UsuarioId;
+
+    SELECT
+        r.IdRol,
+        r.Nombre,
+        r.Descripcion,
+        r.Activo,
+        r.FechaCreacion,
+        r.UsuarioCreacion,
+        r.FechaModificacion,
+        r.UsuarioModificacion
+    FROM seguridad.Rol r
+    INNER JOIN seguridad.UsuarioRol ur ON r.IdRol = ur.IdRol
+    WHERE ur.IdUsuario = @UsuarioId;
 END;
 GO
 
