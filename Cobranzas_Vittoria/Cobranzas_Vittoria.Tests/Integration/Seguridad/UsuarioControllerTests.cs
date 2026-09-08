@@ -49,6 +49,23 @@ public class UsuarioControllerTests : IntegrationTestBase
         Assert.That(items.Any(u => u.UsuarioLogin == "admin"), Is.True);
     }
 
+    [TestCase("admin", "admin123")]
+    [TestCase("ingeniero", "ingeniero")]
+    [TestCase("almacen", "almacen")]
+    [TestCase("contable", "contable")]
+    [TestCase("admin2", "admin2")]
+    public async Task Seed_PasswordHashEsValidoParaLaContrasenaOriginal(
+        string usuarioLogin,
+        string password)
+    {
+        var passwordHash = await DbHelpers.QueryScalarAsync<string>(
+            "SELECT PasswordHash FROM seguridad.Usuario WHERE UsuarioLogin = @usuarioLogin",
+            new { usuarioLogin });
+
+        Assert.That(passwordHash, Is.Not.EqualTo(password));
+        Assert.That(BCrypt.Net.BCrypt.Verify(password, passwordHash), Is.True);
+    }
+
     [Test]
     public async Task List_ConFiltroActivoFalse_ExcluyeActivos()
     {
@@ -111,6 +128,12 @@ public class UsuarioControllerTests : IntegrationTestBase
             "SELECT UsuarioLogin FROM seguridad.Usuario WHERE IdUsuario = @id",
             new { id });
         Assert.That(loginEnBd, Is.EqualTo(request.UsuarioLogin));
+
+        var passwordHashEnBd = await DbHelpers.QueryScalarAsync<string>(
+            "SELECT PasswordHash FROM seguridad.Usuario WHERE IdUsuario = @id",
+            new { id });
+        Assert.That(passwordHashEnBd, Is.Not.EqualTo(request.Password));
+        Assert.That(BCrypt.Net.BCrypt.Verify(request.Password, passwordHashEnBd), Is.True);
     }
 
     [Test]

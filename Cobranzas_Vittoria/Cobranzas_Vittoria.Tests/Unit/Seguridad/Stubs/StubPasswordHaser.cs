@@ -4,15 +4,18 @@ namespace Cobranzas_Vittoria.Tests.Unit.Seguridad.Stubs;
 
 public sealed class StubPasswordHasher : IPasswordHasher
 {
+    public const string HashPrefix = "hashed:";
+
+    public string? LastPasswordHashed { get; private set; }
+
     public string Hash(string password)
     {
-        // Retorna el password tal cual, sin hashear.
-        return password;
+        LastPasswordHashed = password;
+        return $"{HashPrefix}{password}";
     }
 
-    public bool Verify(string hashedPassword, string providedPassword)
+    public bool Verify(string password, string hashedPassword)
     {
-        // Compara los passwords tal cual, sin hashear.
-        return hashedPassword == providedPassword;
+        return hashedPassword == $"{HashPrefix}{password}";
     }
 }

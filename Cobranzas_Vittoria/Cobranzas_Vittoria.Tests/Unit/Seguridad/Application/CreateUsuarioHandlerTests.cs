@@ -58,6 +58,10 @@ public class CreateUsuarioHandlerTests
         Assert.That(result.FechaCreacion, Is.Not.Null);
 
         Assert.That(_repository.Usuarios, Has.Count.EqualTo(1));
+        Assert.That(_passwordHasher.LastPasswordHashed, Is.EqualTo(command.Password));
+        Assert.That(_repository.Usuarios.Single().PasswordHash,
+            Is.EqualTo($"{StubPasswordHasher.HashPrefix}{command.Password}"));
+        Assert.That(_repository.Usuarios.Single().PasswordHash, Is.Not.EqualTo(command.Password));
     }
 
     [Test]
