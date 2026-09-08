@@ -38,6 +38,10 @@ public sealed class StubUsuarioRepository : IUsuarioRepository
         => Task.FromResult(Usuarios.FirstOrDefault(u =>
             string.Equals(u.Correo.Value, correo, StringComparison.OrdinalIgnoreCase)));
 
+    public Task<Usuario?> GetByLoginAsync(string usuarioLogin)
+        => Task.FromResult(Usuarios.FirstOrDefault(u =>
+            string.Equals(u.UsuarioLogin, usuarioLogin, StringComparison.OrdinalIgnoreCase)));
+
     public Task<IEnumerable<Usuario>> GetAllAsync(bool? activo = true)
     {
         IEnumerable<Usuario> q = Usuarios;

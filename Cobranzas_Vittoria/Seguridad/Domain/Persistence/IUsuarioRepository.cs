@@ -10,6 +10,8 @@ public interface IUsuarioRepository
 
     Task<Usuario?> GetByCorreoAsync(string correo);
 
+    Task<Usuario?> GetByLoginAsync(string usuarioLogin);
+
     Task<IEnumerable<Usuario>> GetAllAsync(bool? activo = true);
 
     Task<Usuario> AddAsync(Usuario usuario);

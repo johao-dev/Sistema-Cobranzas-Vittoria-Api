@@ -54,6 +54,17 @@ public class UsuarioRepository : RepositoryBase, IUsuarioRepository
         return usuarioEntity is null ? null : UsuarioMapper.ToDomain(usuarioEntity);
     }
 
+    public async Task<Usuario?> GetByLoginAsync(string usuarioLogin)
+    {
+        using IDbConnection db = Open();
+        UsuarioEntity? usuarioEntity = await db.QueryFirstOrDefaultAsync<UsuarioEntity>(
+            "seguridad.usp_Usuario_GetByLogin",
+            new { UsuarioLogin = usuarioLogin },
+            commandType: CommandType.StoredProcedure);
+
+        return usuarioEntity is null ? null : UsuarioMapper.ToDomain(usuarioEntity);
+    }
+
     public async Task<IEnumerable<Usuario>> GetAllAsync(bool? activo = true)
     {
         using IDbConnection db = Open();

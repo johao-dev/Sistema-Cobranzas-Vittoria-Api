@@ -41,6 +41,10 @@ IF OBJECT_ID('seguridad.usp_Usuario_GetByCorreo', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Usuario_GetByCorreo;
 GO
 
+IF OBJECT_ID('seguridad.usp_Usuario_GetByLogin', 'P') IS NOT NULL
+    DROP PROCEDURE seguridad.usp_Usuario_GetByLogin;
+GO
+
 IF OBJECT_ID('seguridad.usp_Usuario_GetByIdWithRoles', 'P') IS NOT NULL
     DROP PROCEDURE seguridad.usp_Usuario_GetByIdWithRoles;
 GO
@@ -110,6 +114,19 @@ BEGIN
         UsuarioCreacion
     FROM seguridad.Usuario
     WHERE Correo = @Correo;
+END;
+GO
+
+-- Procedimiento para obtener un usuario por su login (nombre de usuario)
+CREATE OR ALTER PROCEDURE seguridad.usp_Usuario_GetByLogin
+    @UsuarioLogin NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT IdUsuario, Nombres, Apellidos, Correo, UsuarioLogin, PasswordHash, Activo,
+           FechaCreacion, UsuarioCreacion
+    FROM seguridad.Usuario
+    WHERE UsuarioLogin = @UsuarioLogin;
 END;
 GO
 
