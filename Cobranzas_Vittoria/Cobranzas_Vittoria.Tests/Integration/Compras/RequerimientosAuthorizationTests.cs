@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 using Cobranzas_Vittoria.Seguridad.Authorization;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 
@@ -46,6 +47,18 @@ public sealed class RequerimientosAuthorizationTests : IntegrationTestBase
 
         HttpResponseMessage response = await client.PostAsJsonAsync(
             "/api/compras/requerimientos", RequerimientoBuilder.Nuevo().Build());
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+    }
+
+    [Test]
+    public async Task EnviarCompras_TokenSinPermisoDeAccion_Retorna403()
+    {
+        using HttpClient client = CrearClienteConPermisos([Permisos.Requerimientos.Enviar]);
+
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/compras/requerimientos/1/enviar-compras",
+            new EnviarRequerimientoComprasRequest(null));
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
     }

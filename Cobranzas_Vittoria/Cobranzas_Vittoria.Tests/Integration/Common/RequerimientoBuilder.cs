@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Cobranzas_Vittoria.Dtos.Compras;
+using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Common;
 
@@ -125,23 +126,28 @@ public class RequerimientoBuilder
     }
 
     /// <summary>
-    /// Crea el requerimiento y luego hace PATCH al estado 'EnviadoOC'.
+    /// Crea el requerimiento y ejecuta el flujo explícito hasta 'EnviadoOC'.
     /// Útil cuando el siguiente paso es crear una OrdenCompra
     /// (el SP usp_OrdenCompra_Insertar exige estado='EnviadoOC' en el requerimiento).
     /// </summary>
     public async Task<int> CrearEnviadoOcAsync(HttpClient client)
     {
         var id = await CrearAsync(client);
-        var estadoDto = new RequerimientoEstadoDto
-        {
-            Estado = "EnviadoOC",
-            Observacion = "Cambio de estado automático (test setup)"
-        };
-        var response = await client.PatchAsync(
-            $"/api/compras/requerimientos/{id}/estado",
-            JsonContent.Create(estadoDto));
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
-            $"Setup falló al cambiar estado a EnviadoOC. Body: {await response.Content.ReadAsStringAsync()}");
+        await EjecutarAccionAsync(client, $"/api/compras/requerimientos/{id}/enviar",
+            new EnviarRequerimientoRequest("Envío automático de test"));
+        await EjecutarAccionAsync(client, $"/api/compras/requerimientos/{id}/validacion-almacen",
+            new ProcesarStockRequerimientoRequest("Conforme", "Stock verificado en test"));
+        await EjecutarAccionAsync(client, $"/api/compras/requerimientos/{id}/aprobar",
+            new AprobarRequerimientoRequest("Aprobación automática de test"));
+        await EjecutarAccionAsync(client, $"/api/compras/requerimientos/{id}/enviar-compras",
+            new EnviarRequerimientoComprasRequest("Envío a compras automático de test"));
         return id;
+    }
+
+    private static async Task EjecutarAccionAsync(HttpClient client, string url, object request)
+    {
+        HttpResponseMessage response = await client.PostAsJsonAsync(url, request);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Setup falló en {url}. Body: {await response.Content.ReadAsStringAsync()}");
     }
 }

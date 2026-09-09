@@ -7,7 +7,11 @@ namespace Cobranzas_Vittoria.Interfaces
         Task<int> CrearAsync(Cobranzas_Vittoria.Dtos.Compras.RequerimientoCreateDto dto);
         Task UpdateAsync(int idRequerimiento, Cobranzas_Vittoria.Dtos.Compras.RequerimientoUpdateDto dto);
         Task<bool> PuedeEditarAsync(int idRequerimiento);
-        Task UpdateEstadoAsync(int idRequerimiento, string estado, string? observacion);
-        Task ValidarAlmacenAsync(int idRequerimiento, int idUsuario, string resultado, string? observacion);
+        Task<bool> EsSolicitanteAsync(int idRequerimiento, int idUsuario);
+        Task EnviarAsync(int idRequerimiento, int idUsuario, string? observacion);
+        Task ProcesarStockAsync(int idRequerimiento, int idUsuario, string resultado, string? observacion);
+        Task AprobarAsync(int idRequerimiento, int idUsuario, string? observacion);
+        Task RechazarAsync(int idRequerimiento, int idUsuario, string? observacion);
+        Task EnviarComprasAsync(int idRequerimiento, int idUsuario, string? observacion);
     }
 }

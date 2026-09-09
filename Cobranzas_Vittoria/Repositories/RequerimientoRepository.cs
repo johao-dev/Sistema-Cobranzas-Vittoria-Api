@@ -3,7 +3,9 @@ using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Compras;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
+using Cobranzas_Vittoria.Application.Compras.Excepciones;
 using Dapper;
+using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Repositories
 {
@@ -235,8 +237,6 @@ END";
             );
         }
 
-
-
         private async Task<string> EnsureNumeroRequerimientoAsync(IDbConnection db, string numeroSolicitado)
         {
             if (!string.IsNullOrWhiteSpace(numeroSolicitado))
@@ -255,24 +255,63 @@ FROM compras.Requerimiento;");
 
             return siguiente.ToString();
         }
-        public async Task UpdateEstadoAsync(int idRequerimiento, string estado, string? observacion)
+        public async Task<bool> EsSolicitanteAsync(int idRequerimiento, int idUsuario)
         {
             using var db = Open();
-            await db.ExecuteAsync(
-                "compras.usp_Requerimiento_ActualizarEstado",
-                new { IdRequerimiento = idRequerimiento, Estado = estado, Observacion = observacion },
-                commandType: CommandType.StoredProcedure
-            );
+            return await db.ExecuteScalarAsync<bool>(@"
+                SELECT CAST(CASE WHEN EXISTS (
+                    SELECT 1 FROM compras.Requerimiento
+                    WHERE IdRequerimiento = @IdRequerimiento AND IdUsuarioSolicitante = @IdUsuario
+                    ) THEN 1 ELSE 0 END AS bit);",
+                new { IdRequerimiento = idRequerimiento, IdUsuario = idUsuario });
         }
 
-        public async Task ValidarAlmacenAsync(int idRequerimiento, int idUsuario, string resultado, string? observacion)
+        public Task EnviarAsync(int idRequerimiento, int idUsuario, string? observacion)
+            => EjecutarTransicionAsync("compras.usp_Requerimiento_Enviar", idRequerimiento, idUsuario, observacion);
+
+        public Task ProcesarStockAsync(int idRequerimiento, int idUsuario, string resultado, string? observacion)
+            => EjecutarTransicionAsync("compras.usp_Requerimiento_ProcesarStock", idRequerimiento, idUsuario, observacion, resultado);
+
+        public Task AprobarAsync(int idRequerimiento, int idUsuario, string? observacion)
+            => EjecutarTransicionAsync("compras.usp_Requerimiento_Aprobar", idRequerimiento, idUsuario, observacion);
+
+        public Task RechazarAsync(int idRequerimiento, int idUsuario, string? observacion)
+            => EjecutarTransicionAsync("compras.usp_Requerimiento_Rechazar", idRequerimiento, idUsuario, observacion);
+
+        public Task EnviarComprasAsync(int idRequerimiento, int idUsuario, string? observacion)
+            => EjecutarTransicionAsync("compras.usp_Requerimiento_EnviarCompras", idRequerimiento, idUsuario, observacion);
+
+        // Se podría refactorizar usando el patrón de diseño Execute Around, encapsulando la apertura de la conexión,
+        // la ejecución del procedimiento almacenado y el manejo de excepciones en un único método.
+        private async Task EjecutarTransicionAsync(
+            string procedimiento,
+            int idRequerimiento,
+            int idUsuario,
+            string? observacion,
+            string? resultado = null)
         {
             using var db = Open();
-            await db.ExecuteAsync(
-                "compras.usp_Requerimiento_ValidarAlmacen",
-                new { IdRequerimiento = idRequerimiento, IdUsuario = idUsuario, Resultado = resultado, Observacion = observacion },
-                commandType: CommandType.StoredProcedure
-            );
+            try
+            {
+                var parametros = new DynamicParameters();
+                parametros.Add("IdRequerimiento", idRequerimiento);
+                parametros.Add("IdUsuario", idUsuario);
+                parametros.Add("Observacion", observacion);
+                if (resultado is not null)
+                    parametros.Add("Resultado", resultado);
+
+                await db.ExecuteAsync(
+                    procedimiento,
+                    parametros,
+                    commandType: CommandType.StoredProcedure);
+            }
+            catch (SqlException ex) when (ex.Number is >= 51051 and <= 51060)
+            {
+                throw new ValidacionNegocioComprasException(
+                    "estado",
+                    "REQUERIMIENTO_TRANSICION_INVALIDA",
+                    ex.Message);
+            }
         }
     }
 }

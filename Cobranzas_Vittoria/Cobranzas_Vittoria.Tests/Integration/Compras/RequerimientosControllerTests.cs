@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Cobranzas_Vittoria.Dtos.Compras;
+using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Compras;
@@ -13,10 +14,14 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 ///   GET    /api/compras/requerimientos/{id}                                  -> Get
 ///   POST   /api/compras/requerimientos                                       -> Crear (TVP)
 ///   PUT    /api/compras/requerimientos/{id}                                  -> Update
-///   PATCH  /api/compras/requerimientos/{id}/estado                           -> UpdateEstado
-///   POST   /api/compras/requerimientos/{id}/validacion-almacen               -> ValidarAlmacen
+///   POST   /api/compras/requerimientos/{id}/enviar                           -> Enviar
+///   POST   /api/compras/requerimientos/{id}/validacion-almacen               -> ProcesarStock
+///   POST   /api/compras/requerimientos/{id}/aprobar                          -> Aprobar
+///   POST   /api/compras/requerimientos/{id}/rechazar                         -> Rechazar
+///   POST   /api/compras/requerimientos/{id}/enviar-compras                   -> EnviarCompras
 ///
-/// Estados válidos (CHECK): Registrado, EnviadoOC, GeneradoOC, ValidadoAlmacen, Anulado.
+/// Estados válidos (CHECK): Registrado, EnviadoAlmacen, ValidadoAlmacen,
+/// AprobadoCoordinador, Rechazado, EnviadoOC, GeneradoOC, Anulado.
 /// Resultados válidos (CHECK): Conforme, Observado.
 ///
 /// Reglas de negocio:
@@ -33,8 +38,6 @@ public class RequerimientosControllerTests : IntegrationTestBase
     // Material 6 -> IdEspecialidad 4 (Casco, Activo=1).
     private const int IdMaterialAlbanileria = 2;
     private const int IdMaterialCasco = 6;
-
-    private const int IdUsuarioAlmacen = SeedIds.AlmacenId;
 
     [Test]
     public async Task List_SinFiltros_RetornaArrayVacio()
@@ -210,20 +213,19 @@ public class RequerimientosControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task UpdateEstado_AValidadoAlmacen_RetornaOkYCambiaEstadoEnBD()
+    public async Task ProcesarStock_Conforme_RetornaOkYCambiaEstadoEnBD()
     {
         // Arrange
         var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        var enviarResponse = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/enviar",
+            new EnviarRequerimientoRequest("Enviar a almacén"));
+        Assert.That(enviarResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            await enviarResponse.Content.ReadAsStringAsync());
 
         // Act
-        var estadoDto = new RequerimientoEstadoDto
-        {
-            Estado = "ValidadoAlmacen",
-            Observacion = "Verificado por almacén"
-        };
-        var response = await _client.PatchAsync(
-            $"/api/compras/requerimientos/{id}/estado",
-            JsonContent.Create(estadoDto));
+        var response = await _client.PostAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/validacion-almacen",
+            new ProcesarStockRequerimientoRequest("Conforme", "Verificado por almacén"));
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -234,21 +236,19 @@ public class RequerimientosControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task ValidarAlmacen_ConResultadoConforme_RetornaOkYRegistraValidacion()
+    public async Task ProcesarStock_ConResultadoConforme_RetornaOkYRegistraValidacion()
     {
         // Arrange
         var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        var enviarResponse = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/enviar",
+            new EnviarRequerimientoRequest("Enviar a almacén"));
+        Assert.That(enviarResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            await enviarResponse.Content.ReadAsStringAsync());
 
         // Act
-        var validacionDto = new RequerimientoValidacionDto
-        {
-            IdUsuario = IdUsuarioAlmacen,
-            Resultado = "Conforme",
-            Observacion = "Todo en orden"
-        };
         var response = await _client.PostAsJsonAsync(
             $"/api/compras/requerimientos/{id}/validacion-almacen",
-            validacionDto);
+            new ProcesarStockRequerimientoRequest("Conforme", "Todo en orden"));
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -261,8 +261,45 @@ public class RequerimientosControllerTests : IntegrationTestBase
             "Debe existir exactamente una validación registrada.");
         var v = validaciones.Single();
         Assert.That(v.IdRequerimiento, Is.EqualTo(id));
-        Assert.That(v.IdUsuario, Is.EqualTo(IdUsuarioAlmacen));
+        Assert.That(v.IdUsuario, Is.EqualTo(1), "La auditoría debe usar el usuario del JWT, no el body.");
         Assert.That(v.Resultado, Is.EqualTo("Conforme"));
+    }
+
+    [Test]
+    public async Task FlujoCompleto_AccionesExplicitas_AlcanzaEstadoEnviadoOC()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+
+        var enviar = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/enviar",
+            new EnviarRequerimientoRequest(null));
+        var procesarStock = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/validacion-almacen",
+            new ProcesarStockRequerimientoRequest("Conforme", null));
+        var aprobar = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/aprobar",
+            new AprobarRequerimientoRequest(null));
+        var enviarCompras = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/enviar-compras",
+            new EnviarRequerimientoComprasRequest(null));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(enviar.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(procesarStock.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(aprobar.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(enviarCompras.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        });
+        var estado = await DbHelpers.QueryScalarAsync<string>(
+            "SELECT Estado FROM compras.Requerimiento WHERE IdRequerimiento = @id", new { id });
+        Assert.That(estado, Is.EqualTo("EnviadoOC"));
+    }
+
+    [Test]
+    public async Task ProcesarStock_SinEnvioPrevio_RetornaUnprocessableEntity()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+
+        var response = await _client.PostAsJsonAsync($"/api/compras/requerimientos/{id}/validacion-almacen",
+            new ProcesarStockRequerimientoRequest("Conforme", null));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
     }
 
     [Test]
