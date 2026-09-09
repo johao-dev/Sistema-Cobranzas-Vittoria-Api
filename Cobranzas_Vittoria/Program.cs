@@ -39,6 +39,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Auth.Logout;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
+using Cobranzas_Vittoria.Seguridad.Authorization;
 using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
@@ -46,6 +47,7 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -96,10 +98,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 // Configuración de autorización basada en roles
-builder.Services.AddAuthorization(options =>
-    {
-        // Policies base
-    });
+builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // ============================================================================
 // Dapper: registro de TypeHandlers globales

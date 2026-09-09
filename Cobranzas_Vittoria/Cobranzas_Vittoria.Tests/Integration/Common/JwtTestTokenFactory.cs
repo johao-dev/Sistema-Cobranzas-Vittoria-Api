@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Cobranzas_Vittoria.Seguridad.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Common;
@@ -14,7 +15,8 @@ public static class JwtTestTokenFactory
         int idUsuario = 1,
         string usuarioLogin = UsuarioLogin,
         string correo = "integration-test-user@local",
-        DateTime? expiraEnUtc = null)
+        DateTime? expiraEnUtc = null,
+        IEnumerable<string>? permisos = null)
     {
         string key = Environment.GetEnvironmentVariable("Jwt__Key")
             ?? throw new InvalidOperationException("Jwt__Key no esta configurada para los tests.");
@@ -23,13 +25,16 @@ public static class JwtTestTokenFactory
         string audience = Environment.GetEnvironmentVariable("Jwt__Audience")
             ?? throw new InvalidOperationException("Jwt__Audience no esta configurado para los tests.");
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, idUsuario.ToString()),
             new Claim(ClaimTypes.Name, usuarioLogin),
             new Claim(ClaimTypes.Email, correo),
             new Claim(ClaimTypes.Role, "Administrador")
         };
+        claims.AddRange((permisos ?? TodosLosPermisosRequerimientos)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(permission => new Claim(PermissionAuthorizationHandler.ClaimType, permission)));
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
             SecurityAlgorithms.HmacSha256);
@@ -49,4 +54,17 @@ public static class JwtTestTokenFactory
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public static IReadOnlyList<string> TodosLosPermisosRequerimientos { get; } =
+    [
+        Permisos.Requerimientos.Ver,
+        Permisos.Requerimientos.Crear,
+        Permisos.Requerimientos.EditarBorrador,
+        Permisos.Requerimientos.Enviar,
+        Permisos.Requerimientos.ProcesarStock,
+        Permisos.Requerimientos.VerDepuracionAlmacen,
+        Permisos.Requerimientos.Aprobar,
+        Permisos.Requerimientos.Rechazar,
+        Permisos.Requerimientos.EnviarCompras
+    ];
 }

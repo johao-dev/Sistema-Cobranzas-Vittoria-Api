@@ -1,5 +1,6 @@
-using Cobranzas_Vittoria.Tests.Setup;
+using Cobranzas_Vittoria.Tests.Integration.Common;
 using Microsoft.Data.SqlClient;
+using System.Net.Http.Headers;
 using Respawn;
 using Respawn.Graph;
 
@@ -34,6 +35,8 @@ public abstract class IntegrationTestBase
                     new Table("seguridad", "Rol"),
                     new Table("seguridad", "Usuario"),
                     new Table("seguridad", "UsuarioRol"),
+                    new Table("seguridad", "Permiso"),
+                    new Table("seguridad", "PermisoRol"),
 
                     // maestra
                     new Table("maestra", "Especialidad"),
@@ -61,5 +64,7 @@ public abstract class IntegrationTestBase
         await using var connection = new SqlConnection(GlobalSetupFixture.DbContainer.GetConnectionString());
         await connection.OpenAsync();
         await _respawner!.ResetAsync(connection);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", JwtTestTokenFactory.CrearToken());
     }
 }
