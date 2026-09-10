@@ -5,6 +5,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
+using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener.ConPermisos;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.AsignarPermisos;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.QuitarPermiso;
 
@@ -19,6 +20,7 @@ public class RolController : ControllerBase
     private readonly ListarRolHandler _listarRolHandler;
     private readonly ActualizarRolHandler _actualizarRolHandler;
     private readonly ObtenerRolHandler _obtenerRolHandler;
+    private readonly ObtenerRolConPermisosHandler _obtenerRolConPermisosHandler;
     private readonly AsignarPermisosHandler _asignarPermisosHandler;
     private readonly QuitarPermisoHandler _quitarPermisoHandler;
     private readonly ILogger<RolController> _logger;
@@ -28,6 +30,7 @@ public class RolController : ControllerBase
         ListarRolHandler listarRolHandler,
         ActualizarRolHandler actualizarRolHandler,
         ObtenerRolHandler obtenerRolHandler,
+        ObtenerRolConPermisosHandler obtenerRolConPermisosHandler,
         AsignarPermisosHandler asignarPermisosHandler,
         QuitarPermisoHandler quitarPermisoHandler,
         ILogger<RolController> logger)
@@ -36,6 +39,7 @@ public class RolController : ControllerBase
         _listarRolHandler = listarRolHandler;
         _actualizarRolHandler = actualizarRolHandler;
         _obtenerRolHandler = obtenerRolHandler;
+        _obtenerRolConPermisosHandler = obtenerRolConPermisosHandler;
         _asignarPermisosHandler = asignarPermisosHandler;
         _quitarPermisoHandler = quitarPermisoHandler;
         _logger = logger;
@@ -58,6 +62,27 @@ public class RolController : ControllerBase
             rol.UsuarioCreacion,
             rol.FechaModificacion,
             rol.UsuarioModificacion);
+
+        return Ok(response);
+    }
+
+    [HttpGet("{idRol}/permisos")]
+    public async Task<IActionResult> GetByIdConPermisos(int idRol)
+    {
+        _logger.LogInformation("Consultando rol y permisos asignados por IdRol={IdRol}", idRol);
+
+        ObtenerRolConPermisosResult rol = await _obtenerRolConPermisosHandler.HandleAsync(
+            new ObtenerRolQuery(idRol));
+
+        RolConPermisosResponse response = new(
+            rol.IdRol,
+            rol.Nombre,
+            rol.Descripcion,
+            rol.Activo,
+            rol.Permisos.Select(p => new PermisoAsignadoResponse(
+                p.IdPermiso,
+                p.Codigo,
+                p.Nombre)));
 
         return Ok(response);
     }

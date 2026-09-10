@@ -140,6 +140,40 @@ public class RolControllerTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task GetByIdConPermisos_RetornaRolYDatosDePermisosAsignados()
+    {
+        RolResponse rol = await CrearRolAsync("GET-PERM");
+        PermisoResponse permiso = await CrearPermisoAsync("get-perm");
+        await _client.PostAsJsonAsync(
+            $"{BaseUrl}/{rol.IdRol}/permisos",
+            new AsignarPermisosRequest(new[] { permiso.IdPermiso }));
+
+        var response = await _client.GetAsync($"{BaseUrl}/{rol.IdRol}/permisos");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var resultado = await response.Content.ReadFromJsonAsync<RolConPermisosResponse>();
+        Assert.That(resultado, Is.Not.Null);
+        Assert.That(resultado!.IdRol, Is.EqualTo(rol.IdRol));
+        PermisoAsignadoResponse permisoAsignado = resultado.Permisos.Single();
+        Assert.That(permisoAsignado.IdPermiso, Is.EqualTo(permiso.IdPermiso));
+        Assert.That(permisoAsignado.Nombre, Is.EqualTo(permiso.Nombre));
+    }
+
+    [Test]
+    public async Task GetByIdConPermisos_RolSinPermisos_RetornaColeccionVacia()
+    {
+        RolResponse rol = await CrearRolAsync("GET-SIN-PERM");
+
+        var response = await _client.GetAsync($"{BaseUrl}/{rol.IdRol}/permisos");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var resultado = await response.Content.ReadFromJsonAsync<RolConPermisosResponse>();
+        Assert.That(resultado, Is.Not.Null);
+        Assert.That(resultado!.IdRol, Is.EqualTo(rol.IdRol));
+        Assert.That(resultado.Permisos, Is.Empty);
+    }
+
+    [Test]
     public async Task AsignarPermisos_SinPermisos_Retorna422()
     {
         RolResponse rol = await CrearRolAsync("SIN-PERM");
