@@ -1,8 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Cobranzas_Vittoria.Dtos.Compras;
 using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
+using Cobranzas_Vittoria.Seguridad.Authorization;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Compras;
@@ -14,6 +17,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 ///   GET    /api/compras/requerimientos/{id}                                  -> Get
 ///   POST   /api/compras/requerimientos                                       -> Crear (TVP)
 ///   PUT    /api/compras/requerimientos/{id}                                  -> Update
+///   PATCH  /api/compras/requerimientos/{id}/cantidades-almacen               -> Actualizar cantidades
 ///   POST   /api/compras/requerimientos/{id}/enviar                           -> Enviar
 ///   POST   /api/compras/requerimientos/{id}/validacion-almacen               -> ProcesarStock
 ///   POST   /api/compras/requerimientos/{id}/aprobar                          -> Aprobar
@@ -213,6 +217,250 @@ public class RequerimientosControllerTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task ActualizarCantidadesAlmacen_ConDatosValidos_ActualizaSoloCantidadesYConservaEstado()
+    {
+        var id = await RequerimientoBuilder.Nuevo()
+            .ConDescripcion("Cabecera que no debe cambiar")
+            .ConItem(IdMaterialAlbanileria, 5m, "Observación uno")
+            .ConItem(IdMaterialCasco, 7m, "Observación dos")
+            .CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+
+        var detallesAntes = (await ObtenerDetallesAlmacenAsync(id)).ToArray();
+        var request = new ActualizarCantidadesAlmacenRequest
+        {
+            Items =
+            [
+                new() { IdRequerimientoDetalle = detallesAntes[0].IdRequerimientoDetalle, Cantidad = 12.5m },
+                new() { IdRequerimientoDetalle = detallesAntes[1].IdRequerimientoDetalle, Cantidad = 4m }
+            ]
+        };
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            request);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(body.GetProperty("ok").GetBoolean(), Is.True);
+
+        var detallesDespues = (await ObtenerDetallesAlmacenAsync(id)).ToArray();
+        var cabecera = (await DbHelpers.QueryAsync<ReqRow>(
+            "SELECT NumeroRequerimiento AS Numero, Estado, Descripcion, Observacion " +
+            "FROM compras.Requerimiento WHERE IdRequerimiento = @id",
+            new { id })).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(detallesDespues.Select(d => d.Cantidad), Is.EqualTo(new[] { 12.5m, 4m }));
+            Assert.That(detallesDespues.Select(d => d.IdMaterial),
+                Is.EqualTo(detallesAntes.Select(d => d.IdMaterial)));
+            Assert.That(detallesDespues.Select(d => d.Observacion),
+                Is.EqualTo(detallesAntes.Select(d => d.Observacion)));
+            Assert.That(cabecera.Estado, Is.EqualTo("EnviadoAlmacen"));
+            Assert.That(cabecera.Descripcion, Is.EqualTo("Cabecera que no debe cambiar"));
+        });
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_ListaParcial_NoModificaDetallesOmitidos()
+    {
+        var id = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterialAlbanileria, 5m)
+            .ConItem(IdMaterialCasco, 7m)
+            .CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalles = (await ObtenerDetallesAlmacenAsync(id)).ToArray();
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items = [new() { IdRequerimientoDetalle = detalles[0].IdRequerimientoDetalle, Cantidad = 25m }]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var resultado = (await ObtenerDetallesAlmacenAsync(id)).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(resultado[0].Cantidad, Is.EqualTo(25m));
+            Assert.That(resultado[1].Cantidad, Is.EqualTo(7m));
+        });
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_SinPermiso_RetornaForbiddenYSinCambios()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            JwtTestTokenFactory.CrearToken(permisos: [Permisos.Requerimientos.Ver]));
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items = [new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = 99m }]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        Assert.That((await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad, Is.EqualTo(10m));
+    }
+
+    [TestCase("Registrado")]
+    [TestCase("ValidadoAlmacen")]
+    [TestCase("AprobadoCoordinador")]
+    public async Task ActualizarCantidadesAlmacen_EstadoNoPermitido_RetornaConflictYSinCambios(string estado)
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await DbHelpers.QueryScalarAsync<int>(
+            "UPDATE compras.Requerimiento SET Estado = @estado WHERE IdRequerimiento = @id; SELECT @@ROWCOUNT;",
+            new { id, estado });
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items = [new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = 99m }]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict),
+            await response.Content.ReadAsStringAsync());
+        Assert.That((await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad, Is.EqualTo(10m));
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_RequerimientoInexistente_RetornaNotFound()
+    {
+        var response = await _client.PatchAsJsonAsync(
+            "/api/compras/requerimientos/99999/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items = [new() { IdRequerimientoDetalle = 1, Cantidad = 10m }]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
+
+    [TestCase(0)]
+    [TestCase(-1)]
+    public async Task ActualizarCantidadesAlmacen_CantidadNoPositiva_RetornaUnprocessableEntity(decimal cantidad)
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items = [new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = cantidad }]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+        Assert.That((await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad, Is.EqualTo(10m));
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_CantidadNoNumerica_RetornaBadRequestYSinCambios()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+        var json = $$"""
+        {
+          "items": [
+            {
+              "idRequerimientoDetalle": {{detalle.IdRequerimientoDetalle}},
+              "cantidad": "cantidad-invalida"
+            }
+          ]
+        }
+        """;
+        using var message = new HttpRequestMessage(
+            HttpMethod.Patch,
+            $"/api/compras/requerimientos/{id}/cantidades-almacen")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        var response = await _client.SendAsync(message);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That((await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad, Is.EqualTo(10m));
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_ItemsVacios_RetornaUnprocessableEntity()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest());
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_IdDuplicado_RetornaUnprocessableEntityYSinCambios()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items =
+                [
+                    new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = 20m },
+                    new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = 30m }
+                ]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity));
+        Assert.That((await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad, Is.EqualTo(10m));
+    }
+
+    [Test]
+    public async Task ActualizarCantidadesAlmacen_DetalleDeOtroRequerimiento_RechazaTodoAtomicamente()
+    {
+        var id = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        var otroId = await RequerimientoBuilder.Nuevo().CrearAsync(_client);
+        await EnviarAAlmacenAsync(id);
+        var detalle = (await ObtenerDetallesAlmacenAsync(id)).Single();
+        var detalleAjeno = (await ObtenerDetallesAlmacenAsync(otroId)).Single();
+
+        var response = await _client.PatchAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/cantidades-almacen",
+            new ActualizarCantidadesAlmacenRequest
+            {
+                Items =
+                [
+                    new() { IdRequerimientoDetalle = detalle.IdRequerimientoDetalle, Cantidad = 20m },
+                    new() { IdRequerimientoDetalle = detalleAjeno.IdRequerimientoDetalle, Cantidad = 30m }
+                ]
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity),
+            await response.Content.ReadAsStringAsync());
+        var cantidadPropia = (await ObtenerDetallesAlmacenAsync(id)).Single().Cantidad;
+        var cantidadAjena = (await ObtenerDetallesAlmacenAsync(otroId)).Single().Cantidad;
+        Assert.Multiple(() =>
+        {
+            Assert.That(cantidadPropia, Is.EqualTo(10m));
+            Assert.That(cantidadAjena, Is.EqualTo(10m));
+        });
+    }
+
+    [Test]
     public async Task ProcesarStock_Conforme_RetornaOkYCambiaEstadoEnBD()
     {
         // Arrange
@@ -369,8 +617,29 @@ public class RequerimientosControllerTests : IntegrationTestBase
         Assert.That(filas.Single().Cantidad, Is.EqualTo(99m));
     }
 
+    private async Task EnviarAAlmacenAsync(int id)
+    {
+        var response = await _client.PostAsJsonAsync(
+            $"/api/compras/requerimientos/{id}/enviar",
+            new EnviarRequerimientoRequest(null));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            await response.Content.ReadAsStringAsync());
+    }
+
+    private static Task<IEnumerable<DetalleAlmacenRow>> ObtenerDetallesAlmacenAsync(int id)
+        => DbHelpers.QueryAsync<DetalleAlmacenRow>(
+            "SELECT IdRequerimientoDetalle, IdMaterial, Cantidad, Observacion " +
+            "FROM compras.RequerimientoDetalle " +
+            "WHERE IdRequerimiento = @id ORDER BY IdRequerimientoDetalle",
+            new { id });
+
     // --- Tipos de proyección para Dapper (records inmutables) ---
     private record ReqRow(string Numero, string Estado, string? Descripcion, string? Observacion);
     private record ValidacionRow(int IdRequerimiento, int IdUsuario, string Resultado);
     private record DetalleRow(int IdMaterial, decimal Cantidad);
+    private record DetalleAlmacenRow(
+        int IdRequerimientoDetalle,
+        int IdMaterial,
+        decimal Cantidad,
+        string? Observacion);
 }

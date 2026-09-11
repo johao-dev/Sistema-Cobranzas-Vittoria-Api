@@ -52,6 +52,16 @@ public class RequerimientosController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    [HttpPatch("{id:int}/cantidades-almacen")]
+    [AuthorizePermission(Permisos.Requerimientos.EditarCantidadesAlmacen)]
+    public async Task<IActionResult> ActualizarCantidadesAlmacen(
+        int id,
+        [FromBody] ActualizarCantidadesAlmacenRequest request)
+    {
+        await _service.ActualizarCantidadesAlmacenAsync(id, request);
+        return Ok(new { ok = true });
+    }
+
     [HttpPost("{id:int}/enviar")]
     [AuthorizePermission(Permisos.Requerimientos.Enviar)]
     public async Task<IActionResult> Enviar(int id, [FromBody] EnviarRequerimientoRequest request)

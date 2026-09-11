@@ -1,6 +1,7 @@
 using System.Data;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Compras;
+using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Application.Compras.Excepciones;
@@ -235,6 +236,86 @@ END";
                 p,
                 commandType: CommandType.StoredProcedure
             );
+        }
+
+        public async Task ActualizarCantidadesAlmacenAsync(
+            int idRequerimiento,
+            IReadOnlyCollection<ActualizarCantidadAlmacenItemRequest> items)
+        {
+            using var db = Open();
+            using var transaction = db.BeginTransaction(IsolationLevel.Serializable);
+
+            try
+            {
+                const string sqlEstado = @"
+SELECT Estado
+FROM compras.Requerimiento WITH (UPDLOCK, HOLDLOCK)
+WHERE IdRequerimiento = @IdRequerimiento;";
+
+                var estado = await db.QueryFirstOrDefaultAsync<string>(
+                    sqlEstado,
+                    new { IdRequerimiento = idRequerimiento },
+                    transaction);
+
+                if (estado is null)
+                {
+                    throw new KeyNotFoundException(
+                        $"No se encontró el requerimiento {idRequerimiento}.");
+                }
+
+                if (!string.Equals(estado, "EnviadoAlmacen", StringComparison.Ordinal))
+                {
+                    throw new ConflictoNegocioComprasException(
+                        "REQUERIMIENTO_ESTADO_INVALIDO",
+                        "Solo se pueden ajustar cantidades de requerimientos en estado EnviadoAlmacen.");
+                }
+
+                int[] idsDetalle = items.Select(item => item.IdRequerimientoDetalle).ToArray();
+                const string sqlDetalles = @"
+SELECT IdRequerimientoDetalle
+FROM compras.RequerimientoDetalle WITH (UPDLOCK, HOLDLOCK)
+WHERE IdRequerimiento = @IdRequerimiento
+  AND IdRequerimientoDetalle IN @IdsDetalle;";
+
+                var idsPertenecientes = (await db.QueryAsync<int>(
+                    sqlDetalles,
+                    new { IdRequerimiento = idRequerimiento, IdsDetalle = idsDetalle },
+                    transaction)).ToHashSet();
+
+                if (idsPertenecientes.Count != idsDetalle.Length)
+                {
+                    throw new ValidacionNegocioComprasException(
+                        "idRequerimientoDetalle",
+                        "REQUERIMIENTO_DETALLE_NO_PERTENECE",
+                        "Todos los detalles deben pertenecer al requerimiento indicado.");
+                }
+
+                const string sqlActualizar = @"
+UPDATE compras.RequerimientoDetalle
+SET Cantidad = @Cantidad
+WHERE IdRequerimiento = @IdRequerimiento
+  AND IdRequerimientoDetalle = @IdRequerimientoDetalle;";
+
+                foreach (var item in items)
+                {
+                    await db.ExecuteAsync(
+                        sqlActualizar,
+                        new
+                        {
+                            IdRequerimiento = idRequerimiento,
+                            item.IdRequerimientoDetalle,
+                            item.Cantidad
+                        },
+                        transaction);
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         private async Task<string> EnsureNumeroRequerimientoAsync(IDbConnection db, string numeroSolicitado)

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Cobranzas_Vittoria.Seguridad.Authorization;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 
@@ -33,6 +34,10 @@ public class AuthControllerTests : IntegrationTestBase
             Assert.That(jwt.Claims.Single(c => c.Type == ClaimTypes.Name).Value, Is.EqualTo("admin"));
             Assert.That(jwt.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value),
                 Contains.Item("Administrador"));
+            Assert.That(jwt.Claims
+                    .Where(c => c.Type == PermissionAuthorizationHandler.ClaimType)
+                    .Select(c => c.Value),
+                Contains.Item(Permisos.Requerimientos.EditarCantidadesAlmacen));
         });
 
         var hashPersistido = await DbHelpers.QueryScalarAsync<string>(
@@ -67,6 +72,11 @@ public class AuthControllerTests : IntegrationTestBase
         {
             Assert.That(renovado!.Token, Is.Not.EqualTo(login.Token));
             Assert.That(renovado.RefreshToken, Is.Not.EqualTo(login.RefreshToken));
+            var jwtRenovado = new JwtSecurityTokenHandler().ReadJwtToken(renovado.Token);
+            Assert.That(jwtRenovado.Claims
+                    .Where(c => c.Type == PermissionAuthorizationHandler.ClaimType)
+                    .Select(c => c.Value),
+                Contains.Item(Permisos.Requerimientos.EditarCantidadesAlmacen));
         });
 
         var tokenAnterior = await _client.PostAsJsonAsync(

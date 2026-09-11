@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Application.Common.Excepciones;
+using Cobranzas_Vittoria.Application.Compras.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
@@ -17,6 +18,7 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - DatosInvalidosException         -> 422 Unprocessable Entity (+ lista de errores por fila)
     ///   - DatosInvalidosValidacionException -> 422 Unprocessable Entity (+ lista de errores generica;
     ///                                       usado por modulos que no son Importacion, ej: Inventario)
+    ///   - ConflictoNegocioComprasException -> 409 Conflict
     ///   - ModuloNoSoportadoException      -> 400 BadRequest (codigo "MODULO_NO_SOPORTADO")
     ///   - FormatoPlantillaInvalidoException -> 400 BadRequest (codigo "FORMATO_PLANTILLA_INVALIDO")
     ///   - PlantillaNoDisponibleException  -> 404 NotFound   (codigo "PLANTILLA_NO_DISPONIBLE")
@@ -135,6 +137,18 @@ namespace Cobranzas_Vittoria.Middleware
                         .GroupBy(e => e.CodigoError)
                         .Select(g => $"{g.Key}={g.Count()}")
                         .OrderBy(s => s));
+            }
+            catch (ConflictoNegocioComprasException ex)
+            {
+                _logger.LogWarning(
+                    "Rechazo 409 ({Tipo}) en {Method} {Path}: {Codigo} - {Mensaje}",
+                    nameof(ConflictoNegocioComprasException), context.Request.Method, context.Request.Path,
+                    ex.CodigoError, ex.Message);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status409Conflict,
+                    ex.CodigoError,
+                    ex.Message);
             }
             catch (ModuloNoSoportadoException ex)
             {

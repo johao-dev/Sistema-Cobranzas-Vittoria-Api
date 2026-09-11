@@ -42,6 +42,7 @@ public sealed class RbacSeedTests : IntegrationTestBase
             Assert.That(permisosAlmacenero, Is.EquivalentTo(new[]
             {
                 Permisos.Requerimientos.Ver,
+                Permisos.Requerimientos.EditarCantidadesAlmacen,
                 Permisos.Requerimientos.ProcesarStock,
                 Permisos.Requerimientos.VerDepuracionAlmacen
             }));

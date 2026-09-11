@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Dtos.Compras;
+using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Application.Compras.Excepciones;
@@ -39,6 +40,47 @@ namespace Cobranzas_Vittoria.Services
         {
             await ValidarSolicitanteAsync(idRequerimiento, idUsuarioActual);
             await _repo.UpdateAsync(idRequerimiento, dto);
+        }
+
+        public async Task ActualizarCantidadesAlmacenAsync(
+            int idRequerimiento,
+            ActualizarCantidadesAlmacenRequest request)
+        {
+            if (request.Items is null || request.Items.Count == 0)
+            {
+                throw new ValidacionNegocioComprasException(
+                    "items",
+                    "REQUERIMIENTO_ITEMS_REQUERIDOS",
+                    "Debe enviar al menos un detalle para actualizar.");
+            }
+
+            if (request.Items.Any(item => item.IdRequerimientoDetalle <= 0))
+            {
+                throw new ValidacionNegocioComprasException(
+                    "idRequerimientoDetalle",
+                    "REQUERIMIENTO_DETALLE_INVALIDO",
+                    "Los identificadores de detalle deben ser mayores que cero.");
+            }
+
+            if (request.Items
+                .GroupBy(item => item.IdRequerimientoDetalle)
+                .Any(group => group.Count() > 1))
+            {
+                throw new ValidacionNegocioComprasException(
+                    "items",
+                    "REQUERIMIENTO_DETALLE_DUPLICADO",
+                    "No se permiten identificadores de detalle repetidos.");
+            }
+
+            if (request.Items.Any(item => item.Cantidad <= 0))
+            {
+                throw new ValidacionNegocioComprasException(
+                    "cantidad",
+                    "REQUERIMIENTO_CANTIDAD_INVALIDA",
+                    "Todas las cantidades deben ser mayores que cero.");
+            }
+
+            await _repo.ActualizarCantidadesAlmacenAsync(idRequerimiento, request.Items);
         }
 
         public Task<bool> PuedeEditarAsync(int idRequerimiento) => _repo.PuedeEditarAsync(idRequerimiento);
