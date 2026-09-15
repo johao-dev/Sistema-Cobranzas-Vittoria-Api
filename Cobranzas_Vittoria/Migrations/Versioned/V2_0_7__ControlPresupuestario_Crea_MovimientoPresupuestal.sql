@@ -66,6 +66,7 @@ CREATE TABLE ControlPresupuestario.MovimientoPresupuestal
 (
     IdMovimientoPresupuestal BIGINT IDENTITY(1,1) NOT NULL,
     IdPresupuestoDetalle INT NOT NULL,
+    ClaveEvento VARCHAR(200) NOT NULL,
     IdTipoMovimientoPresupuestal INT NOT NULL,
     Origen VARCHAR(50) NOT NULL,
     IdOrigen INT NOT NULL,
@@ -78,6 +79,7 @@ CREATE TABLE ControlPresupuestario.MovimientoPresupuestal
         REFERENCES ControlPresupuestario.PresupuestoDetalle(IdPresupuestoDetalle),
     CONSTRAINT FK_MovimientoPresupuestal_TipoMovimiento FOREIGN KEY(IdTipoMovimientoPresupuestal)
         REFERENCES ControlPresupuestario.TipoMovimientoPresupuestal(IdTipoMovimientoPresupuestal),
+    CONSTRAINT UQ_MovimientoPresupuestal_ClaveEvento UNIQUE(ClaveEvento),
     CONSTRAINT CK_MovimientoPresupuestal_Monto CHECK(Monto > 0),
     CONSTRAINT CK_MovimientoPresupuestal_Origen CHECK(LEN(LTRIM(RTRIM(Origen))) > 0),
     CONSTRAINT CK_MovimientoPresupuestal_IdOrigen CHECK(IdOrigen > 0)
