@@ -24,7 +24,7 @@ Ejemplos:
     Orden de compra cancelada/reducida
         -> LIBERACION
 
-    Compra o gasto registrado
+    Compra aceptada o gasto directo activo
         -> EJECUCION
 
     Corrección presupuestaria controlada
@@ -70,6 +70,8 @@ CREATE TABLE ControlPresupuestario.MovimientoPresupuestal
     IdTipoMovimientoPresupuestal INT NOT NULL,
     Origen VARCHAR(50) NOT NULL,
     IdOrigen INT NOT NULL,
+    Afectacion VARCHAR(20) NULL,
+    Direccion VARCHAR(20) NULL,
     Fecha DATETIME2(0) NOT NULL CONSTRAINT DF_MovimientoPresupuestal_Fecha DEFAULT (SYSDATETIME()),
     Monto DECIMAL(18,2) NOT NULL,
     Observacion NVARCHAR(500) NULL,
@@ -80,11 +82,24 @@ CREATE TABLE ControlPresupuestario.MovimientoPresupuestal
     CONSTRAINT FK_MovimientoPresupuestal_TipoMovimiento FOREIGN KEY(IdTipoMovimientoPresupuestal)
         REFERENCES ControlPresupuestario.TipoMovimientoPresupuestal(IdTipoMovimientoPresupuestal),
     CONSTRAINT UQ_MovimientoPresupuestal_ClaveEvento UNIQUE(ClaveEvento),
+    CONSTRAINT CK_MovimientoPresupuestal_ClaveEvento CHECK(LEN(LTRIM(RTRIM(ClaveEvento))) > 0),
+    CONSTRAINT CK_MovimientoPresupuestal_Afectacion CHECK
+        (Afectacion IS NULL OR Afectacion IN ('COMPROMISO', 'EJECUCION')),
+    CONSTRAINT CK_MovimientoPresupuestal_Direccion CHECK
+        (Direccion IS NULL OR Direccion IN ('INCREMENTO', 'DECREMENTO')),
     CONSTRAINT CK_MovimientoPresupuestal_Monto CHECK(Monto > 0),
     CONSTRAINT CK_MovimientoPresupuestal_Origen CHECK(LEN(LTRIM(RTRIM(Origen))) > 0),
     CONSTRAINT CK_MovimientoPresupuestal_IdOrigen CHECK(IdOrigen > 0)
 );
 GO
+
+/*
+La coherencia entre el tipo y Afectacion/Direccion se validará en la API:
+AJUSTE exige ambas dimensiones; los demás tipos exigen ambas en NULL.
+La DB solo restringe los valores permitidos de cada dimensión por separado.
+La validación de API está pendiente de implementación; no se genera un CHECK
+dependiente del ID del catálogo ni se utiliza SQL dinámico para esa regla.
+*/
 
 
 /*
@@ -110,6 +125,8 @@ ON ControlPresupuestario.MovimientoPresupuestal
 INCLUDE
 (
     Monto,
+    Afectacion,
+    Direccion,
     Fecha,
     Origen,
     IdOrigen

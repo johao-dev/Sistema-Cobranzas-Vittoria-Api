@@ -31,12 +31,15 @@ Ejemplos:
     PRE-2027-MKT       Presupuesto de Marketing 2027
 
 Un presupuesto puede tener múltiples versiones durante su ciclo de vida.
+IdMoneda define la moneda de todos sus detalles y movimientos. Cambiar la
+moneda de un presupuesto con versiones requiere crear otro presupuesto.
 ===============================================================================
 */
 CREATE TABLE ControlPresupuestario.Presupuesto
 (
     IdPresupuesto INT IDENTITY(1,1) NOT NULL,
     IdCentroCosto INT NOT NULL,
+    IdMoneda INT NOT NULL,
     Codigo VARCHAR(50) NOT NULL,
     Nombre NVARCHAR(200) NOT NULL,
     Descripcion NVARCHAR(500) NULL,
@@ -49,6 +52,8 @@ CREATE TABLE ControlPresupuestario.Presupuesto
     CONSTRAINT PK_Presupuesto PRIMARY KEY CLUSTERED (IdPresupuesto),
     CONSTRAINT FK_Presupuesto_CentroCosto FOREIGN KEY (IdCentroCosto)
         REFERENCES ControlPresupuestario.CentroCosto(IdCentroCosto),
+    CONSTRAINT FK_Presupuesto_Moneda FOREIGN KEY (IdMoneda)
+        REFERENCES ControlPresupuestario.Moneda(IdMoneda),
     CONSTRAINT UQ_Presupuesto_Codigo UNIQUE (Codigo),
     CONSTRAINT CK_Presupuesto_RangoFechas CHECK
     (
@@ -81,10 +86,15 @@ ON ControlPresupuestario.Presupuesto
 )
 INCLUDE
 (
+    IdMoneda,
     Codigo,
     Nombre,
     FechaInicio,
     FechaFin,
     Activo
 );
+GO
+
+CREATE NONCLUSTERED INDEX IX_Presupuesto_IdMoneda
+ON ControlPresupuestario.Presupuesto (IdMoneda);
 GO

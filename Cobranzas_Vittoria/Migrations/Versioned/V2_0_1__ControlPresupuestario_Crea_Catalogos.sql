@@ -26,8 +26,8 @@ CREATE TABLE ControlPresupuestario.EstadoPresupuesto
 (
     IdEstadoPresupuesto INT IDENTITY(1,1) NOT NULL,
     Codigo VARCHAR(30) NOT NULL,
-    Nombre VARCHAR(50) NOT NULL,
-    Descripcion VARCHAR(255) NULL,
+    Nombre NVARCHAR(50) NOT NULL,
+    Descripcion NVARCHAR(255) NULL,
     Activo BIT NOT NULL
     
     CONSTRAINT DF_EstadoPresupuesto_Activo DEFAULT (1),
@@ -58,8 +58,8 @@ CREATE TABLE ControlPresupuestario.TipoCentroCosto
 (
     IdTipoCentroCosto INT IDENTITY(1,1) NOT NULL,
     Codigo VARCHAR(30) NOT NULL,
-    Nombre VARCHAR(50) NOT NULL,
-    Descripcion VARCHAR(255) NULL,
+    Nombre NVARCHAR(50) NOT NULL,
+    Descripcion NVARCHAR(255) NULL,
     Activo BIT NOT NULL
 
     CONSTRAINT DF_TipoCentroCosto_Activo DEFAULT (1),
@@ -91,8 +91,8 @@ CREATE TABLE ControlPresupuestario.TipoPartida
 (
     IdTipoPartida INT IDENTITY(1,1) NOT NULL,
     Codigo VARCHAR(30) NOT NULL,
-    Nombre VARCHAR(50) NOT NULL,
-    Descripcion VARCHAR(255) NULL,
+    Nombre NVARCHAR(50) NOT NULL,
+    Descripcion NVARCHAR(255) NULL,
     Activo BIT NOT NULL
 
     CONSTRAINT DF_TipoPartida_Activo DEFAULT (1),
@@ -111,7 +111,8 @@ Define la naturaleza de un movimiento dentro del ledger presupuestario.
 COMPROMISO -> Reserva presupuesto, normalmente originada por una OC aprobada.
 LIBERACION -> Libera total o parcialmente un compromiso anterior.
 EJECUCION  -> Registra consumo efectivo del presupuesto.
-AJUSTE     -> Corrección presupuestaria controlada.
+AJUSTE     -> Incrementa o disminuye COMPROMISO/EJECUCION según Afectacion
+              y Direccion del movimiento.
 
 Los movimientos presupuestales serán inmutables. Una operación ya registrada
 no debe corregirse mediante UPDATE/DELETE, sino mediante un nuevo movimiento
@@ -122,13 +123,35 @@ CREATE TABLE ControlPresupuestario.TipoMovimientoPresupuestal
 (
     IdTipoMovimientoPresupuestal INT IDENTITY(1,1) NOT NULL,
     Codigo VARCHAR(30) NOT NULL,
-    Nombre VARCHAR(100) NOT NULL,
-    Descripcion VARCHAR(255) NULL,
+    Nombre NVARCHAR(100) NOT NULL,
+    Descripcion NVARCHAR(255) NULL,
     Activo BIT NOT NULL
 
     CONSTRAINT DF_TipoMovimientoPresupuestal_Activo DEFAULT (1),
     CONSTRAINT PK_TipoMovimientoPresupuestal PRIMARY KEY CLUSTERED (IdTipoMovimientoPresupuestal),
     CONSTRAINT UQ_TipoMovimientoPresupuestal_Codigo UNIQUE (Codigo)
+);
+GO
+
+
+/*
+===============================================================================
+5. MONEDA
+-------------------------------------------------------------------------------
+La moneda pertenece al Presupuesto y se conserva en todas sus versiones.
+Los movimientos utilizan esa misma moneda; no se realizan conversiones.
+===============================================================================
+*/
+CREATE TABLE ControlPresupuestario.Moneda
+(
+    IdMoneda INT IDENTITY(1,1) NOT NULL,
+    Codigo VARCHAR(3) NOT NULL,
+    Nombre NVARCHAR(50) NOT NULL,
+    Simbolo NVARCHAR(10) NOT NULL,
+    Activo BIT NOT NULL CONSTRAINT DF_Moneda_Activo DEFAULT (1),
+
+    CONSTRAINT PK_Moneda PRIMARY KEY CLUSTERED (IdMoneda),
+    CONSTRAINT UQ_Moneda_Codigo UNIQUE (Codigo)
 );
 GO
 
@@ -293,6 +316,18 @@ VALUES
 (
     'AJUSTE',
     N'Ajuste',
-    N'Movimiento utilizado para realizar una corrección presupuestaria controlada.'
+    N'Corrección de compromiso o ejecución mediante afectación y dirección explícitas.'
 );
+GO
+
+
+/*
+===============================================================================
+SEED - MONEDAS
+===============================================================================
+*/
+INSERT INTO ControlPresupuestario.Moneda (Codigo, Nombre, Simbolo)
+VALUES
+    ('PEN', N'Sol peruano', N'S/'),
+    ('USD', N'Dólar estadounidense', N'US' + NCHAR(36));
 GO
