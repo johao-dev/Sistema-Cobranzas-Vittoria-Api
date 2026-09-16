@@ -24,6 +24,11 @@ Ejemplo:
         V3 -> BORRADOR
 
 Cada versión funcionará como cabecera de un snapshot completo.
+Si existe una versión aprobada anterior, se copian todos sus detalles como
+nuevas filas y luego se modifican los importes que correspondan. No se copian
+movimientos. Los detalles no modificados conservan sus montos; cero significa
+una asignación explícita de cero, no ausencia de cambios.
+Una versión revisa la línea base del mismo presupuesto, sin reiniciar su ledger.
 
 Los detalles presupuestales asociados a una versión se almacenarán
 posteriormente en:
@@ -39,12 +44,22 @@ Reglas estructurales:
 
 Reglas de negocio que serán responsabilidad de la API:
 
-    - Una versión APROBADA no puede modificarse.
+    - Una versión APROBADO no puede modificarse.
     - Una versión HISTORICO no puede modificarse.
-    - Una versión ANULADA no puede modificarse.
+    - Una versión ANULADO no puede modificarse.
     - Solo BORRADOR permite modificaciones.
-    - Solo debe existir una versión APROBADA/vigente por presupuesto.
-    - Una nueva versión normalmente se genera copiando la versión aprobada.
+    - Solo debe existir una versión APROBADO/vigente por presupuesto.
+    - Transiciones: BORRADOR -> APROBADO -> HISTORICO; BORRADOR -> ANULADO.
+    - ANULADO solo descarta un BORRADOR que nunca fue vigente. No se permiten
+      APROBADO/HISTORICO -> ANULADO ni ANULADO -> APROBADO.
+    - Al aprobar una nueva versión, la anterior APROBADO pasa a HISTORICO.
+    - No aprobar un snapshot que omita partidas con compromiso pendiente,
+      consumo acumulado relevante u operaciones históricas aún pendientes.
+      Si se retira su asignación, conservar un detalle real con monto cero.
+    - La validación y el reemplazo de la versión vigente deben ser atómicos
+      y garantizar una única APROBADO frente a operaciones concurrentes.
+
+Estas reglas de transición y cobertura no están implementadas en esta tabla.
 ===============================================================================
 */
 CREATE TABLE ControlPresupuestario.PresupuestoVersion

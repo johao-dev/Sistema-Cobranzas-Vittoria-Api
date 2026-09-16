@@ -28,7 +28,7 @@ Ejemplo:
 
 Cada PresupuestoVersion contiene su propio conjunto de PresupuestoDetalle.
 
-Esto permite conservar snapshots completos e independientes:
+Esto permite conservar snapshots completos de la línea base:
 
     V1
         Concreto   S/ 2,500,000
@@ -37,18 +37,28 @@ Esto permite conservar snapshots completos e independientes:
         Concreto   S/ 2,800,000
 
 Modificar V2 no altera los registros correspondientes a V1.
+Al crear V2 se copian todos los detalles anteriores como nuevas filas; las
+partidas no modificadas conservan sus importes. No se copian movimientos.
+Los snapshots tienen líneas base propias, pero comparten el consumo económico
+acumulado del mismo Presupuesto para control vigente.
 
 REGLAS ESTRUCTURALES:
 
     - Cada detalle pertenece exactamente a una versión.
     - Cada detalle referencia exactamente una partida del catálogo.
     - Una partida no puede aparecer dos veces dentro de la misma versión.
-    - El monto presupuestado no puede ser negativo.
+    - El monto presupuestado no puede ser negativo; cero es una asignación
+      explícita válida y debe corresponder a un detalle realmente persistido.
 
 REGLAS DE NEGOCIO DE LA API:
 
     - Solo pueden modificarse detalles de versiones BORRADOR.
-    - Una versión APROBADA/HISTORICO/ANULADA es inmutable.
+    - Una versión APROBADO/HISTORICO/ANULADO es inmutable.
+    - Antes de aprobar, conservar detalles reales para toda partida que deba
+      seguir representándose por compromiso, consumo u operaciones pendientes.
+      Retirar su asignación exige monto cero, no eliminarla del snapshot.
+    - Una partida solo puede omitirse cuando deja de ser relevante para el
+      control económico vigente; reporting no reconstruye detalles faltantes.
     - Solo las partidas hoja deben recibir montos presupuestados.
     - Una partida inactiva no puede agregarse a nuevas versiones.
 ===============================================================================

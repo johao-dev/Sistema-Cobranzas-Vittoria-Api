@@ -339,10 +339,12 @@ Objeto      : vw_ControlPresupuestarioVigente
 Descripción : Línea base aprobada frente al ledger neto acumulado.
 -------------------------------------------------------------------------------
 No suma montos presupuestados históricos ni reasigna movimientos.
-BORRADOR/ANULADO no aportan al arrastre. ANULADO se considera una versión
-descartada que nunca fue efectiva hasta definir una política distinta.
-Una partida ausente del snapshot actual con efecto neto histórico no nulo
-se expone con presupuesto cero e IdPresupuestoDetalle NULL para no ocultar consumo.
+BORRADOR/ANULADO no aportan al arrastre. ANULADO solo representa un BORRADOR
+descartado que nunca tuvo vigencia presupuestaria.
+Todas las filas corresponden a detalles reales del snapshot APROBADO.
+Si se retira la asignación de una partida económicamente relevante, el snapshot
+debe conservar un detalle real con monto cero. La futura aprobación debe
+rechazar omisiones; esta vista no reconstruye ni repara snapshots incompletos.
 ===============================================================================
 */
 CREATE OR ALTER VIEW ControlPresupuestario.vw_ControlPresupuestarioVigente
@@ -376,28 +378,10 @@ Movimientos AS
 Partidas AS
 (
     SELECT v.IdPresupuestoVersion, pd.IdCatalogoPartida,
-        pd.IdPresupuestoDetalle, pd.MontoPresupuestado,
-        CAST(1 AS BIT) AS EsPartidaEnVersionVigente
+        pd.IdPresupuestoDetalle, pd.MontoPresupuestado
     FROM VersionesVigentes v
     INNER JOIN ControlPresupuestario.PresupuestoDetalle pd
         ON pd.IdPresupuestoVersion = v.IdPresupuestoVersion
-
-    UNION ALL
-
-    SELECT v.IdPresupuestoVersion, m.IdCatalogoPartida,
-        CAST(NULL AS INT) AS IdPresupuestoDetalle,
-        CAST(0 AS DECIMAL(18,2)) AS MontoPresupuestado,
-        CAST(0 AS BIT) AS EsPartidaEnVersionVigente
-    FROM VersionesVigentes v
-    INNER JOIN Movimientos m ON m.IdPresupuesto = v.IdPresupuesto
-    WHERE (m.MontoComprometido <> 0 OR m.MontoEjecutado <> 0)
-        AND NOT EXISTS
-        (
-            SELECT 1
-            FROM ControlPresupuestario.PresupuestoDetalle pd
-            WHERE pd.IdPresupuestoVersion = v.IdPresupuestoVersion
-                AND pd.IdCatalogoPartida = m.IdCatalogoPartida
-        )
 )
 SELECT
     cc.IdCentroCosto,
@@ -414,7 +398,6 @@ SELECT
     v.IdEstadoPresupuesto,
     ep.Codigo AS EstadoPresupuesto,
     actual.IdPresupuestoDetalle,
-    actual.EsPartidaEnVersionVigente,
     cp.IdCatalogoPartida,
     cp.Codigo AS CodigoPartida,
     cp.Nombre AS NombrePartida,

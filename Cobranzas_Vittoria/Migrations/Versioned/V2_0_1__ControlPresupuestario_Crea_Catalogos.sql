@@ -186,7 +186,7 @@ VALUES
 (
     'ANULADO',
     N'Anulado',
-    N'Versión descartada y sin efecto presupuestario.'
+    N'Versión descartada mientras era BORRADOR, sin haber tenido vigencia presupuestaria.'
 );
 GO
 
