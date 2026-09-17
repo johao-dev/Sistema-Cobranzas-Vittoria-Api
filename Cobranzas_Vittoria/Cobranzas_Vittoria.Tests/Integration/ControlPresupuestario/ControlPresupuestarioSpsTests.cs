@@ -10,7 +10,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.ControlPresupuestario;
 /// GlobalSetupFixture arranca la aplicación y DbUp antes de cualquier test.
 /// </summary>
 [NonParallelizable]
-public class ControlPresupuestarioSpsTests : IntegrationTestBase
+public partial class ControlPresupuestarioSpsTests : IntegrationTestBase
 {
     private const string Schema = "ControlPresupuestario.";
     private int _idCentro;
