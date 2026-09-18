@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Compras;
 using System.Data;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Compras;
@@ -23,8 +24,6 @@ SELECT
     r.IdRequerimiento,
     r.NumeroRequerimiento,
     r.FechaRequerimiento,
-    r.IdEspecialidad,
-    eb.Nombre AS Especialidad,
     x.Especialidades,
     r.IdProyecto,
     p.NombreProyecto,
@@ -36,7 +35,6 @@ SELECT
     r.Observacion,
     r.FechaCreacion
 FROM compras.Requerimiento r
-INNER JOIN maestra.Especialidad eb ON eb.IdEspecialidad = r.IdEspecialidad
 INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
 INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
 OUTER APPLY (
@@ -63,8 +61,6 @@ GROUP BY
     r.IdRequerimiento,
     r.NumeroRequerimiento,
     r.FechaRequerimiento,
-    r.IdEspecialidad,
-    eb.Nombre,
     r.IdProyecto,
     p.NombreProyecto,
     r.Descripcion,
@@ -89,8 +85,6 @@ SELECT
     r.IdRequerimiento,
     r.NumeroRequerimiento,
     r.FechaRequerimiento,
-    r.IdEspecialidad,
-    eb.Nombre AS Especialidad,
     x.Especialidades,
     r.IdProyecto,
     p.NombreProyecto,
@@ -102,7 +96,6 @@ SELECT
     r.Observacion,
     r.FechaCreacion
 FROM compras.Requerimiento r
-INNER JOIN maestra.Especialidad eb ON eb.IdEspecialidad = r.IdEspecialidad
 INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
 INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
 OUTER APPLY (
@@ -122,6 +115,7 @@ SELECT
     rd.IdRequerimientoDetalle,
     rd.IdRequerimiento,
     rd.IdMaterial,
+    rd.IdPresupuestoDetalle,
     m.IdEspecialidad,
     e.Nombre AS Especialidad,
     m.Descripcion AS Material,
@@ -154,18 +148,20 @@ ORDER BY FechaValidacion DESC;";
             var numeroRequerimiento = await EnsureNumeroRequerimientoAsync(db, (dto.NumeroRequerimiento ?? string.Empty).Trim());
             var fechaRequerimiento = dto.FechaRequerimiento == default ? DateTime.Today : dto.FechaRequerimiento.Date;
 
+            foreach (var item in dto.Items) ComprasNumeros.ValidarDecimal(item.Cantidad, "cantidad");
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
             tvp.Columns.Add("Observacion", typeof(string));
+            tvp.Columns.Add("IdPresupuestoDetalle", typeof(int));
 
             foreach (var it in dto.Items)
-                tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value);
+                tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value, (object?)it.IdPresupuestoDetalle ?? DBNull.Value);
 
             var p = new DynamicParameters();
             p.Add("NumeroRequerimiento", numeroRequerimiento);
             p.Add("FechaRequerimiento", fechaRequerimiento);
-            p.Add("IdEspecialidad", dto.IdEspecialidad);
             p.Add("IdProyecto", dto.IdProyecto);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("FechaEntrega", dto.FechaEntrega);
@@ -211,19 +207,21 @@ END";
             if (!puedeEditar)
                 throw new InvalidOperationException("El requerimiento ya no puede modificarse porque ya fue enviado a orden de compra o ya tiene una orden asociada.");
 
+            foreach (var item in dto.Items) ComprasNumeros.ValidarDecimal(item.Cantidad, "cantidad");
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
             tvp.Columns.Add("Observacion", typeof(string));
+            tvp.Columns.Add("IdPresupuestoDetalle", typeof(int));
 
             foreach (var it in dto.Items)
-                tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value);
+                tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value, (object?)it.IdPresupuestoDetalle ?? DBNull.Value);
 
             var p = new DynamicParameters();
             p.Add("IdRequerimiento", idRequerimiento);
             p.Add("NumeroRequerimiento", dto.NumeroRequerimiento);
             p.Add("FechaRequerimiento", dto.FechaRequerimiento);
-            p.Add("IdEspecialidad", dto.IdEspecialidad);
             p.Add("IdProyecto", dto.IdProyecto);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("FechaEntrega", dto.FechaEntrega);
@@ -242,6 +240,7 @@ END";
             int idRequerimiento,
             IReadOnlyCollection<ActualizarCantidadAlmacenItemRequest> items)
         {
+            foreach (var item in items) ComprasNumeros.ValidarDecimal(item.Cantidad, "cantidad");
             using var db = Open();
             using var transaction = db.BeginTransaction(IsolationLevel.Serializable);
 

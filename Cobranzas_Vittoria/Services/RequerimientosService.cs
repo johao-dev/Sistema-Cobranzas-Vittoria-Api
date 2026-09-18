@@ -1,4 +1,4 @@
-﻿using Cobranzas_Vittoria.Dtos.Requerimientos;
+using Cobranzas_Vittoria.Dtos.Requerimientos;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
 
@@ -18,14 +18,14 @@ namespace Cobranzas_Vittoria.Services
 
         public async Task<RequerimientoGetResponseDto?> ObtenerAsync(int idRequerimiento)
         {
-            var (head, items, cotizaciones) = await _repo.ObtenerAsync(idRequerimiento);
+            var (head, items, validaciones) = await _repo.ObtenerAsync(idRequerimiento);
             if (head == null) return null;
 
             return new RequerimientoGetResponseDto
             {
                 Requerimiento = head,
                 Items = items,
-                Cotizaciones = cotizaciones
+                Validaciones = validaciones
             };
         }
     }

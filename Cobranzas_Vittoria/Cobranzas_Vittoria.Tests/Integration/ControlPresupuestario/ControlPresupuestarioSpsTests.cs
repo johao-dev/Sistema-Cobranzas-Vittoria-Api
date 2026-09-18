@@ -34,8 +34,8 @@ public partial class ControlPresupuestarioSpsTests : IntegrationTestBase
                 ('COMPROMISO'), ('LIBERACION'), ('EJECUCION'), ('AJUSTE')) v(Codigo)
             WHERE NOT EXISTS (SELECT 1 FROM ControlPresupuestario.TipoMovimientoPresupuestal t
                 WHERE t.Codigo = v.Codigo);
-            IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.Moneda WHERE Codigo = 'PEN')
-                INSERT INTO ControlPresupuestario.Moneda (Codigo, Nombre, Simbolo)
+            IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE Codigo = 'PEN')
+                INSERT INTO maestra.Moneda (Codigo, Nombre, Simbolo)
                 VALUES ('PEN', N'Sol', N'S/');
             IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.TipoCentroCosto WHERE Codigo = 'PROYECTO')
                 INSERT INTO ControlPresupuestario.TipoCentroCosto (Codigo, Nombre)
@@ -45,7 +45,7 @@ public partial class ControlPresupuestarioSpsTests : IntegrationTestBase
                 VALUES ('MATERIALES', N'Materiales');
             """);
         _idMoneda = await connection.QuerySingleAsync<int>(
-            "SELECT IdMoneda FROM ControlPresupuestario.Moneda WHERE Codigo = 'PEN'");
+            "SELECT IdMoneda FROM maestra.Moneda WHERE Codigo = 'PEN'");
         _idCentro = await connection.QuerySingleAsync<int>("""
             INSERT INTO ControlPresupuestario.CentroCosto (Codigo, Nombre, IdTipoCentroCosto)
             VALUES (@Codigo, N'Centro de pruebas',

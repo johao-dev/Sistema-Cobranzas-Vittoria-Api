@@ -108,8 +108,8 @@ BEGIN
         c.NumeroCompra,
         c.IdOrdenCompra,
         oc.NumeroOrdenCompra,
-        c.IdProveedor,
-        p.RazonSocial AS Proveedor,
+        proveedores.Proveedores,
+        oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
         c.FechaCompra,
         c.Aceptada,
         c.IncluyeIGV,
@@ -121,7 +121,16 @@ BEGIN
     
     FROM compras.Compra c
     INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
-    INNER JOIN maestra.Proveedor p ON p.IdProveedor = c.IdProveedor
+    INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (SELECT DISTINCT p.IdProveedor, p.RazonSocial
+          FROM compras.CompraDetalle cd
+          JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = c.IdOrdenCompra AND od.IdMaterial = cd.IdMaterial
+          JOIN maestra.Proveedor p ON p.IdProveedor = od.IdProveedor
+          WHERE cd.IdCompra = c.IdCompra) q
+) proveedores
+
     
     WHERE c.IdCompra = @IdCompra;
 
@@ -133,10 +142,13 @@ BEGIN
         m.UnidadMedida,
         cd.Cantidad,
         cd.PrecioUnitario,
-        cd.Subtotal
+        cd.Subtotal, od.IdProveedor, p.RazonSocial AS Proveedor
     
     FROM compras.CompraDetalle cd
     INNER JOIN maestra.Material m ON m.IdMaterial = cd.IdMaterial
+    JOIN compras.Compra c ON c.IdCompra = cd.IdCompra
+    LEFT JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = c.IdOrdenCompra AND od.IdMaterial = cd.IdMaterial
+    LEFT JOIN maestra.Proveedor p ON p.IdProveedor = od.IdProveedor
     WHERE cd.IdCompra = @IdCompra
     ORDER BY cd.IdCompraDetalle;
 
@@ -170,8 +182,8 @@ BEGIN
         c.NumeroCompra,
         c.IdOrdenCompra,
         oc.NumeroOrdenCompra,
-        c.IdProveedor,
-        p.RazonSocial AS Proveedor,
+        proveedores.Proveedores,
+        oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
         c.FechaCompra,
         c.Aceptada,
         c.IncluyeIGV,
@@ -183,10 +195,22 @@ BEGIN
     
     FROM compras.Compra c
     INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
-    INNER JOIN maestra.Proveedor p ON p.IdProveedor = c.IdProveedor
+    INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (SELECT DISTINCT p.IdProveedor, p.RazonSocial
+          FROM compras.CompraDetalle cd
+          JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = c.IdOrdenCompra AND od.IdMaterial = cd.IdMaterial
+          JOIN maestra.Proveedor p ON p.IdProveedor = od.IdProveedor
+          WHERE cd.IdCompra = c.IdCompra) q
+) proveedores
+
     
     WHERE (@Aceptada IS NULL OR c.Aceptada = @Aceptada)
-    AND (@IdProveedor IS NULL OR c.IdProveedor = @IdProveedor)
+    AND (@IdProveedor IS NULL OR EXISTS (
+        SELECT 1 FROM compras.CompraDetalle cd
+        JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = c.IdOrdenCompra AND od.IdMaterial = cd.IdMaterial
+        WHERE cd.IdCompra = c.IdCompra AND od.IdProveedor = @IdProveedor))
     ORDER BY c.IdCompra DESC;
 END;
 GO
@@ -194,7 +218,6 @@ GO
 CREATE OR ALTER PROCEDURE [compras].[usp_Compra_Registrar]
     @NumeroCompra NVARCHAR(30),
     @IdOrdenCompra INT,
-    @IdProveedor INT,
     @FechaCompra DATE,
     @IncluyeIGV BIT = 0,
     @Observacion NVARCHAR(250) = NULL,
@@ -233,13 +256,8 @@ BEGIN
             THROW 50062, 'Orden de compra no existe.',
     1;
 
-    IF NOT EXISTS (
-        SELECT
-            1
-        FROM maestra.Proveedor
-        WHERE IdProveedor = @IdProveedor)
-            THROW 50063, 'Proveedor no existe.',
-    1;
+    IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
+        THROW 51073, 'No se permiten materiales repetidos en una Compra.', 1;
 
     IF NOT EXISTS (
         SELECT
@@ -276,7 +294,6 @@ INSERT INTO
     (
         NumeroCompra,
         IdOrdenCompra,
-        IdProveedor,
         FechaCompra,
         Aceptada,
         IncluyeIGV,
@@ -288,7 +305,6 @@ INSERT INTO
     ) VALUES (
         @NumeroCompra,
         @IdOrdenCompra,
-        @IdProveedor,
         @FechaCompra,
         0,
         @IncluyeIGV,
@@ -369,8 +385,7 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
     @IdOrdenCompra INT,
     @NumeroOrdenCompra NVARCHAR(50),
     @IdRequerimiento INT,
-    @IdProveedor INT,
-    @IdProyecto INT,
+    @IdMoneda INT,
     @FechaOrdenCompra DATE,
     @Descripcion NVARCHAR(500) = NULL,
     @IdUsuarioCreacion INT = NULL,
@@ -423,8 +438,10 @@ WHERE
 RETURN;
 END;
 
-DECLARE @IdProveedorCabecera INT =
-        COALESCE(NULLIF(@IdProveedor, 0), (SELECT TOP 1 IdProveedor FROM @Items ORDER BY IdProveedor));
+IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
+    THROW 51070, 'La moneda no existe o está inactiva.', 1;
+IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
+    THROW 51071, 'No se permiten materiales repetidos en una OC.', 1;
 
 BEGIN TRANSACTION;
 
@@ -434,8 +451,7 @@ BEGIN TRY
 SET
     NumeroOrdenCompra = @NumeroOrdenCompra,
                IdRequerimiento = @IdRequerimiento,
-               IdProveedor = @IdProveedorCabecera,
-               IdProyecto = @IdProyecto,
+               IdMoneda = @IdMoneda,
                FechaOrdenCompra = @FechaOrdenCompra,
                Descripcion = @Descripcion,
                RutaPdf = @RutaPdf
@@ -468,19 +484,13 @@ FROM
 UPDATE
     oc
 SET
-    oc.Total = ISNULL(t.Total, 0),
-               oc.IdProveedor = CASE
-        WHEN t.CantProv = 1 THEN t.IdProveedorUnico
-        ELSE oc.IdProveedor
-    END
+    oc.Total = ISNULL(t.Total, 0)
 FROM
     compras.OrdenCompra oc
         OUTER APPLY
         (
     SELECT
-                SUM(d.Cantidad * d.PrecioUnitario) AS Total,
-                COUNT(DISTINCT d.IdProveedor) AS CantProv,
-                MIN(d.IdProveedor) AS IdProveedorUnico
+                SUM(d.Cantidad * d.PrecioUnitario) AS Total
     FROM
         compras.OrdenCompraDetalle d
     WHERE
@@ -566,8 +576,7 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
 (
     @NumeroOrdenCompra NVARCHAR(50),
     @IdRequerimiento INT,
-    @IdProveedor INT,
-    @IdProyecto INT,
+    @IdMoneda INT,
     @FechaOrdenCompra DATE,
     @Descripcion NVARCHAR(500) = NULL,
     @IdUsuarioCreacion INT = NULL,
@@ -636,8 +645,10 @@ WHERE
 RETURN;
 END;
 
-DECLARE @IdProveedorCabecera INT =
-        COALESCE(NULLIF(@IdProveedor, 0), (SELECT TOP 1 IdProveedor FROM @Items ORDER BY IdProveedor));
+IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
+    THROW 51070, 'La moneda no existe o está inactiva.', 1;
+IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
+    THROW 51071, 'No se permiten materiales repetidos en una OC.', 1;
 
 BEGIN TRANSACTION;
 
@@ -648,8 +659,7 @@ BEGIN TRY
         (
             NumeroOrdenCompra,
     IdRequerimiento,
-    IdProveedor,
-    IdProyecto,
+    IdMoneda,
     FechaOrdenCompra,
             Descripcion,
     Estado,
@@ -662,8 +672,7 @@ VALUES
         (
             @NumeroOrdenCompra,
 @IdRequerimiento,
-@IdProveedorCabecera,
-@IdProyecto,
+@IdMoneda,
 @FechaOrdenCompra,
             @Descripcion,
 'Registrada',
@@ -695,19 +704,13 @@ FROM
 UPDATE
     oc
 SET
-    oc.Total = ISNULL(t.Total, 0),
-               oc.IdProveedor = CASE
-        WHEN t.CantProv = 1 THEN t.IdProveedorUnico
-        ELSE oc.IdProveedor
-    END
+    oc.Total = ISNULL(t.Total, 0)
 FROM
     compras.OrdenCompra oc
         OUTER APPLY
         (
     SELECT
-                SUM(d.Cantidad * d.PrecioUnitario) AS Total,
-                COUNT(DISTINCT d.IdProveedor) AS CantProv,
-                MIN(d.IdProveedor) AS IdProveedorUnico
+                SUM(d.Cantidad * d.PrecioUnitario) AS Total
     FROM
         compras.OrdenCompraDetalle d
     WHERE
@@ -750,49 +753,55 @@ BEGIN
     SET
 NOCOUNT ON;
 
-SELECT
-        oc.IdOrdenCompra,
-        oc.NumeroOrdenCompra,
-        oc.IdRequerimiento,
-        oc.IdProveedor,
-        p.RazonSocial AS Proveedor,
-        oc.IdProyecto,
-        pr.NombreProyecto,
-        oc.FechaOrdenCompra,
-        oc.Descripcion,
-        oc.Estado,
-        oc.Total,
-        oc.RutaPdf,
-        oc.FechaCreacion,
-        oc.IdUsuarioCreacion
-FROM
-    compras.OrdenCompra oc
-LEFT JOIN maestra.Proveedor p ON
-    p.IdProveedor = oc.IdProveedor
-LEFT JOIN maestra.Proyecto pr ON
-    pr.IdProyecto = oc.IdProyecto
-WHERE
-    oc.IdOrdenCompra = @IdOrdenCompra;
+SELECT oc.IdOrdenCompra, oc.NumeroOrdenCompra, oc.IdRequerimiento,
+       r.NumeroRequerimiento, r.IdProyecto, pr.NombreProyecto,
+       oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
+       proveedores.Proveedores, especialidades.Especialidades,
+       oc.FechaOrdenCompra, oc.Descripcion, oc.Estado, oc.Total,
+       oc.RutaPdf, oc.FechaCreacion, oc.IdUsuarioCreacion
+FROM compras.OrdenCompra oc
+JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+JOIN maestra.Proyecto pr ON pr.IdProyecto = r.IdProyecto
+JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
+
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (SELECT DISTINCT p.IdProveedor, p.RazonSocial
+          FROM compras.OrdenCompraDetalle d
+          JOIN maestra.Proveedor p ON p.IdProveedor = d.IdProveedor
+          WHERE d.IdOrdenCompra = oc.IdOrdenCompra) q
+) proveedores
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.Nombre), ', ') AS Especialidades
+    FROM (SELECT DISTINCT e.IdEspecialidad, e.Nombre
+          FROM compras.OrdenCompraDetalle d
+          JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+          JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+          WHERE d.IdOrdenCompra = oc.IdOrdenCompra) q
+) especialidades
+WHERE oc.IdOrdenCompra = @IdOrdenCompra;
 
 SELECT
         d.IdOrdenCompraDetalle,
         d.IdOrdenCompra,
         d.IdMaterial,
         m.Descripcion AS Material,
+        e.Nombre AS Especialidad,
         COALESCE(m.UnidadMedida, '-') AS UnidadMedida,
         d.Cantidad,
-        ISNULL(d.IdProveedor, oc.IdProveedor) AS IdProveedor,
+        d.IdProveedor AS IdProveedor,
         p.RazonSocial AS Proveedor,
         d.PrecioUnitario,
-        CAST(d.Cantidad * d.PrecioUnitario AS DECIMAL(18, 2)) AS Subtotal
+        d.Subtotal
 FROM
     compras.OrdenCompraDetalle d
 INNER JOIN compras.OrdenCompra oc ON
     oc.IdOrdenCompra = d.IdOrdenCompra
 INNER JOIN maestra.Material m ON
     m.IdMaterial = d.IdMaterial
+LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
 LEFT JOIN maestra.Proveedor p ON
-    p.IdProveedor = ISNULL(d.IdProveedor, oc.IdProveedor)
+    p.IdProveedor = d.IdProveedor
 WHERE
     d.IdOrdenCompra = @IdOrdenCompra
 ORDER BY
@@ -833,71 +842,42 @@ END
 END;
 GO
 
-CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_List]
-(
-    @Estado NVARCHAR(20) = NULL,
-    @IdProveedor INT = NULL,
-    @IdProyecto INT = NULL
-)
+CREATE OR ALTER PROCEDURE compras.usp_OrdenCompra_List
+    @Estado NVARCHAR(30) = NULL, @IdProveedor INT = NULL, @IdProyecto INT = NULL
 AS
 BEGIN
-    SET
-NOCOUNT ON;
+    SET NOCOUNT ON;
+SELECT oc.IdOrdenCompra, oc.NumeroOrdenCompra, oc.IdRequerimiento,
+       r.NumeroRequerimiento, r.IdProyecto, pr.NombreProyecto,
+       oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
+       proveedores.Proveedores, especialidades.Especialidades,
+       oc.FechaOrdenCompra, oc.Descripcion, oc.Estado, oc.Total,
+       oc.RutaPdf, oc.FechaCreacion, oc.IdUsuarioCreacion
+FROM compras.OrdenCompra oc
+JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+JOIN maestra.Proyecto pr ON pr.IdProyecto = r.IdProyecto
+JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
 
-SELECT
-        oc.IdOrdenCompra,
-        oc.NumeroOrdenCompra,
-        oc.IdRequerimiento,
-        r.NumeroRequerimiento,
-        oc.IdProveedor,
-        CASE
-            WHEN EXISTS (
-        SELECT
-            1
-        FROM
-            compras.OrdenCompraDetalle d
-        WHERE
-            d.IdOrdenCompra = oc.IdOrdenCompra
-        GROUP BY
-            d.IdOrdenCompra
-        HAVING
-            COUNT(DISTINCT d.IdProveedor) > 1
-            ) THEN 'Múltiples'
-        ELSE p.RazonSocial
-    END AS Proveedor,
-        oc.IdProyecto,
-        pr.NombreProyecto,
-        oc.FechaOrdenCompra,
-        oc.Estado,
-        oc.Total
-FROM
-    compras.OrdenCompra oc
-LEFT JOIN compras.Requerimiento r ON
-    r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Proveedor p ON
-    p.IdProveedor = oc.IdProveedor
-LEFT JOIN maestra.Proyecto pr ON
-    pr.IdProyecto = oc.IdProyecto
-WHERE
-    (@Estado IS NULL
-        OR oc.Estado = @Estado)
-    AND (@IdProyecto IS NULL
-        OR oc.IdProyecto = @IdProyecto)
-    AND (
-            @IdProveedor IS NULL
-        OR oc.IdProveedor = @IdProveedor
-        OR EXISTS (
-        SELECT
-            1
-        FROM
-            compras.OrdenCompraDetalle d
-        WHERE
-            d.IdOrdenCompra = oc.IdOrdenCompra
-            AND d.IdProveedor = @IdProveedor
-            )
-          )
-ORDER BY
-    oc.IdOrdenCompra DESC;
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (SELECT DISTINCT p.IdProveedor, p.RazonSocial
+          FROM compras.OrdenCompraDetalle d
+          JOIN maestra.Proveedor p ON p.IdProveedor = d.IdProveedor
+          WHERE d.IdOrdenCompra = oc.IdOrdenCompra) q
+) proveedores
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.Nombre), ', ') AS Especialidades
+    FROM (SELECT DISTINCT e.IdEspecialidad, e.Nombre
+          FROM compras.OrdenCompraDetalle d
+          JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+          JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+          WHERE d.IdOrdenCompra = oc.IdOrdenCompra) q
+) especialidades
+WHERE (@Estado IS NULL OR @Estado = '' OR oc.Estado = @Estado)
+  AND (@IdProyecto IS NULL OR r.IdProyecto = @IdProyecto)
+  AND (@IdProveedor IS NULL OR EXISTS (SELECT 1 FROM compras.OrdenCompraDetalle d
+       WHERE d.IdOrdenCompra = oc.IdOrdenCompra AND d.IdProveedor = @IdProveedor))
+ORDER BY oc.IdOrdenCompra DESC;
 END;
 GO
 
@@ -906,7 +886,6 @@ CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Actualizar]
     @IdRequerimiento INT,
     @NumeroRequerimiento NVARCHAR(50),
     @FechaRequerimiento DATE,
-    @IdEspecialidad INT,
     @IdProyecto INT,
     @Descripcion NVARCHAR(500) = NULL,
     @FechaEntrega DATE = NULL,
@@ -948,12 +927,18 @@ WHERE
 RETURN;
 END;
 
+IF NOT EXISTS (SELECT 1 FROM compras.Requerimiento WHERE IdRequerimiento = @IdRequerimiento)
+    THROW 51072, 'El requerimiento no existe.', 1;
+IF NOT EXISTS (SELECT 1 FROM @Items)
+    THROW 50045, 'Debe registrar al menos un item.', 1;
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+BEGIN TRY
 UPDATE
     compras.Requerimiento
 SET
     NumeroRequerimiento = @NumeroRequerimiento,
            FechaRequerimiento = @FechaRequerimiento,
-           IdEspecialidad = @IdEspecialidad,
            IdProyecto = @IdProyecto,
            Descripcion = @Descripcion,
            FechaEntrega = @FechaEntrega,
@@ -973,14 +958,22 @@ INSERT
     compras.RequerimientoDetalle (IdRequerimiento,
     IdMaterial,
     Cantidad,
-    Observacion)
+    Observacion,
+    IdPresupuestoDetalle)
     SELECT
     @IdRequerimiento,
     i.IdMaterial,
     i.Cantidad,
-    i.Observacion
+    i.Observacion,
+    i.IdPresupuestoDetalle
 FROM
     @Items i;
+COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
 END;
 GO
 
@@ -988,7 +981,6 @@ GO
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Crear]
     @NumeroRequerimiento NVARCHAR(30),
     @FechaRequerimiento DATE,
-    @IdEspecialidad INT,
     @IdProyecto INT,
     @Descripcion NVARCHAR(250) = NULL,
     @FechaEntrega DATE = NULL,
@@ -1019,16 +1011,6 @@ WHERE
 'Ya existe el Número de Requerimiento.',
 1;
 
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    maestra.Especialidad
-WHERE
-    IdEspecialidad = @IdEspecialidad)
-        THROW 50042,
-'Especialidad no existe.',
-1;
 
 IF NOT EXISTS (
 SELECT
@@ -1062,6 +1044,7 @@ FROM
 1;
 
 BEGIN TRAN;
+BEGIN TRY
 
 INSERT
     INTO
@@ -1069,7 +1052,6 @@ INSERT
     (
         NumeroRequerimiento,
     FechaRequerimiento,
-    IdEspecialidad,
     IdProyecto,
         Descripcion,
     FechaEntrega,
@@ -1081,7 +1063,6 @@ VALUES
     (
         @NumeroRequerimiento,
 @FechaRequerimiento,
-@IdEspecialidad,
 @IdProyecto,
         @Descripcion,
 @FechaEntrega,
@@ -1099,17 +1080,24 @@ INSERT
         IdRequerimiento,
     IdMaterial,
     Cantidad,
-    Observacion
+    Observacion,
+    IdPresupuestoDetalle
     )
     SELECT
     @IdRequerimiento,
     IdMaterial,
     Cantidad,
-    Observacion
+    Observacion,
+    IdPresupuestoDetalle
 FROM
     @Items;
 
 COMMIT;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
 
 SELECT
     @IdRequerimiento AS IdRequerimiento;
@@ -1122,35 +1110,29 @@ AS
 BEGIN
     SET
 NOCOUNT ON;
-    SELECT
-    r.IdRequerimiento,
-            r.NumeroRequerimiento,
-            r.FechaRequerimiento,
-            r.IdEspecialidad,
-            e.Nombre AS Especialidad,
-            r.IdProyecto,
-            p.NombreProyecto,
-            r.Descripcion,
-            r.FechaEntrega,
-            r.IdUsuarioSolicitante,
-            u.Nombres + ISNULL(N' ' + u.Apellidos, N'') AS Solicitante,
-            r.Estado,
-            r.Observacion,
-            r.FechaCreacion
-FROM
-    compras.Requerimiento r
-INNER JOIN maestra.Especialidad e ON
-    e.IdEspecialidad = r.IdEspecialidad
-INNER JOIN maestra.Proyecto p ON
-    p.IdProyecto = r.IdProyecto
-INNER JOIN seguridad.Usuario u ON
-    u.IdUsuario = r.IdUsuarioSolicitante
-WHERE
-    r.IdRequerimiento = @IdRequerimiento;
+SELECT r.IdRequerimiento, r.NumeroRequerimiento, r.FechaRequerimiento,
+       r.IdProyecto, p.NombreProyecto, especialidades.Especialidades,
+       r.Descripcion, r.FechaEntrega, r.IdUsuarioSolicitante,
+       u.Nombres + ISNULL(N' ' + u.Apellidos, N'') AS Solicitante,
+       r.Estado, r.Observacion, r.FechaCreacion
+FROM compras.Requerimiento r
+JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
+JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
+
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.Nombre), ', ') AS Especialidades
+    FROM (SELECT DISTINCT e.IdEspecialidad, e.Nombre
+          FROM compras.RequerimientoDetalle rd
+          JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
+          JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+          WHERE rd.IdRequerimiento = r.IdRequerimiento) q
+) especialidades
+WHERE r.IdRequerimiento = @IdRequerimiento;
     SELECT
     rd.IdRequerimientoDetalle,
             rd.IdRequerimiento,
             rd.IdMaterial,
+            rd.IdPresupuestoDetalle,
             m.Descripcion AS Material,
             m.UnidadMedida,
             rd.Cantidad,
@@ -1182,43 +1164,34 @@ ORDER BY
 END;
 GO
 
-CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_List]
-    @Estado NVARCHAR(30) = NULL,
-    @IdEspecialidad INT = NULL,
-    @IdProyecto INT = NULL
+CREATE OR ALTER PROCEDURE compras.usp_Requerimiento_List
+    @Estado NVARCHAR(30) = NULL, @IdEspecialidad INT = NULL, @IdProyecto INT = NULL
 AS
 BEGIN
-    SET
-NOCOUNT ON;
+    SET NOCOUNT ON;
+SELECT r.IdRequerimiento, r.NumeroRequerimiento, r.FechaRequerimiento,
+       r.IdProyecto, p.NombreProyecto, especialidades.Especialidades,
+       r.Descripcion, r.FechaEntrega, r.IdUsuarioSolicitante,
+       u.Nombres + ISNULL(N' ' + u.Apellidos, N'') AS Solicitante,
+       r.Estado, r.Observacion, r.FechaCreacion
+FROM compras.Requerimiento r
+JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
+JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
 
-SELECT
-    r.IdRequerimiento,
-            r.NumeroRequerimiento,
-            r.FechaRequerimiento,
-            e.Nombre AS Especialidad,
-            p.NombreProyecto,
-            r.Descripcion,
-            r.FechaEntrega,
-            u.Nombres + ISNULL(N' ' + u.Apellidos, N'') AS Solicitante,
-            r.Estado,
-            r.Observacion,
-            r.FechaCreacion
-FROM
-    compras.Requerimiento r
-INNER JOIN maestra.Especialidad e ON
-    e.IdEspecialidad = r.IdEspecialidad
-INNER JOIN maestra.Proyecto p ON
-    p.IdProyecto = r.IdProyecto
-INNER JOIN seguridad.Usuario u ON
-    u.IdUsuario = r.IdUsuarioSolicitante
-WHERE
-    (@Estado IS NULL
-        OR r.Estado = @Estado)
-    AND (@IdEspecialidad IS NULL
-        OR r.IdEspecialidad = @IdEspecialidad)
-    AND (@IdProyecto IS NULL
-        OR r.IdProyecto = @IdProyecto)
-ORDER BY
-    r.IdRequerimiento DESC;
+OUTER APPLY (
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.Nombre), ', ') AS Especialidades
+    FROM (SELECT DISTINCT e.IdEspecialidad, e.Nombre
+          FROM compras.RequerimientoDetalle rd
+          JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
+          JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+          WHERE rd.IdRequerimiento = r.IdRequerimiento) q
+) especialidades
+WHERE (@Estado IS NULL OR @Estado = '' OR r.Estado = @Estado)
+  AND (@IdProyecto IS NULL OR r.IdProyecto = @IdProyecto)
+  AND (@IdEspecialidad IS NULL OR EXISTS (
+       SELECT 1 FROM compras.RequerimientoDetalle rd
+       JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
+       WHERE rd.IdRequerimiento = r.IdRequerimiento AND m.IdEspecialidad = @IdEspecialidad))
+ORDER BY r.IdRequerimiento DESC;
 END;
 GO

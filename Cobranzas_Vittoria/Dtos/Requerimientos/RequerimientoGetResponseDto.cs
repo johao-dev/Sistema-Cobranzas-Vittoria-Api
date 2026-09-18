@@ -1,4 +1,4 @@
-﻿using Cobranzas_Vittoria.Entities;
+using Cobranzas_Vittoria.Entities;
 
 namespace Cobranzas_Vittoria.Dtos.Requerimientos
 {
@@ -6,6 +6,6 @@ namespace Cobranzas_Vittoria.Dtos.Requerimientos
     {
         public Requerimiento? Requerimiento { get; set; }
         public List<RequerimientoDetalle> Items { get; set; } = new();
-        public List<Cotizacion> Cotizaciones { get; set; } = new();
+        public List<RequerimientoValidacion> Validaciones { get; set; } = new();
     }
 }

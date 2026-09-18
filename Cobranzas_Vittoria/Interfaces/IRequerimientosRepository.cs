@@ -1,4 +1,4 @@
-﻿using Cobranzas_Vittoria.Dtos.Requerimientos;
+using Cobranzas_Vittoria.Dtos.Requerimientos;
 using Cobranzas_Vittoria.Entities;
 
 namespace Cobranzas_Vittoria.Interfaces
@@ -9,7 +9,7 @@ namespace Cobranzas_Vittoria.Interfaces
 
         Task<(Requerimiento? requerimiento,
               List<RequerimientoDetalle> items,
-              List<Cotizacion> cotizaciones)>
+              List<RequerimientoValidacion> validaciones)>
             ObtenerAsync(int idRequerimiento);
     }
 }

@@ -75,7 +75,7 @@ INNER JOIN ControlPresupuestario.EstadoPresupuesto ep
     ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
 INNER JOIN ControlPresupuestario.Presupuesto p
     ON p.IdPresupuesto = pv.IdPresupuesto
-INNER JOIN ControlPresupuestario.Moneda mon
+INNER JOIN maestra.Moneda mon
     ON mon.IdMoneda = p.IdMoneda
 INNER JOIN ControlPresupuestario.CentroCosto cc
     ON cc.IdCentroCosto = p.IdCentroCosto
@@ -420,7 +420,7 @@ SELECT
 FROM VersionesVigentes v
 INNER JOIN Partidas actual ON actual.IdPresupuestoVersion = v.IdPresupuestoVersion
 INNER JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
-INNER JOIN ControlPresupuestario.Moneda mon ON mon.IdMoneda = p.IdMoneda
+INNER JOIN maestra.Moneda mon ON mon.IdMoneda = p.IdMoneda
 INNER JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
 INNER JOIN ControlPresupuestario.EstadoPresupuesto ep
     ON ep.IdEstadoPresupuesto = v.IdEstadoPresupuesto

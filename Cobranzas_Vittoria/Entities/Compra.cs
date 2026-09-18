@@ -5,8 +5,7 @@ public class Compra
     public string NumeroCompra { get; set; } = string.Empty;
     public int IdOrdenCompra { get; set; }
     public string? NumeroOrdenCompra { get; set; }
-    public int IdProveedor { get; set; }
-    public string? Proveedor { get; set; }
+    public string? Proveedores { get; set; }
     public DateTime FechaCompra { get; set; }
     public bool Aceptada { get; set; }
     public bool IncluyeIGV { get; set; }

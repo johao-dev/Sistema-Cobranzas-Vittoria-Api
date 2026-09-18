@@ -39,10 +39,11 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
     {
         var dto = new OrdenCompraCreateDto
         {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
             NumeroOrdenCompra = string.Empty, // el server lo autogenera si viene vacío
             IdRequerimiento = idRequerimiento,
-            IdProyecto = SeedIds.ProyectoMaytaCapacII,
-            IdProveedor = idProveedor,
+
+
             FechaOrdenCompra = DateTime.Today,
             Descripcion = "OC de prueba de integración",
             IdUsuarioCreacion = SeedIds.IngenieroId,
@@ -139,7 +140,8 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
         var ordenCompra = body.GetProperty("ordenCompra");
         Assert.That(ordenCompra.GetProperty("idOrdenCompra").GetInt32(), Is.EqualTo(idOc));
         Assert.That(ordenCompra.GetProperty("idRequerimiento").GetInt32(), Is.EqualTo(idReq));
-        Assert.That(ordenCompra.GetProperty("idProveedor").GetInt32(), Is.EqualTo(IdProveedor));
+        Assert.That(ordenCompra.TryGetProperty("idProveedor", out _), Is.False);
+        Assert.That(ordenCompra.GetProperty("idMoneda").GetInt32(), Is.EqualTo(await DbHelpersMoneda.ObtenerPenAsync()));
         Assert.That(ordenCompra.GetProperty("idProyecto").GetInt32(), Is.EqualTo(SeedIds.ProyectoMaytaCapacII));
         Assert.That(ordenCompra.GetProperty("estado").GetString(), Is.EqualTo("Registrada"));
         Assert.That(ordenCompra.GetProperty("numeroOrdenCompra").GetString(), Is.Not.Empty);
@@ -181,13 +183,13 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
 
         // Assert - 1: BD - cabecera
         var cabecera = (await DbHelpers.QueryAsync<OcRow>(
-            "SELECT IdOrdenCompra AS Id, NumeroOrdenCompra AS Numero, Estado, IdRequerimiento AS Req, IdProveedor AS Prov, Total " +
+            "SELECT IdOrdenCompra AS Id, NumeroOrdenCompra AS Numero, Estado, IdRequerimiento AS Req, IdMoneda AS Moneda, Total " +
             "FROM compras.OrdenCompra WHERE IdOrdenCompra = @id",
             new { id = idOc })).Single();
         Assert.That(cabecera.Numero, Is.Not.Empty);
         Assert.That(cabecera.Estado, Is.EqualTo("Registrada"));
         Assert.That(cabecera.Req, Is.EqualTo(idReq));
-        Assert.That(cabecera.Prov, Is.EqualTo(IdProveedor));
+        Assert.That(cabecera.Moneda, Is.EqualTo(await DbHelpersMoneda.ObtenerPenAsync()));
         // Total = (5*20) + (3*100) = 100 + 300 = 400
         Assert.That(cabecera.Total, Is.EqualTo(400.00m));
 
@@ -215,10 +217,10 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
         // Act - PUT con 2 items diferentes
         var updateDto = new OrdenCompraUpdateDto
         {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
             NumeroOrdenCompra = "OC-TEST",
             IdRequerimiento = idReq,
-            IdProveedor = IdProveedor,
-            IdProyecto = SeedIds.ProyectoMaytaCapacII,
+
             FechaOrdenCompra = DateTime.Today,
             Descripcion = "OC actualizada",
             Items = new List<OrdenCompraDetalleUpdateDto>
@@ -319,10 +321,10 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
         var idOc = await CrearOrdenAsync(idReq);
         var updateDto = new OrdenCompraUpdateDto
         {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
             NumeroOrdenCompra = "OC-IDEM",
             IdRequerimiento = idReq,
-            IdProveedor = IdProveedor,
-            IdProyecto = SeedIds.ProyectoMaytaCapacII,
+
             FechaOrdenCompra = DateTime.Today,
             Descripcion = "Actualización idempotente",
             Items = new List<OrdenCompraDetalleUpdateDto>
@@ -357,7 +359,7 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
     }
 
     // --- Tipos de proyección para Dapper ---
-    private record OcRow(int Id, string Numero, string Estado, int Req, int Prov, decimal Total);
+    private record OcRow(int Id, string Numero, string Estado, int Req, int Moneda, decimal Total);
     private record HistorialRow(string Estado, int IdUsuario);
     private record DetRow(int Mat, decimal Cant);
 }

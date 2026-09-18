@@ -4,7 +4,6 @@ public class RequerimientoUpdateDto
 {
     public string NumeroRequerimiento { get; set; } = string.Empty;
     public DateTime FechaRequerimiento { get; set; }
-    public int IdEspecialidad { get; set; }
     public int IdProyecto { get; set; }
     public string? Descripcion { get; set; }
     public DateTime? FechaEntrega { get; set; }
@@ -16,6 +15,7 @@ public class RequerimientoUpdateDto
 public class RequerimientoDetalleUpdateDto
 {
     public int IdMaterial { get; set; }
+    public int? IdPresupuestoDetalle { get; set; }
     public decimal Cantidad { get; set; }
     public string? Observacion { get; set; }
 }

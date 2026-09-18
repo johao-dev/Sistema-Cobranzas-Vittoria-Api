@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Compras;
 using System.Data;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Compras;
@@ -15,48 +16,10 @@ namespace Cobranzas_Vittoria.Repositories
         {
             using var db = Open();
 
-            const string sql = @"
-SELECT
-    oc.IdOrdenCompra,
-    oc.NumeroOrdenCompra,
-    oc.IdRequerimiento,
-    r.NumeroRequerimiento,
-    oc.IdProveedor,
-    p.RazonSocial AS Proveedor,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidades,
-    COALESCE(oc.IdProyecto, r.IdProyecto) AS IdProyecto,
-    pr.NombreProyecto,
-    oc.FechaOrdenCompra,
-    oc.Descripcion,
-    oc.Estado,
-    oc.Total,
-    oc.RutaPdf,
-    oc.FechaCreacion,
-    oc.IdUsuarioCreacion
-FROM compras.OrdenCompra oc
-LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Proveedor p ON p.IdProveedor = oc.IdProveedor
-LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
-OUTER APPLY
-(
-    SELECT STRING_AGG(x.Nombre, ', ') AS Especialidades
-    FROM
-    (
-        SELECT DISTINCT e2.Nombre
-        FROM compras.OrdenCompraDetalle od
-        INNER JOIN maestra.Material m2 ON m2.IdMaterial = od.IdMaterial
-        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
-        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
-    ) x
-) espAgg
-WHERE (@Estado IS NULL OR @Estado = '' OR oc.Estado = @Estado)
-  AND (@IdProveedor IS NULL OR oc.IdProveedor = @IdProveedor)
-  AND (@IdProyecto IS NULL OR COALESCE(oc.IdProyecto, r.IdProyecto) = @IdProyecto)
-ORDER BY oc.IdOrdenCompra DESC;";
-
-            return await db.QueryAsync<OrdenCompra>(sql, new { Estado = estado, IdProveedor = idProveedor, IdProyecto = idProyecto });
+            return await db.QueryAsync<OrdenCompra>(
+                "compras.usp_OrdenCompra_List",
+                new { Estado = estado, IdProveedor = idProveedor, IdProyecto = idProyecto },
+                commandType: CommandType.StoredProcedure);
         }
 
         public async Task<(OrdenCompra? head, List<OrdenCompraDetalle> items, List<OrdenCompraHistorial> historial)> GetAsync(int idOrdenCompra)
@@ -72,61 +35,6 @@ ORDER BY oc.IdOrdenCompra DESC;";
             var items = (await multi.ReadAsync<OrdenCompraDetalle>()).AsList();
             var historial = (await multi.ReadAsync<OrdenCompraHistorial>()).AsList();
 
-            if (head != null)
-            {
-                var meta = await db.QueryFirstOrDefaultAsync<dynamic>(@"
-SELECT
-    COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidades)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidades
-FROM compras.OrdenCompra oc
-LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
-OUTER APPLY
-(
-    SELECT STRING_AGG(x.Nombre, ', ') AS Especialidades
-    FROM
-    (
-        SELECT DISTINCT e2.Nombre
-        FROM compras.OrdenCompraDetalle od
-        INNER JOIN maestra.Material m2 ON m2.IdMaterial = od.IdMaterial
-        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
-        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
-    ) x
-) espAgg
-WHERE oc.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra });
-
-                if (meta != null)
-                {
-                    head.NumeroRequerimiento = (string?)meta.NumeroRequerimiento;
-                    head.Especialidades = (string?)meta.Especialidades;
-                    head.Especialidad = (string?)meta.Especialidades;
-                }
-
-                var detalleMeta = (await db.QueryAsync<dynamic>(@"
-SELECT
-    d.IdOrdenCompraDetalle,
-    COALESCE(NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
-    COALESCE(d.IdProveedor, oc.IdProveedor) AS IdProveedor,
-    COALESCE(NULLIF(LTRIM(RTRIM(p.RazonSocial)), ''), NULLIF(LTRIM(RTRIM(pOc.RazonSocial)), ''), '-') AS Proveedor
-FROM compras.OrdenCompraDetalle d
-INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = d.IdOrdenCompra
-INNER JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
-LEFT JOIN maestra.Proveedor p ON p.IdProveedor = d.IdProveedor
-LEFT JOIN maestra.Proveedor pOc ON pOc.IdProveedor = oc.IdProveedor
-WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })).ToDictionary(x => (int)x.IdOrdenCompraDetalle);
-
-                foreach (var item in items)
-                {
-                    if (detalleMeta.TryGetValue(item.IdOrdenCompraDetalle, out var metaItem))
-                    {
-                        item.Especialidad = (string?)metaItem.Especialidad;
-                        item.IdProveedor = metaItem.IdProveedor == null ? item.IdProveedor : (int)metaItem.IdProveedor;
-                        item.Proveedor = (string?)metaItem.Proveedor;
-                    }
-                }
-            }
-
             return (head, items, historial);
         }
 
@@ -136,6 +44,9 @@ WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })
 
             var numeroOrdenCompra = await EnsureNumeroOrdenCompraAsync(db, (dto.NumeroOrdenCompra ?? string.Empty).Trim());
             var fechaOrdenCompra = dto.FechaOrdenCompra == default ? DateTime.Today : dto.FechaOrdenCompra.Date;
+
+            ComprasNumeros.ValidarMateriales(dto.Items.Select(item => item.IdMaterial));
+            ComprasNumeros.ValidarImportes(dto.Items.Select(item => (item.Cantidad, item.PrecioUnitario)));
 
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
@@ -149,8 +60,7 @@ WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })
             var p = new DynamicParameters();
             p.Add("NumeroOrdenCompra", numeroOrdenCompra);
             p.Add("IdRequerimiento", dto.IdRequerimiento);
-            p.Add("IdProveedor", dto.IdProveedor > 0 ? dto.IdProveedor : dto.Items.FirstOrDefault()?.IdProveedor);
-            p.Add("IdProyecto", dto.IdProyecto);
+            p.Add("IdMoneda", dto.IdMoneda);
             p.Add("FechaOrdenCompra", fechaOrdenCompra);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("IdUsuarioCreacion", dto.IdUsuarioCreacion);
@@ -175,6 +85,9 @@ WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })
                 : dto.NumeroOrdenCompra.Trim();
             var fechaOrdenCompra = dto.FechaOrdenCompra == default ? DateTime.Today : dto.FechaOrdenCompra.Date;
 
+            ComprasNumeros.ValidarMateriales(dto.Items.Select(item => item.IdMaterial));
+            ComprasNumeros.ValidarImportes(dto.Items.Select(item => (item.Cantidad, item.PrecioUnitario)));
+
             var tvp = new DataTable();
             tvp.Columns.Add("IdMaterial", typeof(int));
             tvp.Columns.Add("Cantidad", typeof(decimal));
@@ -188,8 +101,7 @@ WHERE d.IdOrdenCompra = @IdOrdenCompra;", new { IdOrdenCompra = idOrdenCompra })
             p.Add("IdOrdenCompra", idOrdenCompra);
             p.Add("NumeroOrdenCompra", numeroOrdenCompra);
             p.Add("IdRequerimiento", dto.IdRequerimiento);
-            p.Add("IdProveedor", dto.IdProveedor > 0 ? dto.IdProveedor : dto.Items.FirstOrDefault()?.IdProveedor);
-            p.Add("IdProyecto", dto.IdProyecto);
+            p.Add("IdMoneda", dto.IdMoneda);
             p.Add("FechaOrdenCompra", fechaOrdenCompra);
             p.Add("Descripcion", dto.Descripcion);
             p.Add("IdUsuarioCreacion", dto.IdUsuarioCreacion);

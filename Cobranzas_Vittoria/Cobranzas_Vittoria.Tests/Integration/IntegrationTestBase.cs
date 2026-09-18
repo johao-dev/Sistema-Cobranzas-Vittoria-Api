@@ -39,6 +39,7 @@ public abstract class IntegrationTestBase
                     new Table("seguridad", "PermisoRol"),
 
                     // maestra
+                    new Table("maestra", "Moneda"),
                     new Table("maestra", "Especialidad"),
                     new Table("maestra", "UnidadMedida"),
                     new Table("maestra", "CategoriaGasto"),

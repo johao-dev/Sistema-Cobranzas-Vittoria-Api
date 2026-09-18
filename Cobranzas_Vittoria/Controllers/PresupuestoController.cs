@@ -109,7 +109,7 @@ SELECT CAST(ISNULL(SUM(c.MontoTotal), 0) AS DECIMAL(18,2))
 FROM compras.Compra c
 INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
 LEFT JOIN compras.Requerimiento rq ON rq.IdRequerimiento = oc.IdRequerimiento
-WHERE COALESCE(oc.IdProyecto, rq.IdProyecto) = @IdProyecto;", new { IdProyecto = idProyecto });
+WHERE rq.IdProyecto = @IdProyecto;", new { IdProyecto = idProyecto });
 
             var totalPresupuesto = items.Sum(x => x.soles);
             var saldo = decimal.Round(totalPresupuesto - totalCompras, 2);

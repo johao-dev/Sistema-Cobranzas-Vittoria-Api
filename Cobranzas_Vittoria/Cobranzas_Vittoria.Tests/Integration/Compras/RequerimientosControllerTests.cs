@@ -195,7 +195,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
         {
             NumeroRequerimiento = Guid.NewGuid().ToString("N").Substring(0, 8),
             FechaRequerimiento = DateTime.Today,
-            IdEspecialidad = SeedIds.EspecialidadAlbanileria,
+
             IdProyecto = SeedIds.ProyectoMaytaCapacII,
             IdUsuarioSolicitante = SeedIds.IngenieroId,
             Observacion = "Requerimiento actualizado",
@@ -588,7 +588,7 @@ public class RequerimientosControllerTests : IntegrationTestBase
         {
             NumeroRequerimiento = "REQ-IDEM-" + Guid.NewGuid().ToString("N").Substring(0, 8),
             FechaRequerimiento = DateTime.Today,
-            IdEspecialidad = SeedIds.EspecialidadAlbanileria,
+
             IdProyecto = SeedIds.ProyectoMaytaCapacII,
             IdUsuarioSolicitante = SeedIds.IngenieroId,
             Observacion = "Actualización idempotente",

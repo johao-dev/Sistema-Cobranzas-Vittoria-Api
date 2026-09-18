@@ -35,7 +35,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 /// System.Text.Json NO aplica camelCase a las claves. Los asserts usan los nombres
 /// del SQL (PascalCase) via JsonHelpers (case-insensitive).
 ///   - ListAsync NO proyecta c.Aceptada en el SELECT (sí la usa en el WHERE del filtro).
-///   - GetAsync NO proyecta c.IdProveedor (proyecta 'Proveedor' = RazonSocial del JOIN).
+///   - GetAsync proyecta proveedores derivados de las líneas de la OC.
 /// </summary>
 public class ComprasControllerTests : IntegrationTestBase
 {
@@ -52,10 +52,10 @@ public class ComprasControllerTests : IntegrationTestBase
     {
         var dto = new OrdenCompraCreateDto
         {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
             NumeroOrdenCompra = string.Empty,  // el server lo autogenera
             IdRequerimiento = idRequerimiento,
-            IdProveedor = IdProveedor,
-            IdProyecto = SeedIds.ProyectoMaytaCapacII,
+
             FechaOrdenCompra = DateTime.Today,
             Descripcion = "OC de prueba para Compra",
             IdUsuarioCreacion = SeedIds.IngenieroId,
@@ -77,7 +77,7 @@ public class ComprasControllerTests : IntegrationTestBase
         {
             NumeroCompra = string.Empty,  // el server lo autogenera
             IdOrdenCompra = idOc,
-            IdProveedor = IdProveedor,
+
             FechaCompra = DateTime.Today,
             IncluyeIGV = incluyeIgv,
             Observacion = "Compra de prueba de integración",
@@ -209,8 +209,8 @@ public class ComprasControllerTests : IntegrationTestBase
         var compra = JsonHelpers.GetProp(body, "compra");
         Assert.That(JsonHelpers.GetInt32(compra, "IdCompra"), Is.EqualTo(idCompra));
         Assert.That(JsonHelpers.GetInt32(compra, "IdOrdenCompra"), Is.EqualTo(idOc));
-        // El repo no proyecta c.IdProveedor; proyecta 'Proveedor' (RazonSocial del JOIN).
-        Assert.That(JsonHelpers.GetString(compra, "Proveedor"), Is.EqualTo("ACG EDIFICACIONES EIRL"));
+        // El repo proyecta Proveedores desde los detalles de la OC.
+        Assert.That(JsonHelpers.GetString(compra, "Proveedores"), Is.EqualTo("ACG EDIFICACIONES EIRL"));
         Assert.That(JsonHelpers.GetString(compra, "NumeroCompra"), Is.Not.Empty);
         // MontoTotal = 10 * 15.50 = 155.00 (sin IGV)
         Assert.That(JsonHelpers.GetDecimal(compra, "MontoTotal"), Is.EqualTo(155.00m));
@@ -256,12 +256,11 @@ public class ComprasControllerTests : IntegrationTestBase
         // Assert - 1: BD - cabecera
         var cabecera = (await DbHelpers.QueryAsync<CompraRow>(
             "SELECT IdCompra AS Id, NumeroCompra AS Numero, Aceptada AS Aceptada, " +
-            "  SubtotalSinIGV AS Subtotal, MontoIGV AS Igv, MontoTotal AS Total, IdProveedor AS Prov " +
+            "  SubtotalSinIGV AS Subtotal, MontoIGV AS Igv, MontoTotal AS Total " +
             "FROM compras.Compra WHERE IdCompra = @id",
             new { id = idCompra })).Single();
         Assert.That(cabecera.Numero, Is.Not.Empty);
         Assert.That(cabecera.Aceptada, Is.False);
-        Assert.That(cabecera.Prov, Is.EqualTo(IdProveedor));
 
         // Total = (5*20) + (3*100) = 100 + 300 = 400
         // SubtotalSinIGV = 400 / 1.18 = 338.98 (redondeado)
@@ -352,6 +351,6 @@ public class ComprasControllerTests : IntegrationTestBase
 
     // --- Tipos de proyección para Dapper ---
     private record CompraRow(int Id, string Numero, bool Aceptada,
-        decimal Subtotal, decimal Igv, decimal Total, int Prov);
+        decimal Subtotal, decimal Igv, decimal Total);
     private record DocRow(string Nombre, string? Ext, string Tipo);
 }

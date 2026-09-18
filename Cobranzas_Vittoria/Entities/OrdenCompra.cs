@@ -4,10 +4,11 @@ public class OrdenCompra
     public int IdOrdenCompra { get; set; }
     public string NumeroOrdenCompra { get; set; } = string.Empty;
     public int IdRequerimiento { get; set; }
+    public int IdMoneda { get; set; }
+    public string? CodigoMoneda { get; set; }
+    public string? SimboloMoneda { get; set; }
     public string? NumeroRequerimiento { get; set; }
-    public int IdProveedor { get; set; }
-    public string? Proveedor { get; set; }
-    public string? Especialidad { get; set; }
+    public string? Proveedores { get; set; }
     public string? Especialidades { get; set; }
     public int IdProyecto { get; set; }
     public string? NombreProyecto { get; set; }

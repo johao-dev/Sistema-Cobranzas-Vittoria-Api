@@ -15,7 +15,7 @@ namespace Cobranzas_Vittoria.Services
 
         public async Task<OrdenCompraGenerarResponseDto> GenerarAsync(OrdenCompraGenerarDto dto)
         {
-            var res = await _repo.GenerarAsync(dto.IdRequerimiento, dto.IdProveedor);
+            var res = await _repo.GenerarAsync(dto);
 
             return new OrdenCompraGenerarResponseDto
             {

@@ -4,7 +4,6 @@ public class CompraCreateDto
 {
     public string NumeroCompra { get; set; } = string.Empty;
     public int IdOrdenCompra { get; set; }
-    public int IdProveedor { get; set; }
     public DateTime FechaCompra { get; set; }
     public bool IncluyeIGV { get; set; }
     public decimal SubtotalSinIGV { get; set; }

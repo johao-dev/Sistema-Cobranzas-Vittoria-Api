@@ -381,6 +381,7 @@ static void RunMigrations(string? connectionString)
             Assembly.GetExecutingAssembly(),
             filter => filter.Contains(".Migrations.Versioned."))
         .LogToConsole()
+        .LogScriptOutput() // Conservar la evidencia emitida por la auditoría previa de Compras.
         .Build();
 
     if (versionedUpgradeEngine.IsUpgradeRequired())

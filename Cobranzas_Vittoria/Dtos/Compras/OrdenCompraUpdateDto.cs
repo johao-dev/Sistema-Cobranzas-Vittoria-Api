@@ -4,8 +4,8 @@ public class OrdenCompraUpdateDto
 {
     public string NumeroOrdenCompra { get; set; } = string.Empty;
     public int IdRequerimiento { get; set; }
-    public int IdProveedor { get; set; }
-    public int IdProyecto { get; set; }
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
+    public int IdMoneda { get; set; }
     public DateTime FechaOrdenCompra { get; set; }
     public string? Descripcion { get; set; }
     public int? IdUsuarioCreacion { get; set; }

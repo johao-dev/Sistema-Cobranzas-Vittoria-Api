@@ -85,7 +85,7 @@ INNER JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
 INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
 INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
 LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-WHERE COALESCE(oc.IdProyecto, r.IdProyecto) = @IdProyecto
+WHERE r.IdProyecto = @IdProyecto
 GROUP BY m.IdEspecialidad, e.Nombre
 ORDER BY e.Nombre;", new { IdProyecto = idProyecto })).ToList();
 

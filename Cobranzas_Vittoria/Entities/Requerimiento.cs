@@ -4,8 +4,6 @@ public class Requerimiento
     public int IdRequerimiento { get; set; }
     public string NumeroRequerimiento { get; set; } = string.Empty;
     public DateTime FechaRequerimiento { get; set; }
-    public int IdEspecialidad { get; set; }
-    public string? Especialidad { get; set; }
     public string? Especialidades { get; set; }
     public int IdProyecto { get; set; }
     public string? NombreProyecto { get; set; }

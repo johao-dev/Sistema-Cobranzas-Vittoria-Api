@@ -14,7 +14,6 @@ namespace Cobranzas_Vittoria.Tests.Integration.Common;
 /// Defaults:
 ///   - NumeroRequerimiento = Guid(8 chars) → único por test
 ///   - FechaRequerimiento = DateTime.Today
-///   - IdEspecialidad = SeedIds.EspecialidadAlbanileria
 ///   - IdProyecto = SeedIds.ProyectoMaytaCapacII
 ///   - IdUsuarioSolicitante = SeedIds.IngenieroId
 ///   - Items = 1 item con material 2 (MORTERO LISTO) y cantidad 10
@@ -34,12 +33,6 @@ public class RequerimientoBuilder
     public RequerimientoBuilder ConFechaRequerimiento(DateTime fecha)
     {
         _dto.FechaRequerimiento = fecha;
-        return this;
-    }
-
-    public RequerimientoBuilder ConIdEspecialidad(int id)
-    {
-        _dto.IdEspecialidad = id;
         return this;
     }
 
@@ -72,12 +65,13 @@ public class RequerimientoBuilder
         _dto.FechaEntrega = fecha;
         return this;
     }
-
-    public RequerimientoBuilder ConItem(int idMaterial, decimal cantidad, string? observacion = null)
+    
+    public RequerimientoBuilder ConItem(int idMaterial, decimal cantidad, string? observacion = null, int? idPresupuestoDetalle = null)
     {
         _dto.Items.Add(new RequerimientoDetalleCreateDto
         {
             IdMaterial = idMaterial,
+            IdPresupuestoDetalle = idPresupuestoDetalle,
             Cantidad = cantidad,
             Observacion = observacion
         });
@@ -94,8 +88,6 @@ public class RequerimientoBuilder
             _dto.NumeroRequerimiento = Guid.NewGuid().ToString("N").Substring(0, 8);
         if (_dto.FechaRequerimiento == default)
             _dto.FechaRequerimiento = DateTime.Today;
-        if (_dto.IdEspecialidad == 0)
-            _dto.IdEspecialidad = SeedIds.EspecialidadAlbanileria;
         if (_dto.IdProyecto == 0)
             _dto.IdProyecto = SeedIds.ProyectoMaytaCapacII;
         if (_dto.IdUsuarioSolicitante == 0)

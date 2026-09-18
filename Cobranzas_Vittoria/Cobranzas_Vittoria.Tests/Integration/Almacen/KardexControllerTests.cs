@@ -58,10 +58,10 @@ public class KardexControllerTests : IntegrationTestBase
     {
         var dto = new OrdenCompraCreateDto
         {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
             NumeroOrdenCompra = string.Empty,
             IdRequerimiento = idRequerimiento,
-            IdProveedor = IdProveedor,
-            IdProyecto = SeedIds.ProyectoMaytaCapacII,
+
             FechaOrdenCompra = DateTime.Today,
             Descripcion = "OC para test de Kardex",
             IdUsuarioCreacion = SeedIds.IngenieroId,
@@ -83,7 +83,7 @@ public class KardexControllerTests : IntegrationTestBase
         {
             NumeroCompra = string.Empty,
             IdOrdenCompra = idOc,
-            IdProveedor = IdProveedor,
+
             FechaCompra = DateTime.Today,
             IncluyeIGV = false,
             Observacion = "Compra para test de Kardex",

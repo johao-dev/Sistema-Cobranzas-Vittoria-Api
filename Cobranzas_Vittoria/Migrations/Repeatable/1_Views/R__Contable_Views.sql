@@ -49,7 +49,7 @@ WHERE
 Facturado AS
 (
 SELECT
-        COALESCE(oc.IdProyecto, r.IdProyecto) AS IdProyecto,
+        r.IdProyecto AS IdProyecto,
         p.NombreProyecto AS Proyecto,
         m.IdEspecialidad,
         e.Nombre AS Especialidad,
@@ -79,11 +79,11 @@ LEFT JOIN compras.Requerimiento r
     r.IdRequerimiento = oc.IdRequerimiento
 INNER JOIN maestra.Proyecto p
         ON
-    p.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
+    p.IdProyecto = r.IdProyecto
 WHERE
-    COALESCE(oc.IdProyecto, r.IdProyecto) IS NOT NULL
+    r.IdProyecto IS NOT NULL
 GROUP BY
-    COALESCE(oc.IdProyecto, r.IdProyecto),
+    r.IdProyecto,
     p.NombreProyecto,
     m.IdEspecialidad,
     e.Nombre
@@ -210,15 +210,16 @@ GROUP BY
 ComprasProyecto AS
 (
 SELECT
-        oc.IdProyecto,
+        r.IdProyecto,
         CAST(ISNULL(SUM(ISNULL(c.MontoTotal, 0)), 0) AS DECIMAL(18, 2)) AS TotalCompras
 FROM
     [compras].[OrdenCompra] oc
+INNER JOIN [compras].[Requerimiento] r ON r.IdRequerimiento = oc.IdRequerimiento
 LEFT JOIN [compras].[Compra] c
         ON
     c.IdOrdenCompra = oc.IdOrdenCompra
 GROUP BY
-        oc.IdProyecto
+        r.IdProyecto
 )
 SELECT
     pr.IdPresupuestoProyecto,

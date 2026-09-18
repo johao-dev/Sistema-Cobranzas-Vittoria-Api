@@ -73,7 +73,7 @@ BEGIN
         DECLARE @MonedaActiva BIT;
         DECLARE @CodigoMoneda VARCHAR(3);
         SELECT @MonedaActiva = Activo, @CodigoMoneda = Codigo
-        FROM ControlPresupuestario.Moneda WITH (HOLDLOCK)
+        FROM maestra.Moneda WITH (HOLDLOCK)
         WHERE IdMoneda = @IdMoneda;
 
         IF @MonedaActiva IS NULL
@@ -187,7 +187,7 @@ BEGIN
 
         DECLARE @MonedaActiva BIT;
         SELECT @MonedaActiva = Activo
-        FROM ControlPresupuestario.Moneda WITH (HOLDLOCK)
+        FROM maestra.Moneda WITH (HOLDLOCK)
         WHERE IdMoneda = @IdMoneda;
 
         IF @MonedaActiva IS NULL
@@ -471,7 +471,7 @@ BEGIN
 
         DECLARE @CodigoMoneda VARCHAR(3);
         SELECT @CodigoMoneda = Codigo
-        FROM ControlPresupuestario.Moneda WITH (HOLDLOCK)
+        FROM maestra.Moneda WITH (HOLDLOCK)
         WHERE IdMoneda = @IdMoneda;
 
         IF @CodigoMoneda IS NULL
@@ -649,7 +649,7 @@ BEGIN
 
         DECLARE @MonedaActiva BIT;
         SELECT @MonedaActiva = Activo
-        FROM ControlPresupuestario.Moneda WITH (HOLDLOCK)
+        FROM maestra.Moneda WITH (HOLDLOCK)
         WHERE IdMoneda = @IdMoneda;
 
         IF @MonedaActiva IS NULL

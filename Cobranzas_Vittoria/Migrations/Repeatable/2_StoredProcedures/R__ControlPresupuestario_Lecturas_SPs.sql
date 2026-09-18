@@ -27,7 +27,7 @@ BEGIN
             ELSE 'SIN_VERSION_VIGENTE' END) AS EstadoElaboracion
     FROM ControlPresupuestario.Presupuesto p
     JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     OUTER APPLY
     (
         SELECT COUNT(CASE WHEN e.Codigo = 'APROBADO' THEN 1 END) AS CantidadAprobadas,
@@ -68,7 +68,7 @@ BEGIN
             ELSE 'SIN_VERSION_VIGENTE' END) AS EstadoElaboracion
     FROM ControlPresupuestario.Presupuesto p
     JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     OUTER APPLY
     (
         SELECT COUNT(CASE WHEN e.Codigo = 'APROBADO' THEN 1 END) AS CantidadAprobadas,
@@ -99,7 +99,7 @@ BEGIN
     FROM ControlPresupuestario.PresupuestoVersion v
     JOIN ControlPresupuestario.EstadoPresupuesto e ON e.IdEstadoPresupuesto = v.IdEstadoPresupuesto
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     WHERE v.IdPresupuesto = @IdPresupuesto ORDER BY v.NumeroVersion DESC;
 END;
 GO
@@ -120,7 +120,7 @@ BEGIN
     FROM ControlPresupuestario.PresupuestoVersion v
     JOIN ControlPresupuestario.EstadoPresupuesto e ON e.IdEstadoPresupuesto = v.IdEstadoPresupuesto
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     WHERE v.IdPresupuestoVersion = @IdPresupuestoVersion;
 END;
 GO
@@ -258,7 +258,7 @@ BEGIN
     JOIN ControlPresupuestario.PresupuestoVersion v ON v.IdPresupuestoVersion = d.IdPresupuestoVersion
     JOIN ControlPresupuestario.EstadoPresupuesto e ON e.IdEstadoPresupuesto = v.IdEstadoPresupuesto
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     WHERE mp.IdPresupuestoDetalle = @IdPresupuestoDetalle
     ORDER BY mp.Fecha, mp.IdMovimientoPresupuestal;
 END;
@@ -285,7 +285,7 @@ BEGIN
     JOIN ControlPresupuestario.PresupuestoVersion v ON v.IdPresupuestoVersion = d.IdPresupuestoVersion
     JOIN ControlPresupuestario.EstadoPresupuesto e ON e.IdEstadoPresupuesto = v.IdEstadoPresupuesto
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
-    JOIN ControlPresupuestario.Moneda m ON m.IdMoneda = p.IdMoneda
+    JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
     WHERE mp.IdMovimientoPresupuestal = @IdMovimientoPresupuestal;
 END;
 GO
@@ -349,7 +349,7 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT IdMoneda, Codigo, Nombre, Simbolo, Activo
-    FROM ControlPresupuestario.Moneda
+    FROM maestra.Moneda
     WHERE @Activo IS NULL OR Activo = @Activo
     ORDER BY Codigo, IdMoneda;
 END;

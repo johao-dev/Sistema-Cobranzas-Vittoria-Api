@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Application.Compras;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Compras;
 using Cobranzas_Vittoria.Interfaces;
@@ -28,18 +29,30 @@ SELECT
     c.MontoTotal,
     c.Observacion,
     c.IdOrdenCompra,
-    c.IdProveedor,
     oc.NumeroOrdenCompra,
-    p.RazonSocial AS Proveedor,
+    oc.IdMoneda,
+    mon.Codigo AS CodigoMoneda,
+    mon.Simbolo AS SimboloMoneda,
+    provAgg.Proveedores,
     COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
     COALESCE(NULLIF(LTRIM(RTRIM(pr.NombreProyecto)), ''), '-') AS NombreProyecto,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidad)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad
+    COALESCE(espAgg.Especialidad, '-') AS Especialidades
 FROM compras.Compra c
 INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
+INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
 LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Proveedor p ON p.IdProveedor = c.IdProveedor
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
-LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = r.IdProyecto
+OUTER APPLY
+(
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (
+        SELECT DISTINCT p2.IdProveedor, p2.RazonSocial
+        FROM compras.OrdenCompraDetalle od
+        INNER JOIN maestra.Proveedor p2 ON p2.IdProveedor = od.IdProveedor
+        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
+          AND EXISTS (SELECT 1 FROM compras.CompraDetalle cd WHERE cd.IdCompra = c.IdCompra AND cd.IdMaterial = od.IdMaterial)
+    ) q
+) provAgg
 OUTER APPLY
 (
     SELECT STRING_AGG(x.Nombre, ', ') AS Especialidad
@@ -53,7 +66,10 @@ OUTER APPLY
     ) x
 ) espAgg
 WHERE (@Aceptada IS NULL OR c.Aceptada = @Aceptada)
-  AND (@IdProveedor IS NULL OR c.IdProveedor = @IdProveedor)
+  AND (@IdProveedor IS NULL OR EXISTS (
+      SELECT 1 FROM compras.CompraDetalle cd
+      INNER JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = c.IdOrdenCompra AND od.IdMaterial = cd.IdMaterial
+      WHERE cd.IdCompra = c.IdCompra AND od.IdProveedor = @IdProveedor))
 ORDER BY c.IdCompra DESC;";
 
             return await db.QueryAsync(sql, new { Aceptada = aceptada, IdProveedor = idProveedor });
@@ -62,6 +78,8 @@ ORDER BY c.IdCompra DESC;";
         public async Task<(int IdCompra, decimal MontoTotal)> CrearAsync(CompraCreateDto dto)
         {
             using var db = Open();
+            ComprasNumeros.ValidarMateriales(dto.Items.Select(item => item.IdMaterial));
+            ComprasNumeros.ValidarImportes(dto.Items.Select(item => (item.Cantidad, item.PrecioUnitario)));
             using var tx = db.BeginTransaction();
 
             var numeroCompra = await EnsureNumeroCompraAsync(db, tx, (dto.NumeroCompra ?? string.Empty).Trim());
@@ -92,7 +110,6 @@ INSERT INTO compras.Compra
 (
     NumeroCompra,
     IdOrdenCompra,
-    IdProveedor,
     FechaCompra,
     Aceptada,
     IncluyeIGV,
@@ -106,7 +123,6 @@ VALUES
 (
     @NumeroCompra,
     @IdOrdenCompra,
-    @IdProveedor,
     @FechaCompra,
     0,
     @IncluyeIGV,
@@ -122,7 +138,6 @@ SELECT CAST(SCOPE_IDENTITY() AS INT);";
             {
                 NumeroCompra = numeroCompra,
                 dto.IdOrdenCompra,
-                dto.IdProveedor,
                 FechaCompra = fechaCompra,
                 IncluyeIGV = dto.IncluyeIGV,
                 SubtotalSinIGV = subtotalSinIgv,
@@ -161,20 +176,31 @@ VALUES (@IdCompra, @IdMaterial, @Cantidad, @PrecioUnitario);";
 SELECT
     oc.IdOrdenCompra,
     oc.NumeroOrdenCompra,
+    oc.IdMoneda,
+    mon.Codigo AS CodigoMoneda,
+    mon.Simbolo AS SimboloMoneda,
     oc.FechaOrdenCompra,
     oc.Estado,
     oc.Total,
-    oc.IdProveedor,
-    p.RazonSocial AS Proveedor,
+    provAgg.Proveedores,
     r.IdRequerimiento,
     COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidad)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
+    COALESCE(espAgg.Especialidad, '-') AS Especialidades,
     COALESCE(NULLIF(LTRIM(RTRIM(pr.NombreProyecto)), ''), '-') AS NombreProyecto
 FROM compras.OrdenCompra oc
+INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
 LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Proveedor p ON p.IdProveedor = oc.IdProveedor
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
-LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = r.IdProyecto
+OUTER APPLY
+(
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (
+        SELECT DISTINCT p2.IdProveedor, p2.RazonSocial
+        FROM compras.OrdenCompraDetalle od
+        INNER JOIN maestra.Proveedor p2 ON p2.IdProveedor = od.IdProveedor
+        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
+    ) q
+) provAgg
 OUTER APPLY
 (
     SELECT STRING_AGG(x.Nombre, ', ') AS Especialidad
@@ -211,16 +237,29 @@ SELECT
     c.Observacion,
     c.IdOrdenCompra,
     oc.NumeroOrdenCompra,
+    oc.IdMoneda,
+    mon.Codigo AS CodigoMoneda,
+    mon.Simbolo AS SimboloMoneda,
     COALESCE(NULLIF(LTRIM(RTRIM(r.NumeroRequerimiento)), ''), '-') AS NumeroRequerimiento,
-    p.RazonSocial AS Proveedor,
-    COALESCE(NULLIF(LTRIM(RTRIM(espAgg.Especialidad)), ''), NULLIF(LTRIM(RTRIM(e.Nombre)), ''), '-') AS Especialidad,
+    provAgg.Proveedores,
+    COALESCE(espAgg.Especialidad, '-') AS Especialidades,
     COALESCE(NULLIF(LTRIM(RTRIM(pr.NombreProyecto)), ''), '-') AS NombreProyecto
 FROM compras.Compra c
 INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
+INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
 LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
-LEFT JOIN maestra.Proveedor p ON p.IdProveedor = c.IdProveedor
-LEFT JOIN maestra.Especialidad e ON e.IdEspecialidad = r.IdEspecialidad
-LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = COALESCE(oc.IdProyecto, r.IdProyecto)
+LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = r.IdProyecto
+OUTER APPLY
+(
+    SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), q.RazonSocial), ', ') AS Proveedores
+    FROM (
+        SELECT DISTINCT p2.IdProveedor, p2.RazonSocial
+        FROM compras.OrdenCompraDetalle od
+        INNER JOIN maestra.Proveedor p2 ON p2.IdProveedor = od.IdProveedor
+        WHERE od.IdOrdenCompra = oc.IdOrdenCompra
+          AND EXISTS (SELECT 1 FROM compras.CompraDetalle cd WHERE cd.IdCompra = c.IdCompra AND cd.IdMaterial = od.IdMaterial)
+    ) q
+) provAgg
 OUTER APPLY
 (
     SELECT STRING_AGG(x.Nombre, ', ') AS Especialidad
@@ -248,17 +287,18 @@ SELECT
     d.Cantidad,
     d.PrecioUnitario,
     d.Subtotal,
-    ISNULL(od.IdProveedor, oc.IdProveedor) AS IdProveedor,
+    od.IdProveedor AS IdProveedor,
     p.RazonSocial AS Proveedor
 FROM compras.CompraDetalle d
 INNER JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
 INNER JOIN compras.Compra c ON c.IdCompra = d.IdCompra
 INNER JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = c.IdOrdenCompra
+INNER JOIN maestra.Moneda mon ON mon.IdMoneda = oc.IdMoneda
 LEFT JOIN compras.OrdenCompraDetalle od
     ON od.IdOrdenCompra = oc.IdOrdenCompra
    AND od.IdMaterial = d.IdMaterial
 LEFT JOIN maestra.Proveedor p
-    ON p.IdProveedor = ISNULL(od.IdProveedor, oc.IdProveedor)
+    ON p.IdProveedor = od.IdProveedor
 WHERE d.IdCompra = @IdCompra
 ORDER BY d.IdCompraDetalle;", new { IdCompra = idCompra });
 
