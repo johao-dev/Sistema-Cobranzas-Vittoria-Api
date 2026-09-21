@@ -47,8 +47,18 @@ public class PresupuestoControllerTests : IntegrationTestBase
         var idReq = await RequerimientoBuilder.Nuevo()
             .ConItem(IdMaterialAlbanileria, cantidad)
             .CrearEnviadoOcAsync(_client);
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(
+            idReq, idPresupuestoDetalle);
 
         var idOc = await CrearOrdenAsync(idReq, precioUnitario, cantidad);
+        var aprobar = await _client.PatchAsync($"/api/compras/ordenes-compra/{idOc}/estado",
+            JsonContent.Create(new OrdenCompraEstadoDto
+            {
+                EstadoNuevo = "APROBADA", IdUsuario = SeedIds.IngenieroId
+            }));
+        Assert.That(aprobar.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Setup falló al aprobar OC. Body: {await aprobar.Content.ReadAsStringAsync()}");
         var idCompra = await CrearCompraAsync(idOc, precioUnitario, cantidad);
         return idCompra;
     }

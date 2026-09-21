@@ -25,7 +25,8 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - IdRutaInconsistenteException    -> 400 BadRequest (codigo "ID_RUTA_INCONSISTENTE"; PUT con idRuta != idCuerpo)
     ///   - KardexNoEncontradoException     -> 404 NotFound   (codigo "KARDEX_NO_ENCONTRADO"; id de kardex inexistente)
     ///   - KeyNotFoundException            -> 404 NotFound   (codigo "RECURSO_NO_ENCONTRADO"; entidad solicitada no existe)
-    ///   - SqlException                    -> 500 SQL_ERROR        (deuda tecnica documentada)
+    ///   - SqlException 51400-51499        -> 409 conflicto de Compras
+    ///   - Otras SqlException              -> 500 SQL_ERROR
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
     ///
     /// Formato de respuesta:
@@ -228,6 +229,24 @@ namespace Cobranzas_Vittoria.Middleware
                     StatusCodes.Status404NotFound,
                     "RECURSO_NO_ENCONTRADO",
                     ex.Message);
+            }
+            catch (SqlException ex) when (ex.Number is >= 51400 and <= 51499)
+            {
+                var separador = ex.Message.IndexOf(':');
+                var codigo = separador > 0
+                    ? ex.Message[..separador].Trim()
+                    : "CONFLICTO_NEGOCIO_COMPRAS";
+                var mensaje = separador > 0
+                    ? ex.Message[(separador + 1)..].Trim()
+                    : ex.Message;
+                _logger.LogWarning(
+                    "Rechazo 409 de Compras en {Method} {Path}: SQL {Numero} {Codigo}",
+                    context.Request.Method, context.Request.Path, ex.Number, codigo);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status409Conflict,
+                    codigo,
+                    mensaje);
             }
             catch (SqlException ex)
             {

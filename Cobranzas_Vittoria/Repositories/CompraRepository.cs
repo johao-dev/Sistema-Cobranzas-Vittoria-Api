@@ -22,7 +22,8 @@ SELECT
     c.IdCompra,
     c.NumeroCompra,
     c.FechaCompra,
-    CAST('Comprado' AS NVARCHAR(20)) AS Estado,
+    c.Estado,
+    c.Aceptada,
     c.IncluyeIGV,
     c.SubtotalSinIGV,
     c.MontoIGV,
@@ -80,92 +81,44 @@ ORDER BY c.IdCompra DESC;";
             using var db = Open();
             ComprasNumeros.ValidarMateriales(dto.Items.Select(item => item.IdMaterial));
             ComprasNumeros.ValidarImportes(dto.Items.Select(item => (item.Cantidad, item.PrecioUnitario)));
-            using var tx = db.BeginTransaction();
-
-            var numeroCompra = await EnsureNumeroCompraAsync(db, tx, (dto.NumeroCompra ?? string.Empty).Trim());
+            var numeroCompra = await EnsureNumeroCompraAsync(db, null, (dto.NumeroCompra ?? string.Empty).Trim());
             var fechaCompra = dto.FechaCompra == default ? DateTime.Today : dto.FechaCompra.Date;
 
-            var montoBaseConIgv = (dto.Items ?? new List<CompraDetalleCreateDto>())
-                .Sum(x => x.Cantidad * x.PrecioUnitario);
+            var items = new DataTable();
+            items.Columns.Add("IdMaterial", typeof(int));
+            items.Columns.Add("Cantidad", typeof(decimal));
+            items.Columns.Add("PrecioUnitario", typeof(decimal));
+            foreach (var item in dto.Items)
+                items.Rows.Add(item.IdMaterial, item.Cantidad, item.PrecioUnitario);
 
-            decimal subtotalSinIgv;
-            decimal montoIgv;
-            decimal montoTotal;
+            var documentos = new DataTable();
+            documentos.Columns.Add("TipoDocumento", typeof(string));
+            documentos.Columns.Add("NumeroDocumento", typeof(string));
+            documentos.Columns.Add("RutaArchivo", typeof(string));
+            documentos.Columns.Add("FechaDocumento", typeof(DateTime));
+            documentos.Columns.Add("Monto", typeof(decimal));
+            documentos.Columns.Add("Observacion", typeof(string));
 
-            if (dto.IncluyeIGV)
-            {
-                montoTotal = Math.Round(montoBaseConIgv, 2);
-                subtotalSinIgv = Math.Round(montoTotal / 1.18m, 2);
-                montoIgv = Math.Round(montoTotal - subtotalSinIgv, 2);
-            }
-            else
-            {
-                subtotalSinIgv = Math.Round(montoBaseConIgv, 2);
-                montoIgv = 0;
-                montoTotal = subtotalSinIgv;
-            }
+            var parametros = new DynamicParameters();
+            parametros.Add("NumeroCompra", numeroCompra);
+            parametros.Add("IdOrdenCompra", dto.IdOrdenCompra);
+            parametros.Add("FechaCompra", fechaCompra);
+            parametros.Add("IncluyeIGV", dto.IncluyeIGV);
+            parametros.Add("Observacion", dto.Observacion);
+            parametros.Add("Items", items.AsTableValuedParameter("compras.TVP_CompraDetalle"));
+            parametros.Add("Documentos", documentos.AsTableValuedParameter("compras.TVP_CompraDocumento"));
 
-            const string sqlCompra = @"
-INSERT INTO compras.Compra
-(
-    NumeroCompra,
-    IdOrdenCompra,
-    FechaCompra,
-    Aceptada,
-    IncluyeIGV,
-    SubtotalSinIGV,
-    MontoIGV,
-    MontoTotal,
-    Observacion,
-    FechaCreacion
-)
-VALUES
-(
-    @NumeroCompra,
-    @IdOrdenCompra,
-    @FechaCompra,
-    0,
-    @IncluyeIGV,
-    @SubtotalSinIGV,
-    @MontoIGV,
-    @MontoTotal,
-    @Observacion,
-    GETDATE()
-);
-SELECT CAST(SCOPE_IDENTITY() AS INT);";
+            var resultado = await db.QuerySingleAsync<dynamic>(
+                "compras.usp_Compra_Registrar", parametros, commandType: CommandType.StoredProcedure);
+            return ((int)resultado.IdCompra, (decimal)resultado.MontoTotal);
+        }
 
-            var idCompra = await db.ExecuteScalarAsync<int>(sqlCompra, new
-            {
-                NumeroCompra = numeroCompra,
-                dto.IdOrdenCompra,
-                FechaCompra = fechaCompra,
-                IncluyeIGV = dto.IncluyeIGV,
-                SubtotalSinIGV = subtotalSinIgv,
-                MontoIGV = montoIgv,
-                MontoTotal = montoTotal,
-                dto.Observacion
-            }, tx);
-
-            if (dto.Items != null && dto.Items.Count > 0)
-            {
-                const string sqlDetalle = @"
-INSERT INTO compras.CompraDetalle (IdCompra, IdMaterial, Cantidad, PrecioUnitario)
-VALUES (@IdCompra, @IdMaterial, @Cantidad, @PrecioUnitario);";
-
-                foreach (var item in dto.Items)
-                {
-                    await db.ExecuteAsync(sqlDetalle, new
-                    {
-                        IdCompra = idCompra,
-                        item.IdMaterial,
-                        item.Cantidad,
-                        item.PrecioUnitario
-                    }, tx);
-                }
-            }
-
-            tx.Commit();
-            return (idCompra, montoTotal);
+        public async Task AceptarAsync(int idCompra, int? idUsuario, string? observacion)
+        {
+            using var db = Open();
+            await db.ExecuteAsync("compras.usp_Compra_Aceptar",
+                new { IdCompra = idCompra, IdUsuario = idUsuario, Observacion = observacion },
+                commandType: CommandType.StoredProcedure);
         }
 
         public async Task<IEnumerable<dynamic>> ListPendientesDesdeOcAsync()
@@ -229,7 +182,8 @@ SELECT
     c.IdCompra,
     c.NumeroCompra,
     c.FechaCompra,
-    CAST('Comprado' AS NVARCHAR(20)) AS Estado,
+    c.Estado,
+    c.Aceptada,
     c.IncluyeIGV,
     c.SubtotalSinIGV,
     c.MontoIGV,
@@ -326,7 +280,7 @@ ORDER BY IdCompraDocumento DESC;", new { IdCompra = idCompra });
 
 
 
-        private async Task<string> EnsureNumeroCompraAsync(IDbConnection db, IDbTransaction tx, string numeroSolicitado)
+        private async Task<string> EnsureNumeroCompraAsync(IDbConnection db, IDbTransaction? tx, string numeroSolicitado)
         {
             if (!string.IsNullOrWhiteSpace(numeroSolicitado))
             {

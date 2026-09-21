@@ -48,9 +48,29 @@ public class KardexControllerTests : IntegrationTestBase
         var idReq = await RequerimientoBuilder.Nuevo()
             .ConItem(idMaterial, cantidad)  // agrega item con el material deseado
             .CrearEnviadoOcAsync(_client);
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(
+            idReq, idPresupuestoDetalle);
 
         var idOc = await CrearOrdenAsync(idReq, idMaterial, cantidad);
+        var aprobar = await _client.PatchAsync($"/api/compras/ordenes-compra/{idOc}/estado",
+            JsonContent.Create(new OrdenCompraEstadoDto
+            {
+                EstadoNuevo = "APROBADA",
+                IdUsuario = SeedIds.IngenieroId,
+                Observacion = "Aprobación automática de test"
+            }));
+        Assert.That(aprobar.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Setup falló al aprobar OC. Body: {await aprobar.Content.ReadAsStringAsync()}");
         var idCompra = await CrearCompraAsync(idOc, idMaterial, cantidad);
+        var aceptar = await _client.PostAsJsonAsync($"/api/compras/compras/{idCompra}/aceptar",
+            new CompraAceptarDto
+            {
+                IdUsuario = SeedIds.IngenieroId,
+                Observacion = "Aceptación automática de test"
+            });
+        Assert.That(aceptar.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Setup falló al aceptar Compra. Body: {await aceptar.Content.ReadAsStringAsync()}");
         return idCompra;
     }
 

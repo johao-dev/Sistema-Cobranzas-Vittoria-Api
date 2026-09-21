@@ -1,99 +1,123 @@
 CREATE OR ALTER PROCEDURE [compras].[usp_Compra_Aceptar]
-    @IdCompra INT
+    @IdCompra INT,
+    @IdUsuario INT = NULL,
+    @Observacion NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-    
-    DECLARE
-        @IdOrdenCompra INT,
-        @FechaCompra DATE,
-        @Aceptada BIT;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        DECLARE @IdOrdenCompra INT, @FechaCompra DATE, @EstadoCompra VARCHAR(20),
+            @EstadoOc NVARCHAR(30), @IdMoneda INT, @IdProyecto INT;
 
-    SELECT
-        @IdOrdenCompra = IdOrdenCompra,
-        @FechaCompra = FechaCompra,
-        @Aceptada = Aceptada
+        SELECT @IdOrdenCompra = c.IdOrdenCompra, @FechaCompra = c.FechaCompra,
+            @EstadoCompra = c.Estado
+        FROM compras.Compra c WITH (UPDLOCK, HOLDLOCK)
+        WHERE c.IdCompra = @IdCompra;
 
-    FROM compras.Compra
-    WHERE IdCompra = @IdCompra;
+        IF @IdOrdenCompra IS NULL THROW 50065, 'Compra no existe.', 1;
+        IF @EstadoCompra = 'ACEPTADA'
+        BEGIN
+            COMMIT TRANSACTION;
+            SELECT 1 AS Ok, N'La compra ya estaba aceptada.' AS Mensaje;
+            RETURN;
+        END;
+        IF @EstadoCompra <> 'REGISTRADA'
+            THROW 51430, 'ESTADO_COMPRA_INVALIDO: solo una Compra REGISTRADA puede aceptarse.', 1;
 
-    IF @IdOrdenCompra IS NULL
-        THROW 50065, 'Compra no existe.',
-    1;
+        SELECT @EstadoOc = oc.Estado, @IdMoneda = oc.IdMoneda, @IdProyecto = r.IdProyecto
+        FROM compras.OrdenCompra oc WITH (UPDLOCK, HOLDLOCK)
+        JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+        WHERE oc.IdOrdenCompra = @IdOrdenCompra;
 
-    IF ISNULL(@Aceptada, 0) = 1
-    BEGIN
-        SELECT
-            1 AS Ok,
-            N'La compra ya estaba aceptada.' AS Mensaje;
-
-        RETURN;
-    END
-
-    BEGIN TRAN;
-
-        UPDATE
-        compras.Compra
-        SET
-            Aceptada = 1
-        WHERE
-            IdCompra = @IdCompra;
-
-    INSERT INTO
-        almacen.KardexMovimiento
+        IF @EstadoOc <> 'APROBADA'
+            THROW 51431, 'ESTADO_OC_INVALIDO: la Compra solo puede aceptarse contra una OC APROBADA.', 1;
+        IF EXISTS
         (
-            IdMaterial,
-            IdEspecialidad,
-            TipoMovimiento,
-            FechaMovimiento,
-            CantidadEntrada,
-            CantidadSalida,
-            StockResultante,
-            IdCompra,
-            IdOrdenCompra,
-            Observacion,
-            FechaIngresoAlmacen,
-            FechaSalidaAlmacen,
-            FechaCreacion
+            SELECT IdMaterial, Cantidad FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra
+            EXCEPT
+            SELECT IdMaterial, Cantidad FROM compras.CompraDetalle WHERE IdCompra = @IdCompra
+        ) OR EXISTS
+        (
+            SELECT IdMaterial, Cantidad FROM compras.CompraDetalle WHERE IdCompra = @IdCompra
+            EXCEPT
+            SELECT IdMaterial, Cantidad FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra
         )
-    SELECT
-        cd.IdMaterial,
-        m.IdEspecialidad,
-        N'ENTRADA',
-        @FechaCompra,
-        cd.Cantidad,
-        0,
-        ISNULL((
-            SELECT TOP 1 km.StockResultante
-            FROM almacen.KardexMovimiento km
-            WHERE km.IdMaterial = cd.IdMaterial
-            ORDER BY km.FechaMovimiento DESC, km.IdKardexMovimiento DESC
-            ), 0) + cd.Cantidad,
-            @IdCompra,
-            @IdOrdenCompra,
-            N'Ingreso por compra aceptada',
-            @FechaCompra,
-            NULL,
-            GETDATE()
+            THROW 51432, 'COMPRA_NO_CUBRE_OC: materiales y cantidades deben coincidir completamente con la OC.', 1;
 
-    FROM compras.CompraDetalle cd
-    INNER JOIN maestra.Material m ON m.IdMaterial = cd.IdMaterial
+        IF EXISTS
+        (
+            SELECT 1
+            FROM compras.OrdenCompraDetalle od
+            LEFT JOIN compras.Requerimiento r ON r.IdRequerimiento =
+                (SELECT IdRequerimiento FROM compras.OrdenCompra WHERE IdOrdenCompra = @IdOrdenCompra)
+            LEFT JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = r.IdRequerimiento
+                AND rd.IdMaterial = od.IdMaterial
+            WHERE od.IdOrdenCompra = @IdOrdenCompra
+              AND (rd.IdRequerimientoDetalle IS NULL OR rd.IdPresupuestoDetalle IS NULL)
+        )
+            THROW 51433, 'PARTIDA_REQUERIDA: todas las líneas de la OC deben tener partida presupuestaria.', 1;
 
-    WHERE cd.IdCompra = @IdCompra
-    AND NOT EXISTS (
-        SELECT
-            1
-        FROM almacen.KardexMovimiento km
-        WHERE km.IdCompra = @IdCompra
-        AND km.IdMaterial = cd.IdMaterial
-    );
+        DECLARE @Movimientos compras.TVP_MovimientoEconomico;
+        INSERT INTO @Movimientos
+            (IdPresupuestoDetalle, TipoMovimiento, ClaveEvento, Origen, IdOrigen, Monto, Fecha, Observacion)
+        SELECT rd.IdPresupuestoDetalle, 'LIBERACION',
+            CONCAT('COMPRA:', @IdCompra, ':MATERIAL:', cd.IdMaterial, ':LIBERACION'),
+            'COMPRA', @IdCompra, od.Subtotal, CONVERT(DATETIME2(0), @FechaCompra),
+            N'Liberación del compromiso al aceptar la Compra'
+        FROM compras.CompraDetalle cd
+        JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = @IdOrdenCompra
+        JOIN compras.OrdenCompraDetalle od ON od.IdOrdenCompra = oc.IdOrdenCompra
+            AND od.IdMaterial = cd.IdMaterial
+        JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = oc.IdRequerimiento
+            AND rd.IdMaterial = cd.IdMaterial
+        WHERE cd.IdCompra = @IdCompra
+        UNION ALL
+        SELECT rd.IdPresupuestoDetalle, 'EJECUCION',
+            CONCAT('COMPRA:', @IdCompra, ':MATERIAL:', cd.IdMaterial, ':EJECUCION'),
+            'COMPRA', @IdCompra, cd.Subtotal, CONVERT(DATETIME2(0), @FechaCompra),
+            N'Ejecución presupuestaria por Compra aceptada'
+        FROM compras.CompraDetalle cd
+        JOIN compras.OrdenCompra oc ON oc.IdOrdenCompra = @IdOrdenCompra
+        JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = oc.IdRequerimiento
+            AND rd.IdMaterial = cd.IdMaterial
+        WHERE cd.IdCompra = @IdCompra;
 
-    COMMIT;
+        EXEC compras.usp_IntegracionEconomica_RegistrarLote
+            @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Movimientos;
 
-    SELECT
-        1 AS Ok,
-        N'Compra aceptada y kardex actualizado.' AS Mensaje;
+        UPDATE compras.Compra SET Aceptada = 1, Estado = 'ACEPTADA' WHERE IdCompra = @IdCompra;
+
+        INSERT INTO almacen.KardexMovimiento
+            (IdMaterial, IdEspecialidad, TipoMovimiento, FechaMovimiento,
+             CantidadEntrada, CantidadSalida, StockResultante, IdCompra, IdOrdenCompra,
+             Observacion, FechaIngresoAlmacen, FechaSalidaAlmacen, FechaCreacion)
+        SELECT cd.IdMaterial, m.IdEspecialidad, N'ENTRADA', @FechaCompra,
+            cd.Cantidad, 0,
+            ISNULL((SELECT TOP 1 km.StockResultante FROM almacen.KardexMovimiento km WITH (UPDLOCK, HOLDLOCK)
+                WHERE km.IdMaterial = cd.IdMaterial
+                ORDER BY km.FechaMovimiento DESC, km.IdKardexMovimiento DESC), 0) + cd.Cantidad,
+            @IdCompra, @IdOrdenCompra, N'Ingreso por compra aceptada', @FechaCompra, NULL, SYSDATETIME()
+        FROM compras.CompraDetalle cd
+        JOIN maestra.Material m ON m.IdMaterial = cd.IdMaterial
+        WHERE cd.IdCompra = @IdCompra
+          AND NOT EXISTS (SELECT 1 FROM almacen.KardexMovimiento km
+              WHERE km.IdCompra = @IdCompra AND km.IdMaterial = cd.IdMaterial);
+
+        UPDATE compras.OrdenCompra SET Estado = 'ATENDIDA' WHERE IdOrdenCompra = @IdOrdenCompra;
+        INSERT INTO compras.OrdenCompraHistorial
+            (IdOrdenCompra, EstadoAnterior, EstadoNuevo, IdUsuario, Observacion)
+        VALUES (@IdOrdenCompra, 'APROBADA', 'ATENDIDA', @IdUsuario,
+            COALESCE(@Observacion, N'OC atendida por aceptación definitiva de la Compra'));
+
+        COMMIT TRANSACTION;
+        SELECT 1 AS Ok, N'Compra aceptada; kardex y presupuesto actualizados.' AS Mensaje;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -111,6 +135,7 @@ BEGIN
         proveedores.Proveedores,
         oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
         c.FechaCompra,
+        c.Estado,
         c.Aceptada,
         c.IncluyeIGV,
         c.SubtotalSinIGV,
@@ -185,6 +210,7 @@ BEGIN
         proveedores.Proveedores,
         oc.IdMoneda, mon.Codigo AS CodigoMoneda, mon.Simbolo AS SimboloMoneda,
         c.FechaCompra,
+        c.Estado,
         c.Aceptada,
         c.IncluyeIGV,
         c.SubtotalSinIGV,
@@ -227,156 +253,74 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
-
     IF NULLIF(LTRIM(RTRIM(@NumeroCompra)), '') IS NULL
-        THROW 50060, 'NumeroCompra es requerido.',
-    1;
-
-    IF EXISTS (
-        SELECT
-            1
-        FROM compras.Compra
-        WHERE NumeroCompra = @NumeroCompra)
-            THROW 50061, 'Ya existe el Número de Compra.',
-    1;
-
-    IF NOT EXISTS (
-        SELECT
-            1
-        FROM compras.OrdenCompra
-        WHERE IdOrdenCompra = @IdOrdenCompra)
-            THROW 50062, 'Orden de compra no existe.',
-    1;
-
-    IF NOT EXISTS (
-        SELECT
-            1
-        FROM compras.OrdenCompra
-        WHERE IdOrdenCompra = @IdOrdenCompra)
-            THROW 50062, 'Orden de compra no existe.',
-    1;
-
+        THROW 50060, 'NumeroCompra es requerido.', 1;
+    IF NOT EXISTS (SELECT 1 FROM @Items)
+        THROW 50064, 'Debe registrar items en la compra.', 1;
+    IF EXISTS (SELECT 1 FROM @Items WHERE Cantidad <= 0 OR PrecioUnitario <= 0)
+        THROW 51434, 'Los importes y cantidades de la Compra deben ser positivos.', 1;
     IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
         THROW 51073, 'No se permiten materiales repetidos en una Compra.', 1;
 
-    IF NOT EXISTS (
-        SELECT
-            1
-        FROM @Items)
-            THROW 50064, 'Debe registrar items en la compra.',
-    1;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        IF EXISTS (SELECT 1 FROM compras.Compra WITH (UPDLOCK, HOLDLOCK) WHERE NumeroCompra = @NumeroCompra)
+            THROW 50061, 'Ya existe el Número de Compra.', 1;
+        DECLARE @EstadoOc NVARCHAR(30);
+        SELECT @EstadoOc = Estado FROM compras.OrdenCompra WITH (UPDLOCK, HOLDLOCK)
+        WHERE IdOrdenCompra = @IdOrdenCompra;
+        IF @EstadoOc IS NULL THROW 50062, 'Orden de compra no existe.', 1;
+        IF @EstadoOc <> 'APROBADA'
+            THROW 51431, 'ESTADO_OC_INVALIDO: solo una OC APROBADA admite registrar Compra.', 1;
+        IF EXISTS (SELECT 1 FROM compras.Compra WITH (UPDLOCK, HOLDLOCK) WHERE IdOrdenCompra = @IdOrdenCompra)
+            THROW 51435, 'COMPRA_UNICA_POR_OC: la OrdenCompra ya tiene una Compra.', 1;
+        IF EXISTS
+        (
+            SELECT IdMaterial, Cantidad FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra
+            EXCEPT SELECT IdMaterial, Cantidad FROM @Items
+        ) OR EXISTS
+        (
+            SELECT IdMaterial, Cantidad FROM @Items
+            EXCEPT SELECT IdMaterial, Cantidad FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra
+        )
+            THROW 51432, 'COMPRA_NO_CUBRE_OC: materiales y cantidades deben coincidir completamente con la OC.', 1;
 
-    DECLARE
-        @MontoBruto DECIMAL(18, 2),
-        @SubtotalSinIGV DECIMAL(18, 2),
-        @MontoIGV DECIMAL(18, 2),
-        @MontoTotal DECIMAL(18, 2);
+        DECLARE @MontoTotal DECIMAL(18,2), @SubtotalSinIGV DECIMAL(18,2), @MontoIGV DECIMAL(18,2);
+        SELECT @MontoTotal = ROUND(SUM(Cantidad * PrecioUnitario), 2) FROM @Items;
+        SET @SubtotalSinIGV = CASE WHEN ISNULL(@IncluyeIGV, 0) = 1
+            THEN ROUND(@MontoTotal / 1.18, 2) ELSE @MontoTotal END;
+        SET @MontoIGV = CASE WHEN ISNULL(@IncluyeIGV, 0) = 1
+            THEN ROUND(@MontoTotal - @SubtotalSinIGV, 2) ELSE 0 END;
 
-    SELECT
-        @MontoBruto = ROUND(SUM(Cantidad * PrecioUnitario), 2)
-    FROM @Items;
+        INSERT INTO compras.Compra
+            (NumeroCompra, IdOrdenCompra, FechaCompra, Aceptada, Estado, IncluyeIGV,
+             SubtotalSinIGV, MontoIGV, MontoTotal, Observacion, FechaCreacion)
+        VALUES (@NumeroCompra, @IdOrdenCompra, @FechaCompra, 0, 'REGISTRADA', @IncluyeIGV,
+            @SubtotalSinIGV, @MontoIGV, @MontoTotal, @Observacion, SYSDATETIME());
+        DECLARE @IdCompra INT = CONVERT(INT, SCOPE_IDENTITY());
 
-    SET @MontoTotal = ISNULL(@MontoBruto, 0);
-    SET @SubtotalSinIGV = CASE
-    WHEN ISNULL(@IncluyeIGV, 0) = 1 THEN ROUND(@MontoTotal / 1.18, 2)
-    ELSE @MontoTotal
-END;
+        INSERT INTO compras.CompraDetalle (IdCompra, IdMaterial, Cantidad, PrecioUnitario)
+        SELECT @IdCompra, IdMaterial, Cantidad, PrecioUnitario FROM @Items;
 
-SET @MontoIGV = CASE
-    WHEN ISNULL(@IncluyeIGV, 0) = 1 THEN ROUND(@MontoTotal - @SubtotalSinIGV, 2)
-ELSE 0
-END;
+        INSERT INTO compras.CompraDocumento
+            (IdCompra, TipoDocumento, NumeroDocumento, RutaArchivo, FechaDocumento,
+             Monto, Observacion, NombreArchivo, Extension, FechaCreacion)
+        SELECT @IdCompra, TipoDocumento, NumeroDocumento, RutaArchivo, FechaDocumento,
+            Monto, Observacion,
+            RIGHT(RutaArchivo, CHARINDEX('/', REVERSE(RutaArchivo + '/')) - 1),
+            CASE WHEN CHARINDEX('.', RutaArchivo) > 0
+                THEN RIGHT(RutaArchivo, CHARINDEX('.', REVERSE(RutaArchivo)) - 1) END,
+            SYSDATETIME()
+        FROM @Documentos;
 
-BEGIN TRAN;
-
-INSERT INTO
-    compras.Compra
-    (
-        NumeroCompra,
-        IdOrdenCompra,
-        FechaCompra,
-        Aceptada,
-        IncluyeIGV,
-        SubtotalSinIGV,
-        MontoIGV,
-        MontoTotal,
-        Observacion,
-        FechaCreacion
-    ) VALUES (
-        @NumeroCompra,
-        @IdOrdenCompra,
-        @FechaCompra,
-        0,
-        @IncluyeIGV,
-        @SubtotalSinIGV,
-        @MontoIGV,
-        @MontoTotal,
-        @Observacion,
-        GETDATE()
-    );
-
-DECLARE @IdCompra INT = SCOPE_IDENTITY();
-
-INSERT INTO
-    compras.CompraDetalle
-    (
-        IdCompra,
-        IdMaterial,
-        Cantidad,
-        PrecioUnitario
-    ) SELECT
-        @IdCompra,
-        IdMaterial,
-        Cantidad,
-        PrecioUnitario
-
-    FROM @Items;
-
-INSERT INTO
-    compras.CompraDocumento
-    (
-        IdCompra,
-        TipoDocumento,
-        NumeroDocumento,
-        RutaArchivo,
-        FechaDocumento,
-        Monto,
-        Observacion,
-        NombreArchivo,
-        Extension,
-        FechaCreacion
-    ) SELECT
-        @IdCompra,
-        TipoDocumento,
-        NumeroDocumento,
-        RutaArchivo,
-        FechaDocumento,
-        Monto,
-        Observacion,
-        RIGHT(RutaArchivo, CHARINDEX('/', REVERSE(RutaArchivo + '/')) - 1),
-        CASE
-        WHEN CHARINDEX('.', RutaArchivo) > 0 THEN RIGHT(RutaArchivo, CHARINDEX('.', REVERSE(RutaArchivo)) - 1)
-        ELSE NULL
-    END,
-        GETDATE()
-FROM
-    @Documentos;
-
-UPDATE
-    compras.OrdenCompra
-SET
-    Estado = N'Atendida'
-WHERE
-    IdOrdenCompra = @IdOrdenCompra;
-
-COMMIT;
-
-SELECT
-    @IdCompra AS IdCompra,
-            @SubtotalSinIGV AS SubtotalSinIGV,
-            @MontoIGV AS MontoIGV,
-            @MontoTotal AS MontoTotal,
-            @IncluyeIGV AS IncluyeIGV;
+        COMMIT TRANSACTION;
+        SELECT @IdCompra AS IdCompra, @SubtotalSinIGV AS SubtotalSinIGV,
+            @MontoIGV AS MontoIGV, @MontoTotal AS MontoTotal, @IncluyeIGV AS IncluyeIGV;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -394,118 +338,124 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
 )
 AS
 BEGIN
-    SET
-NOCOUNT ON;
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    IF NOT EXISTS (SELECT 1 FROM @Items) THROW 51444, 'La orden debe tener items.', 1;
+    IF EXISTS (SELECT 1 FROM @Items WHERE IdProveedor <= 0 OR Cantidad <= 0 OR PrecioUnitario <= 0)
+        THROW 51442, 'Proveedor, cantidades y precios de la OC deben ser positivos.', 1;
+    IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
+        THROW 51071, 'No se permiten materiales repetidos en una OC.', 1;
+    IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
+        THROW 51070, 'La moneda no existe o está inactiva.', 1;
 
-SET
-XACT_ABORT ON;
-
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    compras.OrdenCompra
-WHERE
-    IdOrdenCompra = @IdOrdenCompra)
-    BEGIN
-        RAISERROR('La orden de compra no existe.', 16, 1);
-
-RETURN;
-END;
-
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    @Items)
-    BEGIN
-        RAISERROR('La orden debe tener items.', 16, 1);
-
-RETURN;
-END;
-
-IF EXISTS (
-SELECT
-    1
-FROM
-    @Items
-WHERE
-    IdProveedor IS NULL
-    OR IdProveedor <= 0)
-    BEGIN
-        RAISERROR('Cada material debe tener proveedor.', 16, 1);
-
-RETURN;
-END;
-
-IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
-    THROW 51070, 'La moneda no existe o está inactiva.', 1;
-IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
-    THROW 51071, 'No se permiten materiales repetidos en una OC.', 1;
-
-BEGIN TRANSACTION;
-
-BEGIN TRY
-        UPDATE
-    compras.OrdenCompra
-SET
-    NumeroOrdenCompra = @NumeroOrdenCompra,
-               IdRequerimiento = @IdRequerimiento,
-               IdMoneda = @IdMoneda,
-               FechaOrdenCompra = @FechaOrdenCompra,
-               Descripcion = @Descripcion,
-               RutaPdf = @RutaPdf
-WHERE
-    IdOrdenCompra = @IdOrdenCompra;
-
-DELETE
-FROM
-    compras.OrdenCompraDetalle
-WHERE
-    IdOrdenCompra = @IdOrdenCompra;
-
-INSERT
-    INTO
-    compras.OrdenCompraDetalle
-            (IdOrdenCompra,
-    IdMaterial,
-    Cantidad,
-    IdProveedor,
-    PrecioUnitario)
-        SELECT
-            @IdOrdenCompra,
-    i.IdMaterial,
-    i.Cantidad,
-    i.IdProveedor,
-    i.PrecioUnitario
-FROM
-    @Items i;
-
-UPDATE
-    oc
-SET
-    oc.Total = ISNULL(t.Total, 0)
-FROM
-    compras.OrdenCompra oc
-        OUTER APPLY
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        DECLARE @Estado NVARCHAR(30), @IdRequerimientoActual INT, @IdMonedaActual INT,
+            @VersionActual INT, @IdProyecto INT;
+        SELECT @Estado = oc.Estado, @IdRequerimientoActual = oc.IdRequerimiento,
+            @IdMonedaActual = oc.IdMoneda, @VersionActual = oc.VersionEconomica,
+            @IdProyecto = r.IdProyecto
+        FROM compras.OrdenCompra oc WITH (UPDLOCK, HOLDLOCK)
+        JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+        WHERE oc.IdOrdenCompra = @IdOrdenCompra;
+        IF @Estado IS NULL THROW 50057, 'Orden de compra no existe.', 1;
+        IF @Estado NOT IN ('REGISTRADA', 'APROBADA')
+            THROW 51445, 'OC_NO_EDITABLE: solo REGISTRADA o APROBADA puede modificarse.', 1;
+        IF @Estado = 'APROBADA' AND (@IdRequerimiento <> @IdRequerimientoActual OR @IdMoneda <> @IdMonedaActual)
+            THROW 51446, 'OC_APROBADA_IDENTIDAD_INMUTABLE: no puede cambiar Requerimiento ni Moneda.', 1;
+        IF @Estado = 'APROBADA' AND EXISTS
         (
-    SELECT
-                SUM(d.Cantidad * d.PrecioUnitario) AS Total
-    FROM
-        compras.OrdenCompraDetalle d
-    WHERE
-        d.IdOrdenCompra = oc.IdOrdenCompra
-        ) t
-WHERE
-    oc.IdOrdenCompra = @IdOrdenCompra;
+            SELECT 1
+            FROM compras.Compra c WITH (UPDLOCK, HOLDLOCK)
+            WHERE c.IdOrdenCompra = @IdOrdenCompra
+              AND
+              (
+                  c.Estado = 'ACEPTADA'
+                  OR EXISTS
+                  (
+                      SELECT IdMaterial, Cantidad FROM compras.CompraDetalle WHERE IdCompra = c.IdCompra
+                      EXCEPT SELECT IdMaterial, Cantidad FROM @Items
+                  )
+                  OR EXISTS
+                  (
+                      SELECT IdMaterial, Cantidad FROM @Items
+                      EXCEPT SELECT IdMaterial, Cantidad FROM compras.CompraDetalle WHERE IdCompra = c.IdCompra
+                  )
+              )
+        )
+            THROW 51447, 'OC_CON_COMPRA_INCOMPATIBLE: la modificación no puede invalidar una Compra registrada o aceptada.', 1;
+        IF EXISTS
+        (
+            SELECT IdMaterial FROM @Items
+            EXCEPT SELECT IdMaterial FROM compras.RequerimientoDetalle
+                WHERE IdRequerimiento = @IdRequerimiento
+        )
+            THROW 51443, 'MATERIAL_FUERA_REQUERIMIENTO: toda línea de OC debe provenir del Requerimiento.', 1;
 
-COMMIT TRANSACTION;
-END TRY
+        IF @Estado = 'APROBADA'
+        BEGIN
+            IF EXISTS
+            (
+                SELECT 1 FROM @Items i
+                LEFT JOIN compras.RequerimientoDetalle rd
+                    ON rd.IdRequerimiento = @IdRequerimiento AND rd.IdMaterial = i.IdMaterial
+                WHERE rd.IdPresupuestoDetalle IS NULL
+            )
+                THROW 51433, 'PARTIDA_REQUERIDA: todas las líneas deben tener partida presupuestaria.', 1;
+
+            DECLARE @NuevaVersion INT = @VersionActual + 1;
+            DECLARE @Ajustes compras.TVP_MovimientoEconomico;
+            ;WITH Materiales AS
+            (
+                SELECT IdMaterial FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra
+                UNION SELECT IdMaterial FROM @Items
+            ), Importes AS
+            (
+                SELECT m.IdMaterial, rd.IdPresupuestoDetalle,
+                    COALESCE(ant.Subtotal, 0) AS ImporteAnterior,
+                    COALESCE(CONVERT(DECIMAL(18,2), ROUND(nuevo.Cantidad * nuevo.PrecioUnitario, 2)), 0) AS ImporteNuevo
+                FROM Materiales m
+                LEFT JOIN compras.OrdenCompraDetalle ant ON ant.IdOrdenCompra = @IdOrdenCompra
+                    AND ant.IdMaterial = m.IdMaterial
+                LEFT JOIN @Items nuevo ON nuevo.IdMaterial = m.IdMaterial
+                JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = @IdRequerimiento
+                    AND rd.IdMaterial = m.IdMaterial
+            )
+            INSERT INTO @Ajustes
+                (IdPresupuestoDetalle, TipoMovimiento, ClaveEvento, Origen, IdOrigen, Monto, Fecha, Observacion)
+            SELECT IdPresupuestoDetalle,
+                CASE WHEN ImporteNuevo > ImporteAnterior THEN 'COMPROMISO' ELSE 'LIBERACION' END,
+                CONCAT('OC:', @IdOrdenCompra, ':MOD:', @NuevaVersion, ':MATERIAL:', IdMaterial, ':',
+                    CASE WHEN ImporteNuevo > ImporteAnterior THEN 'COMPROMISO' ELSE 'LIBERACION' END),
+                'ORDEN_COMPRA', @IdOrdenCompra, ABS(ImporteNuevo - ImporteAnterior), SYSDATETIME(),
+                N'Ajuste económico por modificación de OrdenCompra aprobada'
+            FROM Importes WHERE ImporteNuevo <> ImporteAnterior;
+
+            EXEC compras.usp_IntegracionEconomica_RegistrarLote
+                @IdMoneda = @IdMonedaActual, @IdProyecto = @IdProyecto, @Movimientos = @Ajustes;
+            UPDATE compras.OrdenCompra SET VersionEconomica = @NuevaVersion
+            WHERE IdOrdenCompra = @IdOrdenCompra;
+        END;
+
+        UPDATE compras.OrdenCompra
+        SET NumeroOrdenCompra = @NumeroOrdenCompra, IdRequerimiento = @IdRequerimiento,
+            IdMoneda = @IdMoneda, FechaOrdenCompra = @FechaOrdenCompra,
+            Descripcion = @Descripcion, RutaPdf = @RutaPdf
+        WHERE IdOrdenCompra = @IdOrdenCompra;
+
+        DELETE FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra;
+        INSERT INTO compras.OrdenCompraDetalle
+            (IdOrdenCompra, IdMaterial, Cantidad, IdProveedor, PrecioUnitario)
+        SELECT @IdOrdenCompra, IdMaterial, Cantidad, IdProveedor, PrecioUnitario FROM @Items;
+        UPDATE compras.OrdenCompra SET Total =
+            (SELECT COALESCE(SUM(Subtotal), 0) FROM compras.OrdenCompraDetalle WHERE IdOrdenCompra = @IdOrdenCompra)
+        WHERE IdOrdenCompra = @IdOrdenCompra;
+        COMMIT TRANSACTION;
+    END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-
-THROW;
-END CATCH
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -516,59 +466,92 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_ActualizarEstado]
     @Observacion NVARCHAR(250) = NULL
 AS
 BEGIN
-    SET
-NOCOUNT ON;
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    SET @EstadoNuevo = UPPER(LTRIM(RTRIM(@EstadoNuevo)));
+    IF @EstadoNuevo NOT IN (N'APROBADA', N'ANULADA', N'CERRADA')
+        THROW 50056, 'Estado inválido para la transición manual de OrdenCompra.', 1;
 
-SET
-XACT_ABORT ON;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        DECLARE @EstadoAnterior NVARCHAR(30), @IdMoneda INT, @IdRequerimiento INT, @IdProyecto INT;
+        SELECT @EstadoAnterior = oc.Estado, @IdMoneda = oc.IdMoneda,
+            @IdRequerimiento = oc.IdRequerimiento, @IdProyecto = r.IdProyecto
+        FROM compras.OrdenCompra oc WITH (UPDLOCK, HOLDLOCK)
+        JOIN compras.Requerimiento r ON r.IdRequerimiento = oc.IdRequerimiento
+        WHERE oc.IdOrdenCompra = @IdOrdenCompra;
+        IF @EstadoAnterior IS NULL THROW 50057, 'Orden de compra no existe.', 1;
+        IF @EstadoAnterior = @EstadoNuevo
+        BEGIN
+            COMMIT TRANSACTION;
+            SELECT 1 AS Ok;
+            RETURN;
+        END;
 
-IF @EstadoNuevo NOT IN (N'Generada', N'Aprobada', N'Enviada', N'Atendida', N'Anulada')
-        THROW 50056,
-'Estado inválido para orden de compra.',
-1;
+        IF NOT ((@EstadoAnterior = 'REGISTRADA' AND @EstadoNuevo IN ('APROBADA', 'ANULADA'))
+             OR (@EstadoAnterior = 'APROBADA' AND @EstadoNuevo = 'ANULADA')
+             OR (@EstadoAnterior = 'ATENDIDA' AND @EstadoNuevo = 'CERRADA'))
+            THROW 51440, 'TRANSICION_OC_INVALIDA.', 1;
 
-DECLARE @EstadoAnterior NVARCHAR(30);
+        IF @EstadoNuevo = 'APROBADA'
+        BEGIN
+            IF EXISTS
+            (
+                SELECT 1
+                FROM compras.OrdenCompraDetalle od
+                LEFT JOIN compras.RequerimientoDetalle rd
+                    ON rd.IdRequerimiento = @IdRequerimiento AND rd.IdMaterial = od.IdMaterial
+                WHERE od.IdOrdenCompra = @IdOrdenCompra
+                  AND (rd.IdRequerimientoDetalle IS NULL OR rd.IdPresupuestoDetalle IS NULL)
+            )
+                THROW 51433, 'PARTIDA_REQUERIDA: todas las líneas de la OC deben tener partida presupuestaria.', 1;
 
-SELECT
-    @EstadoAnterior = Estado
-FROM
-    compras.OrdenCompra
-WHERE
-    IdOrdenCompra = @IdOrdenCompra;
+            DECLARE @Compromisos compras.TVP_MovimientoEconomico;
+            INSERT INTO @Compromisos
+                (IdPresupuestoDetalle, TipoMovimiento, ClaveEvento, Origen, IdOrigen, Monto, Fecha, Observacion)
+            SELECT rd.IdPresupuestoDetalle, 'COMPROMISO',
+                CONCAT('OC:', @IdOrdenCompra, ':APROBACION:MATERIAL:', od.IdMaterial),
+                'ORDEN_COMPRA', @IdOrdenCompra, od.Subtotal, SYSDATETIME(),
+                N'Compromiso por aprobación de OrdenCompra'
+            FROM compras.OrdenCompraDetalle od
+            JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = @IdRequerimiento
+                AND rd.IdMaterial = od.IdMaterial
+            WHERE od.IdOrdenCompra = @IdOrdenCompra;
 
-IF @EstadoAnterior IS NULL
-        THROW 50057,
-'Orden de compra no existe.',
-1;
+            EXEC compras.usp_IntegracionEconomica_RegistrarLote
+                @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Compromisos;
+        END;
 
-UPDATE
-    compras.OrdenCompra
-SET
-    Estado = @EstadoNuevo
-WHERE
-    IdOrdenCompra = @IdOrdenCompra;
+        IF @EstadoAnterior = 'APROBADA' AND @EstadoNuevo = 'ANULADA'
+        BEGIN
+            IF EXISTS (SELECT 1 FROM compras.Compra WHERE IdOrdenCompra = @IdOrdenCompra AND Estado = 'ACEPTADA')
+                THROW 51441, 'OC_CON_COMPRA_ACEPTADA: no puede anularse.', 1;
+            DECLARE @Liberaciones compras.TVP_MovimientoEconomico;
+            INSERT INTO @Liberaciones
+                (IdPresupuestoDetalle, TipoMovimiento, ClaveEvento, Origen, IdOrigen, Monto, Fecha, Observacion)
+            SELECT rd.IdPresupuestoDetalle, 'LIBERACION',
+                CONCAT('OC:', @IdOrdenCompra, ':ANULACION:MATERIAL:', od.IdMaterial),
+                'ORDEN_COMPRA', @IdOrdenCompra, od.Subtotal, SYSDATETIME(),
+                N'Liberación total por anulación de OrdenCompra'
+            FROM compras.OrdenCompraDetalle od
+            JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = @IdRequerimiento
+                AND rd.IdMaterial = od.IdMaterial
+            WHERE od.IdOrdenCompra = @IdOrdenCompra;
+            EXEC compras.usp_IntegracionEconomica_RegistrarLote
+                @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Liberaciones;
+        END;
 
-INSERT
-    INTO
-    compras.OrdenCompraHistorial
-    (
-        IdOrdenCompra,
-    EstadoAnterior,
-    EstadoNuevo,
-    IdUsuario,
-    Observacion
-    )
-VALUES
-    (
-        @IdOrdenCompra,
-@EstadoAnterior,
-@EstadoNuevo,
-@IdUsuario,
-@Observacion
-    );
-
-SELECT
-    1 AS Ok;
+        UPDATE compras.OrdenCompra SET Estado = @EstadoNuevo WHERE IdOrdenCompra = @IdOrdenCompra;
+        INSERT INTO compras.OrdenCompraHistorial
+            (IdOrdenCompra, EstadoAnterior, EstadoNuevo, IdUsuario, Observacion)
+        VALUES (@IdOrdenCompra, @EstadoAnterior, @EstadoNuevo, @IdUsuario, @Observacion);
+        COMMIT TRANSACTION;
+        SELECT 1 AS Ok;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -645,6 +628,15 @@ WHERE
 RETURN;
 END;
 
+IF EXISTS (SELECT 1 FROM @Items WHERE Cantidad <= 0 OR PrecioUnitario <= 0)
+    THROW 51442, 'Las cantidades y precios de la OC deben ser positivos.', 1;
+IF EXISTS
+(
+    SELECT IdMaterial FROM @Items
+    EXCEPT SELECT IdMaterial FROM compras.RequerimientoDetalle
+        WHERE IdRequerimiento = @IdRequerimiento
+)
+    THROW 51443, 'MATERIAL_FUERA_REQUERIMIENTO: toda línea de OC debe provenir del Requerimiento.', 1;
 IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
     THROW 51070, 'La moneda no existe o está inactiva.', 1;
 IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
@@ -675,7 +667,7 @@ VALUES
 @IdMoneda,
 @FechaOrdenCompra,
             @Descripcion,
-'Registrada',
+'REGISTRADA',
 0,
 @RutaPdf,
 GETDATE(),
@@ -931,6 +923,25 @@ IF NOT EXISTS (SELECT 1 FROM compras.Requerimiento WHERE IdRequerimiento = @IdRe
     THROW 51072, 'El requerimiento no existe.', 1;
 IF NOT EXISTS (SELECT 1 FROM @Items)
     THROW 50045, 'Debe registrar al menos un item.', 1;
+IF EXISTS
+(
+    SELECT 1
+    FROM @Items i
+    LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd
+        ON pd.IdPresupuestoDetalle = i.IdPresupuestoDetalle
+    LEFT JOIN ControlPresupuestario.PresupuestoVersion pv
+        ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+    LEFT JOIN ControlPresupuestario.EstadoPresupuesto ep
+        ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
+    LEFT JOIN ControlPresupuestario.Presupuesto p
+        ON p.IdPresupuesto = pv.IdPresupuesto
+    LEFT JOIN ControlPresupuestario.CentroCosto cc
+        ON cc.IdCentroCosto = p.IdCentroCosto
+    WHERE i.IdPresupuestoDetalle IS NOT NULL
+      AND (pd.IdPresupuestoDetalle IS NULL OR ep.Codigo <> 'APROBADO'
+           OR p.Activo <> 1 OR cc.Activo <> 1 OR cc.IdProyecto <> @IdProyecto)
+)
+    THROW 51420, 'PARTIDA_REQUERIMIENTO_INVALIDA: debe pertenecer a la versión APROBADA vigente del CentroCosto del Proyecto.', 1;
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 BEGIN TRY
@@ -1042,6 +1053,26 @@ FROM
         THROW 50045,
 'Debe registrar al menos un item.',
 1;
+
+IF EXISTS
+(
+    SELECT 1
+    FROM @Items i
+    LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd
+        ON pd.IdPresupuestoDetalle = i.IdPresupuestoDetalle
+    LEFT JOIN ControlPresupuestario.PresupuestoVersion pv
+        ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+    LEFT JOIN ControlPresupuestario.EstadoPresupuesto ep
+        ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
+    LEFT JOIN ControlPresupuestario.Presupuesto p
+        ON p.IdPresupuesto = pv.IdPresupuesto
+    LEFT JOIN ControlPresupuestario.CentroCosto cc
+        ON cc.IdCentroCosto = p.IdCentroCosto
+    WHERE i.IdPresupuestoDetalle IS NOT NULL
+      AND (pd.IdPresupuestoDetalle IS NULL OR ep.Codigo <> 'APROBADO'
+           OR p.Activo <> 1 OR cc.Activo <> 1 OR cc.IdProyecto <> @IdProyecto)
+)
+    THROW 51420, 'PARTIDA_REQUERIMIENTO_INVALIDA: debe pertenecer a la versión APROBADA vigente del CentroCosto del Proyecto.', 1;
 
 BEGIN TRAN;
 BEGIN TRY

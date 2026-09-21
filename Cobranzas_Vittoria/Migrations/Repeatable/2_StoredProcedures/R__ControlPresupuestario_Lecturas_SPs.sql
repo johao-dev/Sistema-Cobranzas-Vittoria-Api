@@ -155,11 +155,12 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SET @Busqueda = NULLIF(LTRIM(RTRIM(@Busqueda)), N'');
-    SELECT x.IdCentroCosto, x.Codigo, x.Nombre, x.Descripcion,
+    SELECT x.IdCentroCosto, x.Codigo, x.Nombre, x.Descripcion, x.IdProyecto, p.NombreProyecto,
         x.IdTipoCentroCosto, t.Codigo AS CodigoTipoCentroCosto, t.Nombre AS NombreTipoCentroCosto,
         x.Activo, x.FechaCreacion, x.FechaModificacion
     FROM ControlPresupuestario.CentroCosto x
     JOIN ControlPresupuestario.TipoCentroCosto t ON t.IdTipoCentroCosto = x.IdTipoCentroCosto
+    LEFT JOIN maestra.Proyecto p ON p.IdProyecto = x.IdProyecto
     WHERE (@Activo IS NULL OR x.Activo = @Activo)
         AND (@IdTipoCentroCosto IS NULL OR x.IdTipoCentroCosto = @IdTipoCentroCosto)
         AND (@Busqueda IS NULL OR CHARINDEX(@Busqueda, x.Codigo) > 0 OR CHARINDEX(@Busqueda, x.Nombre) > 0)
@@ -174,11 +175,12 @@ BEGIN
     SET NOCOUNT ON;
         IF @IdCentroCosto IS NULL OR @IdCentroCosto <= 0
             THROW 51200, 'CAMPO_REQUERIDO: IdCentroCosto positivo.', 1;
-    SELECT x.IdCentroCosto, x.Codigo, x.Nombre, x.Descripcion,
+    SELECT x.IdCentroCosto, x.Codigo, x.Nombre, x.Descripcion, x.IdProyecto, p.NombreProyecto,
         x.IdTipoCentroCosto, t.Codigo AS CodigoTipoCentroCosto, t.Nombre AS NombreTipoCentroCosto,
         x.Activo, x.FechaCreacion, x.FechaModificacion
     FROM ControlPresupuestario.CentroCosto x
     JOIN ControlPresupuestario.TipoCentroCosto t ON t.IdTipoCentroCosto = x.IdTipoCentroCosto
+    LEFT JOIN maestra.Proyecto p ON p.IdProyecto = x.IdProyecto
     WHERE x.IdCentroCosto = @IdCentroCosto;
 END;
 GO
@@ -354,5 +356,4 @@ BEGIN
     ORDER BY Codigo, IdMoneda;
 END;
 GO
-
 

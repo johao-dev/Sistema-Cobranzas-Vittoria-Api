@@ -36,6 +36,13 @@ namespace Cobranzas_Vittoria.Controllers
         public async Task<IActionResult> Crear([FromBody] CompraCreateDto dto)
             => Ok(await _service.CrearAsync(dto));
 
+        [HttpPost("{id:int}/aceptar")]
+        public async Task<IActionResult> Aceptar(int id, [FromBody] CompraAceptarDto? dto)
+        {
+            await _service.AceptarAsync(id, dto?.IdUsuario, dto?.Observacion);
+            return Ok(new { ok = true });
+        }
+
         [HttpGet("{id:int}/documentos")]
         public async Task<IActionResult> GetDocumentos(int id)
             => Ok(await _service.GetDocumentosAsync(id));

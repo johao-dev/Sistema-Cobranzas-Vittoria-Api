@@ -1,4 +1,5 @@
 using System.Data;
+using Cobranzas_Vittoria.Tests.Integration.Common;
 using Dapper;
 using Microsoft.Data.SqlClient;
 
@@ -204,9 +205,11 @@ public partial class ControlPresupuestarioSpsTests
             "SELECT IdTipoCentroCosto FROM ControlPresupuestario.TipoCentroCosto WHERE Codigo = 'PROYECTO'");
         var codigo = Guid.NewGuid().ToString("N")[..30];
         var centro = await cn.QuerySingleAsync<CentroResultado>(Schema + "usp_CentroCosto_Crear",
-            new { Codigo = codigo, Nombre = "Centro", IdTipoCentroCosto = tipo }, commandType: CommandType.StoredProcedure);
+            new { Codigo = codigo, Nombre = "Centro", IdTipoCentroCosto = tipo,
+                IdProyecto = SeedIds.ProyectoMaytaCapacII }, commandType: CommandType.StoredProcedure);
         Error(51205, async () => { await cn.QuerySingleAsync(Schema + "usp_CentroCosto_Crear",
-            new { Codigo = codigo, Nombre = "Otro", IdTipoCentroCosto = tipo }, commandType: CommandType.StoredProcedure); });
+            new { Codigo = codigo, Nombre = "Otro", IdTipoCentroCosto = tipo,
+                IdProyecto = SeedIds.ProyectoMaytaCapacII }, commandType: CommandType.StoredProcedure); });
         _idCentro = centro.IdCentroCosto;
         var p = await Crear(cn);
         await cn.QuerySingleAsync(Schema + "usp_CentroCosto_Actualizar",
@@ -250,7 +253,8 @@ public partial class ControlPresupuestarioSpsTests
             "SELECT IdTipoPartida FROM ControlPresupuestario.TipoPartida WHERE Codigo = 'MATERIALES'");
         using var tx = cn.BeginTransaction();
         var centro = await cn.QuerySingleAsync<CentroResultado>(Schema + "usp_CentroCosto_Crear",
-            new { Codigo = Guid.NewGuid().ToString("N")[..30], Nombre = "Temporal", IdTipoCentroCosto = tipoCentro },
+            new { Codigo = Guid.NewGuid().ToString("N")[..30], Nombre = "Temporal",
+                IdTipoCentroCosto = tipoCentro, IdProyecto = SeedIds.ProyectoMaytaCapacII },
             tx, commandType: CommandType.StoredProcedure);
         await cn.QuerySingleAsync(Schema + "usp_CentroCosto_Actualizar",
             new { centro.IdCentroCosto, Nombre = "Actualizado", Activo = false }, tx, commandType: CommandType.StoredProcedure);

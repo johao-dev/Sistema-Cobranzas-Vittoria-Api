@@ -58,6 +58,8 @@ public class NormalizacionComprasTests : IntegrationTestBase
         var proveedores = (await cn.QueryAsync<int>("SELECT TOP (2) IdProveedor FROM maestra.Proveedor WHERE Activo=1 ORDER BY IdProveedor")).ToArray();
         Assert.That(proveedores.Length, Is.EqualTo(2));
         var req = await RequerimientoBuilder.Nuevo().ConItem(2, 5).ConItem(6, 3).CrearEnviadoOcAsync(_client);
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(req, idPresupuestoDetalle);
         var dto = new OrdenCompraCreateDto
         {
             IdRequerimiento = req, IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
@@ -67,7 +69,14 @@ public class NormalizacionComprasTests : IntegrationTestBase
         var response = await _client.PostAsJsonAsync("/api/compras/ordenes-compra", dto);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), await response.Content.ReadAsStringAsync());
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return (result.GetProperty("idOrdenCompra").GetInt32(),proveedores[0],proveedores[1]);
+        var idOc = result.GetProperty("idOrdenCompra").GetInt32();
+        var aprobacion = await _client.PatchAsync($"/api/compras/ordenes-compra/{idOc}/estado",
+            JsonContent.Create(new OrdenCompraEstadoDto
+            {
+                EstadoNuevo = "APROBADA", IdUsuario = SeedIds.IngenieroId
+            }));
+        Assert.That(aprobacion.StatusCode, Is.EqualTo(HttpStatusCode.OK), await aprobacion.Content.ReadAsStringAsync());
+        return (idOc,proveedores[0],proveedores[1]);
     }
 
     [TestCase(true)]
@@ -103,16 +112,17 @@ public class NormalizacionComprasTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Compra_ProveedorSeDerivaSoloDeLosMaterialesComprados()
+    public async Task Compra_ParcialEsRechazadaSinPersistir()
     {
         var (oc,_,p2)=await CrearMultiproveedor();
         var created=await _client.PostAsJsonAsync("/api/compras/compras",new CompraCreateDto
         {
             IdOrdenCompra=oc,Items=[new(){IdMaterial=2,Cantidad=1,PrecioUnitario=20}]
         });
-        Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(created.StatusCode,Is.EqualTo(HttpStatusCode.Conflict));
         var filtrado=await _client.GetFromJsonAsync<JsonElement>($"/api/compras/compras?idProveedor={p2}");
         Assert.That(filtrado.GetArrayLength(),Is.Zero);
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM compras.Compra"), Is.Zero);
     }
 
     [Test]
@@ -136,12 +146,14 @@ public class NormalizacionComprasTests : IntegrationTestBase
     public async Task CompraYDb_RechazanMaterialesDuplicados()
     {
         var (oc,_,_)=await CrearMultiproveedor();
-        var dto=new CompraCreateDto{IdOrdenCompra=oc,Items=[new(){IdMaterial=2,Cantidad=1,PrecioUnitario=20}]};
+        var dto=new CompraCreateDto{IdOrdenCompra=oc,Items=[
+            new(){IdMaterial=2,Cantidad=5,PrecioUnitario=20},
+            new(){IdMaterial=6,Cantidad=3,PrecioUnitario=100}]};
         dto.Items.Add(dto.Items[0]);
         var invalid=await _client.PostAsJsonAsync("/api/compras/compras",dto);
         Assert.That(invalid.StatusCode,Is.EqualTo(HttpStatusCode.UnprocessableEntity));
         Assert.That(await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM compras.Compra"),Is.Zero);
-        dto.Items.RemoveAt(1);
+        dto.Items.RemoveAt(2);
         var response=await _client.PostAsJsonAsync("/api/compras/compras",dto);
         Assert.That(response.StatusCode,Is.EqualTo(HttpStatusCode.OK));
         var created=await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -164,10 +176,12 @@ public class NormalizacionComprasTests : IntegrationTestBase
         await cn.ExecuteAsync("""
             INSERT INTO ControlPresupuestario.TipoCentroCosto (Codigo,Nombre) VALUES ('PROYECTO','Proyecto');
             INSERT INTO ControlPresupuestario.TipoPartida (Codigo,Nombre) VALUES ('MATERIALES','Materiales');
-            INSERT INTO ControlPresupuestario.EstadoPresupuesto (Codigo,Nombre) VALUES ('BORRADOR','Borrador');
-            INSERT INTO ControlPresupuestario.CentroCosto (Codigo,Nombre,IdTipoCentroCosto)
-                SELECT 'TEST','Test',IdTipoCentroCosto FROM ControlPresupuestario.TipoCentroCosto WHERE Codigo='PROYECTO';
-            """);
+            INSERT INTO ControlPresupuestario.EstadoPresupuesto (Codigo,Nombre)
+                VALUES ('BORRADOR','Borrador'),('APROBADO','Aprobado'),('HISTORICO','Histórico'),('ANULADO','Anulado');
+            INSERT INTO ControlPresupuestario.CentroCosto (Codigo,Nombre,IdTipoCentroCosto,IdProyecto)
+                SELECT 'TEST','Test',IdTipoCentroCosto,@idProyecto
+                FROM ControlPresupuestario.TipoCentroCosto WHERE Codigo='PROYECTO';
+            """, new { idProyecto = SeedIds.ProyectoMaytaCapacII });
         var centro=await cn.QuerySingleAsync<int>("SELECT IdCentroCosto FROM ControlPresupuestario.CentroCosto WHERE Codigo='TEST'");
         var presupuesto=await cn.QuerySingleAsync<dynamic>("ControlPresupuestario.usp_Presupuesto_Crear",
             new{IdCentroCosto=centro,IdMoneda=await DbHelpersMoneda.ObtenerPenAsync(),Codigo="TEST",Nombre="Test"},commandType:CommandType.StoredProcedure);
@@ -178,6 +192,9 @@ public class NormalizacionComprasTests : IntegrationTestBase
             INSERT INTO ControlPresupuestario.PresupuestoDetalle (IdPresupuestoVersion,IdCatalogoPartida,MontoPresupuestado)
                 SELECT @version,IdCatalogoPartida,1000 FROM ControlPresupuestario.CatalogoPartida;
             """,new{version=(int)presupuesto.IdPresupuestoVersion});
+        await cn.QuerySingleAsync("ControlPresupuestario.usp_PresupuestoVersion_Aprobar",
+            new { IdPresupuestoVersion = (int)presupuesto.IdPresupuestoVersion, UsuarioAprobacion = "test" },
+            commandType: CommandType.StoredProcedure);
         var partidas=(await cn.QueryAsync<int>("SELECT IdPresupuestoDetalle FROM ControlPresupuestario.PresupuestoDetalle ORDER BY IdPresupuestoDetalle")).ToArray();
         var req=await RequerimientoBuilder.Nuevo().ConItem(2,1,idPresupuestoDetalle:partidas[0]).ConItem(6,2,idPresupuestoDetalle:partidas[1]).CrearAsync(_client);
         var items=(await cn.QueryAsync<int>("SELECT IdPresupuestoDetalle FROM compras.RequerimientoDetalle WHERE IdRequerimiento=@req ORDER BY IdMaterial",new{req})).ToArray();

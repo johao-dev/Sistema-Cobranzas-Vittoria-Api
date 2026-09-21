@@ -22,7 +22,8 @@ public class NormalizacionMigracionesTests
         await master.ExecuteAsync($"CREATE DATABASE [{_database}]");
         _connectionString = new SqlConnectionStringBuilder(GlobalSetupFixture.DbContainer.GetConnectionString())
             { InitialCatalog = _database }.ConnectionString;
-        var result = Upgrade(name => name.Contains(".Migrations.Versioned.") && !name.Contains(".V2_1_"));
+        var result = Upgrade(name => name.Contains(".Migrations.Versioned.")
+            && !name.Contains(".V2_1_") && !name.Contains(".V2_2_"));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
     }
 
@@ -44,6 +45,9 @@ public class NormalizacionMigracionesTests
     private DatabaseUpgradeResult NormalizarHasta(int version = 8) => Upgrade(name =>
         name.Contains(".Migrations.Versioned.V2_1_") &&
         int.Parse(name.Split("V2_1_")[1].Split("__")[0]) <= version);
+
+    private DatabaseUpgradeResult IntegrarEconomia() => Upgrade(name =>
+        name.Contains(".Migrations.Versioned.V2_2_"));
 
     private async Task<SqlConnection> Conexion()
     {
@@ -83,6 +87,9 @@ public class NormalizacionMigracionesTests
         var assembly = typeof(OrdenCompra).Assembly;
         var scripts = assembly.GetManifestResourceNames()
             .Where(name => name.Contains(".Migrations.Repeatable.") && name.Contains("R__ControlPresupuestario_"))
+            // Estos repeatables requieren la columna CentroCosto.IdProyecto de V2.2.0;
+            // no existían en el estado V2.0.9 que este caso reproduce.
+            .Where(name => !name.Contains("_Lecturas_SPs.sql") && !name.Contains("_Maestros_SPs.sql"))
             .OrderBy(name => name)
             .Select(name =>
             {
@@ -241,6 +248,55 @@ public class NormalizacionMigracionesTests
         Bloqueado(NormalizarHasta(5),51320);
         Assert.That(await cn.QuerySingleAsync<int>("SELECT precision FROM sys.columns WHERE object_id=OBJECT_ID('compras.OrdenCompraDetalle') AND name='Subtotal'"),Is.EqualTo(37));
         Assert.That(await cn.QuerySingleAsync<int>("SELECT COUNT(*) FROM compras.OrdenCompraDetalle"),Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task IntegracionEconomica_EstadoAmbiguoExigeConciliacionYPermiteReintento()
+    {
+        var (_, oc) = await CrearOcLegacy();
+        await using var cn = await Conexion();
+        await cn.ExecuteAsync("UPDATE compras.OrdenCompra SET Estado='Aceptada' WHERE IdOrdenCompra=@oc", new { oc });
+        Bloqueado(NormalizarHasta(), 51340);
+        await cn.ExecuteAsync("""
+            UPDATE compras.OrdenCompra
+            SET IdMoneda=(SELECT IdMoneda FROM maestra.Moneda WHERE Codigo='PEN')
+            WHERE IdOrdenCompra=@oc;
+            """, new { oc });
+        Assert.That(NormalizarHasta().Successful, Is.True);
+
+        Bloqueado(IntegrarEconomia(), 51401);
+        Assert.That(await cn.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM dbo.SchemaVersions WHERE ScriptName LIKE '%V2_2_0__%'"), Is.Zero);
+
+        await cn.ExecuteAsync("UPDATE compras.OrdenCompra SET Estado='APROBADA' WHERE IdOrdenCompra=@oc", new { oc });
+        var reintento = IntegrarEconomia();
+        Assert.That(reintento.Successful, Is.True, reintento.Error?.ToString());
+        Assert.That(await cn.QuerySingleAsync<string>(
+            "SELECT Estado FROM compras.OrdenCompra WHERE IdOrdenCompra=@oc", new { oc }), Is.EqualTo("APROBADA"));
+    }
+
+    [Test]
+    public async Task IntegracionEconomica_MultiplesComprasExigeConciliacionSinEliminarDatos()
+    {
+        var (_, oc) = await CrearOcLegacy();
+        await using var cn = await Conexion();
+        Bloqueado(NormalizarHasta(), 51340);
+        await cn.ExecuteAsync("""
+            UPDATE compras.OrdenCompra
+            SET IdMoneda=(SELECT IdMoneda FROM maestra.Moneda WHERE Codigo='PEN')
+            WHERE IdOrdenCompra=@oc;
+            """, new { oc });
+        Assert.That(NormalizarHasta().Successful, Is.True);
+        await cn.ExecuteAsync("""
+            INSERT INTO compras.Compra (NumeroCompra,IdOrdenCompra,FechaCompra,Aceptada)
+            VALUES ('C1',@oc,GETDATE(),0),('C2',@oc,GETDATE(),0);
+            """, new { oc });
+
+        Bloqueado(IntegrarEconomia(), 51402);
+        Assert.That(await cn.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM compras.Compra WHERE IdOrdenCompra=@oc", new { oc }), Is.EqualTo(2));
+        Assert.That(await cn.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID('compras.Compra') AND name='UX_Compra_IdOrdenCompra'"), Is.Zero);
     }
 
     private record Moneda(int IdMoneda,string Codigo,string Nombre,string Simbolo,bool Activo);

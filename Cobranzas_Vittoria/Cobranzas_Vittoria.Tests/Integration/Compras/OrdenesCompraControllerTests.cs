@@ -15,8 +15,8 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 ///   PUT    /api/compras/ordenes-compra/{id}                              -> Update
 ///   PATCH  /api/compras/ordenes-compra/{id}/estado                       -> UpdateEstado
 ///
-/// Estados válidos (CHECK): Registrada, Aceptada, Atendida, Cerrada, Anulada.
-/// Estado inicial al crear: 'Registrada'.
+/// Estados válidos: REGISTRADA, APROBADA, ATENDIDA, CERRADA y ANULADA.
+/// Estado inicial al crear: REGISTRADA.
 ///
 /// Numeración: el server calcula NumeroOrdenCompra como
 ///   RIGHT('0000000' + CONVERT(MAX(NumeroOrdenCompra como int) + 1), 7)
@@ -143,7 +143,7 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
         Assert.That(ordenCompra.TryGetProperty("idProveedor", out _), Is.False);
         Assert.That(ordenCompra.GetProperty("idMoneda").GetInt32(), Is.EqualTo(await DbHelpersMoneda.ObtenerPenAsync()));
         Assert.That(ordenCompra.GetProperty("idProyecto").GetInt32(), Is.EqualTo(SeedIds.ProyectoMaytaCapacII));
-        Assert.That(ordenCompra.GetProperty("estado").GetString(), Is.EqualTo("Registrada"));
+        Assert.That(ordenCompra.GetProperty("estado").GetString(), Is.EqualTo("REGISTRADA"));
         Assert.That(ordenCompra.GetProperty("numeroOrdenCompra").GetString(), Is.Not.Empty);
 
         // Total = 10 * 15.50 = 155.00
@@ -172,7 +172,10 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
     public async Task Crear_ConRequerimientoYProveedorValidos_RetornaOkEPersisteCabeceraDetalleYHistorial()
     {
         // Arrange
-        var idReq = await RequerimientoBuilder.Nuevo().CrearEnviadoOcAsync(_client);
+        var idReq = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterialAlbanileria, 5m)
+            .ConItem(IdMaterialCasco, 3m)
+            .CrearEnviadoOcAsync(_client);
 
         // Act
         var idOc = await CrearOrdenAsync(idReq, detalles: new List<OrdenCompraDetalleCreateDto>
@@ -187,7 +190,7 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
             "FROM compras.OrdenCompra WHERE IdOrdenCompra = @id",
             new { id = idOc })).Single();
         Assert.That(cabecera.Numero, Is.Not.Empty);
-        Assert.That(cabecera.Estado, Is.EqualTo("Registrada"));
+        Assert.That(cabecera.Estado, Is.EqualTo("REGISTRADA"));
         Assert.That(cabecera.Req, Is.EqualTo(idReq));
         Assert.That(cabecera.Moneda, Is.EqualTo(await DbHelpersMoneda.ObtenerPenAsync()));
         // Total = (5*20) + (3*100) = 100 + 300 = 400
@@ -211,7 +214,10 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
     public async Task Update_ConIdExistente_RetornaOkYSobreescribeItems()
     {
         // Arrange - crear OC con 1 item
-        var idReq = await RequerimientoBuilder.Nuevo().CrearEnviadoOcAsync(_client);
+        var idReq = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterialAlbanileria, 10m)
+            .ConItem(IdMaterialCasco, 30m)
+            .CrearEnviadoOcAsync(_client);
         var idOc = await CrearOrdenAsync(idReq);
 
         // Act - PUT con 2 items diferentes
@@ -247,23 +253,20 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task UpdateEstado_AAtendida_RetornaOkYCambiaEstadoEnBDYRegistraHistorial()
+    public async Task UpdateEstado_AAprobada_RegistraCompromisoEHistorial()
     {
         // Arrange
         var idReq = await RequerimientoBuilder.Nuevo().CrearEnviadoOcAsync(_client);
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(idReq, idPresupuestoDetalle);
         var idOc = await CrearOrdenAsync(idReq);
 
         // Act
-        // Bug del código fuente: el SP usp_OrdenCompra_ActualizarEstado solo acepta
-        //   {Generada, Aprobada, Enviada, Atendida, Anulada}
-        // pero el CHECK de la tabla solo permite
-        //   {Anulada, Cerrada, Atendida, Aceptada, Registrada}.
-        // La única transición válida desde 'Registrada' es a 'Atendida' (o 'Anulada').
         var estadoDto = new OrdenCompraEstadoDto
         {
-            EstadoNuevo = "Atendida",
+            EstadoNuevo = "APROBADA",
             IdUsuario = SeedIds.IngenieroId,
-            Observacion = "OC atendida completamente"
+            Observacion = "OC aprobada con compromiso"
         };
         var response = await _client.PatchAsync(
             $"/api/compras/ordenes-compra/{idOc}/estado",
@@ -275,17 +278,23 @@ public class OrdenesCompraControllerTests : IntegrationTestBase
         var estadoEnBd = await DbHelpers.QueryScalarAsync<string>(
             "SELECT Estado FROM compras.OrdenCompra WHERE IdOrdenCompra = @id",
             new { id = idOc });
-        Assert.That(estadoEnBd, Is.EqualTo("Atendida"));
+        Assert.That(estadoEnBd, Is.EqualTo("APROBADA"));
 
-        // Assert - 2: historial - debe haber 1 evento con EstadoAnterior='Registrada' y EstadoNuevo='Atendida'
+        // Assert - 2: historial y compromiso atómico.
         var historial = await DbHelpers.QueryAsync<HistorialRow>(
             "SELECT EstadoNuevo AS Estado, IdUsuario FROM compras.OrdenCompraHistorial " +
             "WHERE IdOrdenCompra = @id ORDER BY IdOrdenCompraHistorial",
             new { id = idOc });
         Assert.That(historial, Has.Exactly(1).Items,
             "Crear OC no inserta historial; el primer evento es el cambio de estado.");
-        Assert.That(historial.Single().Estado, Is.EqualTo("Atendida"));
+        Assert.That(historial.Single().Estado, Is.EqualTo("APROBADA"));
         Assert.That(historial.Single().IdUsuario, Is.EqualTo(SeedIds.IngenieroId));
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("""
+            SELECT COUNT(*) FROM ControlPresupuestario.MovimientoPresupuestal mp
+            JOIN ControlPresupuestario.TipoMovimientoPresupuestal tm
+                ON tm.IdTipoMovimientoPresupuestal = mp.IdTipoMovimientoPresupuestal
+            WHERE tm.Codigo = 'COMPROMISO' AND mp.IdOrigen = @idOc;
+            """, new { idOc }), Is.EqualTo(1));
     }
 
     [Test]

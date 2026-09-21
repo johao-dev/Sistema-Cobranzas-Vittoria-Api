@@ -20,7 +20,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 ///   GET    /api/compras/compras/{id}/documentos/{docId}/download                -> DownloadDocumento
 ///
 /// Reglas:
-///   - Para crear una Compra se necesita una OC existente (no se valida estado).
+///   - Para crear una Compra se necesita una OC APROBADA con respaldo presupuestario.
 ///   - NumeroCompra es requerido. Si el enviado ya existe, el repo autogenera
 ///     (MAX(TRY_CAST(NumeroCompra AS INT)) + 1, mismo patrón que OC).
 ///   - Cálculo de IGV:
@@ -50,6 +50,9 @@ public class ComprasControllerTests : IntegrationTestBase
 
     private async Task<int> CrearOrdenAsync(int idRequerimiento)
     {
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(
+            idRequerimiento, idPresupuestoDetalle);
         var dto = new OrdenCompraCreateDto
         {
             IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
@@ -68,7 +71,18 @@ public class ComprasControllerTests : IntegrationTestBase
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Setup falló al crear OC. Body: {await response.Content.ReadAsStringAsync()}");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("idOrdenCompra").GetInt32();
+        var idOc = body.GetProperty("idOrdenCompra").GetInt32();
+        var aprobacion = await _client.PatchAsync(
+            $"/api/compras/ordenes-compra/{idOc}/estado",
+            JsonContent.Create(new OrdenCompraEstadoDto
+            {
+                EstadoNuevo = "APROBADA",
+                IdUsuario = SeedIds.IngenieroId,
+                Observacion = "Aprobación automática de test"
+            }));
+        Assert.That(aprobacion.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            $"Setup falló al aprobar OC. Body: {await aprobacion.Content.ReadAsStringAsync()}");
+        return idOc;
     }
 
     private async Task<int> CrearCompraAsync(int idOc, bool incluyeIgv = false, List<CompraDetalleCreateDto>? items = null)
@@ -243,8 +257,33 @@ public class ComprasControllerTests : IntegrationTestBase
     public async Task Crear_ConOrdenCompraYProveedorValidos_RetornaOkEPersisteCompraYDetalle()
     {
         // Arrange
-        var idReq = await RequerimientoBuilder.Nuevo().CrearEnviadoOcAsync(_client);
-        var idOc = await CrearOrdenAsync(idReq);
+        var idReq = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterialAlbanileria, 5m)
+            .ConItem(IdMaterialCasco, 3m)
+            .CrearEnviadoOcAsync(_client);
+        var idPresupuestoDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
+        await IntegracionEconomicaTestData.AsignarDetalleARequerimientoAsync(idReq, idPresupuestoDetalle);
+        var ocResponse = await _client.PostAsJsonAsync("/api/compras/ordenes-compra", new OrdenCompraCreateDto
+        {
+            IdMoneda = await DbHelpersMoneda.ObtenerPenAsync(),
+            IdRequerimiento = idReq,
+            FechaOrdenCompra = DateTime.Today,
+            IdUsuarioCreacion = SeedIds.IngenieroId,
+            Items =
+            [
+                new() { IdMaterial = IdMaterialAlbanileria, Cantidad = 5m, IdProveedor = IdProveedor, PrecioUnitario = 20m },
+                new() { IdMaterial = IdMaterialCasco, Cantidad = 3m, IdProveedor = IdProveedor, PrecioUnitario = 100m }
+            ]
+        });
+        Assert.That(ocResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var ocBody = await ocResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var idOc = ocBody.GetProperty("idOrdenCompra").GetInt32();
+        var aprobar = await _client.PatchAsync($"/api/compras/ordenes-compra/{idOc}/estado",
+            JsonContent.Create(new OrdenCompraEstadoDto
+            {
+                EstadoNuevo = "APROBADA", IdUsuario = SeedIds.IngenieroId
+            }));
+        Assert.That(aprobar.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         // Act - 2 items con IGV
         var idCompra = await CrearCompraAsync(idOc, incluyeIgv: true, items: new List<CompraDetalleCreateDto>

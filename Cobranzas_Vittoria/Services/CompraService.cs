@@ -21,6 +21,9 @@ namespace Cobranzas_Vittoria.Services
             return new { idCompra = res.IdCompra, montoTotal = res.MontoTotal };
         }
 
+        public Task AceptarAsync(int idCompra, int? idUsuario, string? observacion)
+            => _repo.AceptarAsync(idCompra, idUsuario, observacion);
+
         public Task<IEnumerable<dynamic>> ListPendientesDesdeOcAsync() => _repo.ListPendientesDesdeOcAsync();
         public Task<IEnumerable<dynamic>> GetDocumentosAsync(int idCompra) => _repo.GetDocumentosAsync(idCompra);
         public Task SaveDocumentosAsync(int idCompra, IEnumerable<(string NombreArchivo, string RutaArchivo, string? Extension)> docs) => _repo.SaveDocumentosAsync(idCompra, docs);

@@ -8,7 +8,8 @@ CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_CentroCosto_Crear
     @Codigo VARCHAR(30),
     @Nombre NVARCHAR(150),
     @IdTipoCentroCosto INT,
-    @Descripcion NVARCHAR(255) = NULL
+    @Descripcion NVARCHAR(255) = NULL,
+    @IdProyecto INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -29,22 +30,32 @@ BEGIN
             SAVE TRANSACTION CP_CentroCostoCrear;
             SET @SavepointCreado = 1;
         END;
-        DECLARE @TipoActivo BIT;
-        SELECT @TipoActivo = Activo FROM ControlPresupuestario.TipoCentroCosto WITH (HOLDLOCK)
+        DECLARE @TipoActivo BIT, @CodigoTipo VARCHAR(30);
+        SELECT @TipoActivo = Activo, @CodigoTipo = Codigo FROM ControlPresupuestario.TipoCentroCosto WITH (HOLDLOCK)
         WHERE IdTipoCentroCosto = @IdTipoCentroCosto;
         IF @TipoActivo IS NULL THROW 51201, 'REFERENCIA_NO_EXISTE: TipoCentroCosto.', 1;
         IF @TipoActivo = 0 THROW 51202, 'RECURSO_INACTIVO: TipoCentroCosto.', 1;
+        IF @CodigoTipo = 'PROYECTO' AND @IdProyecto IS NULL
+            THROW 51200, 'CAMPO_REQUERIDO: un CentroCosto de tipo PROYECTO requiere IdProyecto.', 1;
+        IF @IdProyecto IS NOT NULL AND @CodigoTipo <> 'PROYECTO'
+            THROW 51220, 'DOMINIO_CENTRO_COSTO_INVALIDO: solo el tipo PROYECTO admite IdProyecto.', 1;
+        IF @IdProyecto IS NOT NULL AND NOT EXISTS
+            (SELECT 1 FROM maestra.Proyecto WITH (HOLDLOCK) WHERE IdProyecto = @IdProyecto AND Activo = 1)
+            THROW 51201, 'REFERENCIA_NO_EXISTE: Proyecto activo.', 1;
+        IF @IdProyecto IS NOT NULL AND EXISTS (SELECT 1 FROM ControlPresupuestario.CentroCosto WITH
+            (UPDLOCK, HOLDLOCK, INDEX(UX_CentroCosto_IdProyecto)) WHERE IdProyecto = @IdProyecto)
+            THROW 51205, 'PROYECTO_DUPLICADO: ya está asociado a otro CentroCosto.', 1;
         IF EXISTS (SELECT 1 FROM ControlPresupuestario.CentroCosto WITH
             (UPDLOCK, HOLDLOCK, INDEX(UQ_CentroCosto_Codigo)) WHERE Codigo = @Codigo)
             THROW 51205, 'CODIGO_DUPLICADO: CentroCosto.', 1;
         DECLARE @IdCentroCosto INT, @FechaCreacion DATETIME2(0) = SYSUTCDATETIME();
         INSERT INTO ControlPresupuestario.CentroCosto
-            (Codigo, Nombre, IdTipoCentroCosto, Descripcion, FechaCreacion, FechaModificacion)
-        VALUES (@Codigo, @Nombre, @IdTipoCentroCosto, @Descripcion, @FechaCreacion, NULL);
+            (Codigo, Nombre, IdTipoCentroCosto, IdProyecto, Descripcion, FechaCreacion, FechaModificacion)
+        VALUES (@Codigo, @Nombre, @IdTipoCentroCosto, @IdProyecto, @Descripcion, @FechaCreacion, NULL);
         SET @IdCentroCosto = CONVERT(INT, SCOPE_IDENTITY());
         IF @TranCount = 0 COMMIT TRANSACTION;
         SELECT @IdCentroCosto AS IdCentroCosto, @Codigo AS Codigo, @Nombre AS Nombre,
-            @IdTipoCentroCosto AS IdTipoCentroCosto, @Descripcion AS Descripcion,
+            @IdTipoCentroCosto AS IdTipoCentroCosto, @IdProyecto AS IdProyecto, @Descripcion AS Descripcion,
             CONVERT(BIT, 1) AS Activo, @FechaCreacion AS FechaCreacion;
     END TRY
     BEGIN CATCH
@@ -60,7 +71,8 @@ CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_CentroCosto_Actualizar
     @IdCentroCosto INT,
     @Nombre NVARCHAR(150),
     @Activo BIT,
-    @Descripcion NVARCHAR(255) = NULL
+    @Descripcion NVARCHAR(255) = NULL,
+    @IdProyecto INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -80,17 +92,32 @@ BEGIN
             SAVE TRANSACTION CP_CentroCostoActualizar;
             SET @SavepointCreado = 1;
         END;
-        IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.CentroCosto WITH
-            (UPDLOCK, HOLDLOCK, INDEX(PK_CentroCosto)) WHERE IdCentroCosto = @IdCentroCosto)
+        DECLARE @IdTipoCentroCosto INT, @IdProyectoActual INT, @CodigoTipo VARCHAR(30);
+        SELECT @IdTipoCentroCosto = cc.IdTipoCentroCosto, @IdProyectoActual = cc.IdProyecto,
+            @CodigoTipo = t.Codigo
+        FROM ControlPresupuestario.CentroCosto cc WITH (UPDLOCK, HOLDLOCK, INDEX(PK_CentroCosto))
+        JOIN ControlPresupuestario.TipoCentroCosto t ON t.IdTipoCentroCosto = cc.IdTipoCentroCosto
+        WHERE cc.IdCentroCosto = @IdCentroCosto;
+        IF @IdTipoCentroCosto IS NULL
             THROW 51203, 'RECURSO_NO_EXISTE: CentroCosto.', 1;
+        SET @IdProyecto = COALESCE(@IdProyecto, @IdProyectoActual);
+        IF @IdProyecto IS NOT NULL AND @CodigoTipo <> 'PROYECTO'
+            THROW 51220, 'DOMINIO_CENTRO_COSTO_INVALIDO: solo el tipo PROYECTO admite IdProyecto.', 1;
+        IF @IdProyecto IS NOT NULL AND NOT EXISTS
+            (SELECT 1 FROM maestra.Proyecto WITH (HOLDLOCK) WHERE IdProyecto = @IdProyecto AND Activo = 1)
+            THROW 51201, 'REFERENCIA_NO_EXISTE: Proyecto activo.', 1;
+        IF @IdProyecto IS NOT NULL AND EXISTS (SELECT 1 FROM ControlPresupuestario.CentroCosto WITH
+            (UPDLOCK, HOLDLOCK, INDEX(UX_CentroCosto_IdProyecto))
+            WHERE IdProyecto = @IdProyecto AND IdCentroCosto <> @IdCentroCosto)
+            THROW 51205, 'PROYECTO_DUPLICADO: ya está asociado a otro CentroCosto.', 1;
         DECLARE @FechaModificacion DATETIME2(0) = SYSUTCDATETIME();
         UPDATE ControlPresupuestario.CentroCosto
-        SET Nombre = @Nombre, Descripcion = @Descripcion, Activo = @Activo,
+        SET Nombre = @Nombre, Descripcion = @Descripcion, Activo = @Activo, IdProyecto = @IdProyecto,
             FechaModificacion = @FechaModificacion
         WHERE IdCentroCosto = @IdCentroCosto;
         IF @TranCount = 0 COMMIT TRANSACTION;
         SELECT @IdCentroCosto AS IdCentroCosto, @Nombre AS Nombre, @Descripcion AS Descripcion,
-            @Activo AS Activo, @FechaModificacion AS FechaModificacion;
+            @IdProyecto AS IdProyecto, @Activo AS Activo, @FechaModificacion AS FechaModificacion;
     END TRY
     BEGIN CATCH
         IF @TranCount = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
@@ -306,4 +333,3 @@ BEGIN
     END CATCH;
 END;
 GO
-

@@ -8,6 +8,7 @@ public class Compra
     public string? Proveedores { get; set; }
     public DateTime FechaCompra { get; set; }
     public bool Aceptada { get; set; }
+    public string Estado { get; set; } = string.Empty;
     public bool IncluyeIGV { get; set; }
     public decimal SubtotalSinIGV { get; set; }
     public decimal MontoIGV { get; set; }
