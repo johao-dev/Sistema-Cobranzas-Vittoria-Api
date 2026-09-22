@@ -325,10 +325,10 @@ GO
 
 CREATE OR ALTER PROCEDURE [maestra].[usp_Proveedor_Upsert]
     @IdProveedor INT = NULL,
-    @RazonSocial NVARCHAR(200),
-    @Ruc NVARCHAR(20),
+    @RazonSocial NVARCHAR(250),
+    @Ruc NVARCHAR(20) = NULL,
     @Contacto NVARCHAR(150) = NULL,
-    @Telefono NVARCHAR(30) = NULL,
+    @Telefono NVARCHAR(50) = NULL,
     @Correo NVARCHAR(150) = NULL,
     @Direccion NVARCHAR(250) = NULL,
     @Banco NVARCHAR(50) = NULL,
@@ -348,14 +348,12 @@ SET
 XACT_ABORT ON;
 
 IF NULLIF(LTRIM(RTRIM(@RazonSocial)), '') IS NULL
-        THROW 50020,
+        THROW 51520,
 'RazonSocial es requerido.',
 1;
 
-IF NULLIF(LTRIM(RTRIM(@Ruc)), '') IS NULL
-        THROW 50021,
-'RUC es requerido.',
-1;
+SET @RazonSocial = LTRIM(RTRIM(@RazonSocial));
+SET @Ruc = NULLIF(LTRIM(RTRIM(@Ruc)), '');
 
 IF @IdProveedor IS NULL
     BEGIN
@@ -365,8 +363,8 @@ SELECT
 FROM
     maestra.Proveedor
 WHERE
-    Ruc = @Ruc)
-            THROW 50022,
+    @Ruc IS NOT NULL AND Ruc = @Ruc)
+            THROW 51522,
 'Ya existe un proveedor con ese RUC.',
 1;
 
@@ -418,9 +416,9 @@ SELECT
 FROM
 maestra.Proveedor
 WHERE
-Ruc = @Ruc
+@Ruc IS NOT NULL AND Ruc = @Ruc
 AND IdProveedor <> @IdProveedor)
-            THROW 50023,
+            THROW 51523,
 'Ya existe otro proveedor con ese RUC.',
 1;
 
@@ -629,169 +627,6 @@ WHERE
 SELECT
     @IdProveedorEspecialidadCotizacion AS IdProveedorEspecialidadCotizacion;
 END
-END;
-GO
-
-CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Delete]
-    @IdProveedorGastoAdministrativo INT
-AS
-BEGIN
-    SET
-NOCOUNT ON;
-
-UPDATE
-    maestra.ProveedorGastoAdministrativo
-SET
-    Activo = 0
-WHERE
-    IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_List]
-    @Activo BIT = NULL,
-    @IdCategoriaGasto INT = NULL
-AS
-BEGIN
-    SET
-    NOCOUNT ON;
-    
-    SELECT
-        pga.IdProveedorGastoAdministrativo,
-        pga.IdCategoriaGasto,
-        cg.Nombre AS Categoria,
-        pga.RazonSocial,
-        pga.Ruc,
-        pga.Contacto,
-        pga.Telefono,
-        pga.Correo,
-        pga.Activo,
-        pga.FechaCreacion
-FROM
-    maestra.ProveedorGastoAdministrativo pga
-LEFT JOIN maestra.CategoriaGasto cg
-        ON
-    cg.IdCategoriaGasto = pga.IdCategoriaGasto
-WHERE
-    (@Activo IS NULL
-        OR pga.Activo = @Activo)
-    AND (@IdCategoriaGasto IS NULL
-        OR pga.IdCategoriaGasto = @IdCategoriaGasto)
-    AND pga.IdCategoriaGasto IS NOT NULL
-ORDER BY
-    cg.Nombre,
-    pga.RazonSocial;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_Upsert]
-    @IdProveedorGastoAdministrativo INT = NULL,
-    @IdCategoriaGasto INT,
-    @RazonSocial NVARCHAR(200),
-    @Ruc NVARCHAR(30) = NULL,
-    @Contacto NVARCHAR(150) = NULL,
-    @Telefono NVARCHAR(50) = NULL,
-    @Correo NVARCHAR(150) = NULL,
-    @Activo BIT = 1
-AS
-BEGIN
-    SET
-NOCOUNT ON;
-
-SET
-@RazonSocial = LTRIM(RTRIM(ISNULL(@RazonSocial, '')));
-
-SET
-@Ruc = NULLIF(LTRIM(RTRIM(ISNULL(@Ruc, ''))), '');
-
-SET
-@Contacto = NULLIF(LTRIM(RTRIM(ISNULL(@Contacto, ''))), '');
-
-SET
-@Telefono = NULLIF(LTRIM(RTRIM(ISNULL(@Telefono, ''))), '');
-
-SET
-@Correo = NULLIF(LTRIM(RTRIM(ISNULL(@Correo, ''))), '');
-
-IF @IdCategoriaGasto IS NULL
-OR @IdCategoriaGasto <= 0
-        THROW 50001,
-'Debes seleccionar una categoría para el proveedor de gasto.',
-1;
-
-IF @RazonSocial = ''
-        THROW 50002,
-'Debes ingresar la razón social del proveedor.',
-1;
-
-IF EXISTS (
-SELECT
-    1
-FROM
-    maestra.ProveedorGastoAdministrativo
-WHERE
-    IdCategoriaGasto = @IdCategoriaGasto
-    AND (RazonSocial = @RazonSocial
-        OR (@Ruc IS NOT NULL
-            AND NULLIF(LTRIM(RTRIM(Ruc)), '') = @Ruc))
-        AND (@IdProveedorGastoAdministrativo IS NULL
-            OR IdProveedorGastoAdministrativo <> @IdProveedorGastoAdministrativo)
-    )
-    BEGIN
-        THROW 50003,
-'Ya existe un proveedor de gasto para esa categoría con la misma razón social o RUC.',
-1;
-END
-
-    IF @IdProveedorGastoAdministrativo IS NOT NULL
-AND @IdProveedorGastoAdministrativo > 0
-    BEGIN
-        UPDATE
-    maestra.ProveedorGastoAdministrativo
-SET
-    IdCategoriaGasto = @IdCategoriaGasto,
-            RazonSocial = @RazonSocial,
-            Ruc = @Ruc,
-            Contacto = @Contacto,
-            Telefono = @Telefono,
-            Correo = @Correo,
-            Activo = @Activo
-WHERE
-    IdProveedorGastoAdministrativo = @IdProveedorGastoAdministrativo;
-
-SELECT
-    @IdProveedorGastoAdministrativo AS IdProveedorGastoAdministrativo;
-
-RETURN;
-END
-
-    INSERT
-    INTO
-    maestra.ProveedorGastoAdministrativo
-    (
-        IdCategoriaGasto,
-        RazonSocial,
-        Ruc,
-        Contacto,
-        Telefono,
-        Correo,
-        Activo,
-        FechaCreacion
-    )
-VALUES
-    (
-        @IdCategoriaGasto,
-        @RazonSocial,
-        @Ruc,
-        @Contacto,
-        @Telefono,
-        @Correo,
-        @Activo,
-        GETDATE()
-    );
-
-SELECT
-    CAST(SCOPE_IDENTITY() AS INT) AS IdProveedorGastoAdministrativo;
 END;
 GO
 

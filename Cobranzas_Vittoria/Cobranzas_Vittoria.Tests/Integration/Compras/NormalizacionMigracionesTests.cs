@@ -23,7 +23,8 @@ public class NormalizacionMigracionesTests
         _connectionString = new SqlConnectionStringBuilder(GlobalSetupFixture.DbContainer.GetConnectionString())
             { InitialCatalog = _database }.ConnectionString;
         var result = Upgrade(name => name.Contains(".Migrations.Versioned.")
-            && !name.Contains(".V2_1_") && !name.Contains(".V2_2_"));
+            && !name.Contains(".V2_1_") && !name.Contains(".V2_2_")
+            && !name.Contains(".V2_3_"));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
     }
 
@@ -48,6 +49,9 @@ public class NormalizacionMigracionesTests
 
     private DatabaseUpgradeResult IntegrarEconomia() => Upgrade(name =>
         name.Contains(".Migrations.Versioned.V2_2_"));
+
+    private DatabaseUpgradeResult RefactorizarContable() => Upgrade(name =>
+        name.Contains(".Migrations.Versioned.V2_3_"));
 
     private async Task<SqlConnection> Conexion()
     {
@@ -297,6 +301,29 @@ public class NormalizacionMigracionesTests
             "SELECT COUNT(*) FROM compras.Compra WHERE IdOrdenCompra=@oc", new { oc }), Is.EqualTo(2));
         Assert.That(await cn.QuerySingleAsync<int>(
             "SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID('compras.Compra') AND name='UX_Compra_IdOrdenCompra'"), Is.Zero);
+    }
+
+    [Test]
+    public async Task RefactorContable_ActualizaUnaBaseLegacyNormalizada()
+    {
+        var normalizacion = NormalizarHasta();
+        Assert.That(normalizacion.Successful, Is.True, normalizacion.Error?.ToString());
+
+        var integracion = IntegrarEconomia();
+        Assert.That(integracion.Successful, Is.True, integracion.Error?.ToString());
+
+        var refactor = RefactorizarContable();
+        Assert.That(refactor.Successful, Is.True, refactor.Error?.ToString());
+
+        await using var cn = await Conexion();
+        Assert.Multiple(() =>
+        {
+            Assert.That(cn.ExecuteScalar<int>("SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID('contable.GastoDirecto')"), Is.EqualTo(1));
+            Assert.That(cn.ExecuteScalar<int>("SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID('maestra.Proveedor') AND name='UX_Proveedor_Ruc_NoNulo'"), Is.EqualTo(1));
+            Assert.That(cn.ExecuteScalar<int>("SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID('contable.PresupuestoProyecto')"), Is.Zero);
+            Assert.That(cn.ExecuteScalar<int>("SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID('contable.CotizacionMaterialEspecialidad')"), Is.Zero);
+            Assert.That(cn.ExecuteScalar<int>("SELECT COUNT(*) FROM maestra.ProveedorLegacyMap"), Is.GreaterThan(0));
+        });
     }
 
     private record Moneda(int IdMoneda,string Codigo,string Nombre,string Simbolo,bool Activo);

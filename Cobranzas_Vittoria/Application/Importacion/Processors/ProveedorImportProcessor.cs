@@ -10,12 +10,12 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// <summary>
 /// Processor de importacion masiva para <c>maestra.Proveedor</c>.
 ///
-/// Encabezados requeridos: <c>RazonSocial</c>, <c>Ruc</c>.
+/// Encabezado requerido: <c>RazonSocial</c>. <c>Ruc</c> es opcional.
 /// Opcionales: resto de columnas de contacto y datos bancarios.
 ///
 /// Reglas de mapeo:
 ///   - <c>RazonSocial</c>: requerido, no vacio.
-///   - <c>Ruc</c>: requerido, no vacio (unicidad validada en SP).
+///   - <c>Ruc</c>: opcional; cuando está presente su unicidad se valida en BD.
 ///   - <c>TrabajamosConProveedor</c>: opcional, string libre (max 10 chars).
 ///   - Resto: opcionales, strings libres.
 /// </summary>
@@ -35,7 +35,7 @@ public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto, 
     protected override string SpName => "maestra.usp_Proveedor_CargaMasiva";
     protected override string TvpTypeName => "maestra.TVP_Proveedor";
 
-    protected override string[] EncabezadosRequeridos => new[] { "RazonSocial", "Ruc" };
+    protected override string[] EncabezadosRequeridos => new[] { "RazonSocial" };
 
     internal override ProveedorImportDto MapearFila(SpreadsheetRow fila)
     {
@@ -44,8 +44,6 @@ public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto, 
             throw new KeyNotFoundException("La columna 'RazonSocial' es requerida y no puede estar vacia.");
 
         var ruc = fila.GetString("Ruc");
-        if (string.IsNullOrWhiteSpace(ruc))
-            throw new KeyNotFoundException("La columna 'Ruc' es requerida y no puede estar vacia.");
 
         var activo = LeerBoolConDefault(fila, "Activo", defaultValue: true);
 
@@ -53,7 +51,7 @@ public class ProveedorImportProcessor : ImportProcessorBase<ProveedorImportDto, 
         {
             _Fila = fila.NumeroFila,
             RazonSocial = razonSocial.Trim(),
-            Ruc = ruc.Trim(),
+            Ruc = string.IsNullOrWhiteSpace(ruc) ? null : ruc.Trim(),
             Contacto = fila.GetString("Contacto")?.Trim(),
             Telefono = fila.GetString("Telefono")?.Trim(),
             Correo = fila.GetString("Correo")?.Trim(),

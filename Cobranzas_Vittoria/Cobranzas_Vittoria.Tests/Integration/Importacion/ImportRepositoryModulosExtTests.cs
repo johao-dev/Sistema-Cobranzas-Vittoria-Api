@@ -4,13 +4,11 @@ using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging.Abstractions;
-
 namespace Cobranzas_Vittoria.Tests.Integration.Importacion;
 
 /// <summary>
-/// Pruebas de integracion de los 6 SPs de carga masiva restantes:
-/// Especialidad, Material, Proveedor, ProveedorGastoAdministrativo,
-/// ProveedorTerreno, CategoriaGasto.
+/// Pruebas de integración de los 4 SPs de carga masiva restantes:
+/// Especialidad, Material, Proveedor y CategoriaGasto.
 ///
 /// Para cada modulo se cubren 2 escenarios minimos:
 ///   - Happy path: N filas validas -> N inserts.
@@ -18,7 +16,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Importacion;
 ///     -> SqlException y rollback completo (ninguna fila del prefijo queda).
 ///
 /// <para>
-/// <b>Persistencia entre tests:</b> las 7 tablas de maestra estan en
+/// <b>Persistencia entre tests:</b> las tablas maestras correspondientes están en
 /// <c>TablesToIgnore</c> del Respawn, por lo que los datos seed y los inserts
 /// de tests anteriores persisten. Cada test usa prefijos unicos
 /// (<c>PrefijoUnico()</c>) y verifica por prefijo, no por conteo total.
@@ -196,7 +194,7 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Proveedor_RucVacio_Lanza50001_Rollback()
+    public async Task Proveedor_RucVacio_SeImportaComoNull()
     {
         var prefijo = PrefijoUnico();
 
@@ -207,11 +205,14 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
         };
 
         using var connection = AbrirConexion();
-        var ex = Assert.ThrowsAsync<SqlException>(async () =>
-            await _repo.ImportAsync(SpProveedor, TvpProveedor, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" }))!;
+        var count = await _repo.ImportAsync(SpProveedor, TvpProveedor, dtos, connection,
+            transaction: null, extraParameters: new { Usuario = "test-user" });
 
-        Assert.That(ex.Number, Is.EqualTo(50001));
-        Assert.That(ContarProveedorPorPrefijo(connection, prefijo), Is.EqualTo(0));
+        Assert.That(count, Is.EqualTo(2));
+        Assert.That(ContarProveedorPorPrefijo(connection, prefijo), Is.EqualTo(2));
+        Assert.That(await connection.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM maestra.Proveedor WHERE RazonSocial = @RazonSocial AND Ruc IS NULL",
+            new { RazonSocial = $"{prefijo} B" }), Is.EqualTo(1));
     }
 
     [Test]
@@ -237,107 +238,6 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
 
         Assert.That(ex.Number, Is.EqualTo(50003));
         Assert.That(ex.Message, Does.Contain("VALOR_YA_EXISTE_EN_BD"));
-    }
-
-    // =========================================================================
-    // PROVEEDOR GASTO ADMINISTRATIVO
-    // =========================================================================
-    private const string SpProveedorGasto = "maestra.usp_ProveedorGastoAdministrativo_CargaMasiva";
-    private const string TvpProveedorGasto = "maestra.TVP_ProveedorGastoAdministrativo";
-
-    [Test]
-    public async Task ProveedorGasto_HappyPath_Inserta2Filas()
-    {
-        var prefijo = PrefijoUnico();
-        var ruc1 = $"20{prefijo.Substring(0, 9)}01";
-
-        var dtos = new[]
-        {
-            new ProveedorGastoAdministrativoImportDto
-            {
-                _Fila = 2, RazonSocial = $"{prefijo} A", Ruc = ruc1,
-                Contacto = "C1", Correo = "a@b.com", Activo = true, IdCategoriaGasto = null
-            },
-            new ProveedorGastoAdministrativoImportDto
-            {
-                _Fila = 3, RazonSocial = $"{prefijo} B", Ruc = null,
-                Contacto = null, Activo = true, IdCategoriaGasto = 1   // CategoriaGasto del seed
-            }
-        };
-
-        using var connection = AbrirConexion();
-        var count = await _repo.ImportAsync(SpProveedorGasto, TvpProveedorGasto, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" });
-
-        Assert.That(count, Is.EqualTo(2));
-        Assert.That(ContarProveedorGastoPorPrefijo(connection, prefijo), Is.EqualTo(2));
-    }
-
-    [Test]
-    public async Task ProveedorGasto_RazonSocialVacia_Lanza50001_Rollback()
-    {
-        var prefijo = PrefijoUnico();
-
-        var dtos = new[]
-        {
-            new ProveedorGastoAdministrativoImportDto { _Fila = 2, RazonSocial = $"{prefijo} A", Activo = true },
-            new ProveedorGastoAdministrativoImportDto { _Fila = 3, RazonSocial = "  ",          Activo = true }
-        };
-
-        using var connection = AbrirConexion();
-        var ex = Assert.ThrowsAsync<SqlException>(async () =>
-            await _repo.ImportAsync(SpProveedorGasto, TvpProveedorGasto, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" }))!;
-
-        Assert.That(ex.Number, Is.EqualTo(50001));
-        Assert.That(ContarProveedorGastoPorPrefijo(connection, prefijo), Is.EqualTo(0));
-    }
-
-    // =========================================================================
-    // PROVEEDOR TERRENO
-    // =========================================================================
-    private const string SpProveedorTerreno = "maestra.usp_ProveedorTerreno_CargaMasiva";
-    private const string TvpProveedorTerreno = "maestra.TVP_ProveedorTerreno";
-
-    [Test]
-    public async Task ProveedorTerreno_HappyPath_Inserta2Filas()
-    {
-        var prefijo = PrefijoUnico();
-
-        var dtos = new[]
-        {
-            new ProveedorTerrenoImportDto
-            {
-                _Fila = 2, RazonSocial = $"{prefijo} A", Ruc = "20123456789", Contacto = "C1", Telefono = "999111", Activo = true
-            },
-            new ProveedorTerrenoImportDto
-            {
-                _Fila = 3, RazonSocial = $"{prefijo} B", Ruc = null, Activo = true
-            }
-        };
-
-        using var connection = AbrirConexion();
-        var count = await _repo.ImportAsync(SpProveedorTerreno, TvpProveedorTerreno, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" });
-
-        Assert.That(count, Is.EqualTo(2));
-        Assert.That(ContarProveedorTerrenoPorPrefijo(connection, prefijo), Is.EqualTo(2));
-    }
-
-    [Test]
-    public async Task ProveedorTerreno_RazonSocialVacia_Lanza50001_Rollback()
-    {
-        var prefijo = PrefijoUnico();
-
-        var dtos = new[]
-        {
-            new ProveedorTerrenoImportDto { _Fila = 2, RazonSocial = $"{prefijo} A", Activo = true },
-            new ProveedorTerrenoImportDto { _Fila = 3, RazonSocial = "",            Activo = true }
-        };
-
-        using var connection = AbrirConexion();
-        var ex = Assert.ThrowsAsync<SqlException>(async () =>
-            await _repo.ImportAsync(SpProveedorTerreno, TvpProveedorTerreno, dtos, connection, transaction: null, extraParameters: new { Usuario = "test-user" }))!;
-
-        Assert.That(ex.Number, Is.EqualTo(50001));
-        Assert.That(ContarProveedorTerrenoPorPrefijo(connection, prefijo), Is.EqualTo(0));
     }
 
     // =========================================================================
@@ -406,16 +306,6 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
     private static int ContarProveedorPorPrefijo(System.Data.IDbConnection connection, string prefijo)
         => connection.QueryFirstOrDefault<int>(
             "SELECT COUNT(*) FROM maestra.Proveedor WHERE RazonSocial LIKE @Patron + '%'",
-            new { Patron = prefijo });
-
-    private static int ContarProveedorGastoPorPrefijo(System.Data.IDbConnection connection, string prefijo)
-        => connection.QueryFirstOrDefault<int>(
-            "SELECT COUNT(*) FROM maestra.ProveedorGastoAdministrativo WHERE RazonSocial LIKE @Patron + '%'",
-            new { Patron = prefijo });
-
-    private static int ContarProveedorTerrenoPorPrefijo(System.Data.IDbConnection connection, string prefijo)
-        => connection.QueryFirstOrDefault<int>(
-            "SELECT COUNT(*) FROM maestra.ProveedorTerreno WHERE RazonSocial LIKE @Patron + '%'",
             new { Patron = prefijo });
 
     private static int ContarCategoriaGastoPorPrefijo(System.Data.IDbConnection connection, string prefijo)

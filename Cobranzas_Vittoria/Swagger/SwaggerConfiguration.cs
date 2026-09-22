@@ -52,8 +52,6 @@ public static class SwaggerConfiguration
                     | `especialidad` | `maestra.Especialidad` |
                     | `material` | `maestra.Material` |
                     | `proveedor` | `maestra.Proveedor` |
-                    | `proveedor-gasto` | `maestra.ProveedorGastoAdministrativo` |
-                    | `proveedor-terreno` | `maestra.ProveedorTerreno` |
                     | `categoria-gasto` | `maestra.CategoriaGasto` |
 
                     **Limitaciones**: tamano maximo 10 MB, maximo 100 filas por archivo.

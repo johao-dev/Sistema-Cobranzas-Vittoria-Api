@@ -32,7 +32,7 @@ public interface IImportService
     /// <param name="modulo">
     /// Identificador del modulo, case-insensitive (ej: <c>"unidad-medida"</c>,
     /// <c>"especialidad"</c>, <c>"material"</c>, <c>"proveedor"</c>,
-    /// <c>"proveedor-gasto"</c>, <c>"proveedor-terreno"</c>, <c>"categoria-gasto"</c>).
+    /// <c>"proveedor"</c> o <c>"categoria-gasto"</c>).
     /// </param>
     /// <param name="archivo">Archivo a importar (.csv, .xlsx o .xls).</param>
     /// <param name="usuario">Identificador del usuario que ejecuta la operacion.</param>

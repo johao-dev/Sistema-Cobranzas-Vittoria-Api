@@ -121,8 +121,8 @@ public class TvpMapperTests
     }
 
     // ====================================================================
-    // Cobertura de los 6 DTOs adicionales (Especialidad, Material, Proveedor,
-    // ProveedorGastoAdministrativo, ProveedorTerreno, CategoriaGasto).
+    // Cobertura de los DTOs adicionales (Especialidad, Material, Proveedor y
+    // CategoriaGasto).
     // Verifica que la cantidad de columnas y sus tipos coincidan con el TVP
     // correspondiente. El orden de columnas es importante porque TvpMapper usa
     // el orden de declaracion de las propiedades, y el SQL rechaza la insercion
@@ -165,37 +165,6 @@ public class TvpMapperTests
         Assert.That(dataTable.Columns["DescripcionServicio"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Observacion"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["TrabajamosConProveedor"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
-        Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));
-    }
-
-    [Test]
-    public void ToDataTable_ConProveedorGastoAdministrativoDto_DevuelveColumnasYTiposEsperados()
-    {
-        var dataTable = TvpMapper.ToDataTable(Array.Empty<ProveedorGastoAdministrativoImportDto>());
-
-        Assert.That(dataTable.Columns.Count, Is.EqualTo(8));
-        Assert.That(dataTable.Columns["RazonSocial"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Ruc"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Contacto"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Telefono"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Correo"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
-        Assert.That(dataTable.Columns["IdCategoriaGasto"]!.DataType, Is.EqualTo(typeof(int)));
-        Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));
-    }
-
-    [Test]
-    public void ToDataTable_ConProveedorTerrenoDto_DevuelveColumnasYTiposEsperados()
-    {
-        var dataTable = TvpMapper.ToDataTable(Array.Empty<ProveedorTerrenoImportDto>());
-
-        Assert.That(dataTable.Columns.Count, Is.EqualTo(7));
-        Assert.That(dataTable.Columns["RazonSocial"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Ruc"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Contacto"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Telefono"]!.DataType, Is.EqualTo(typeof(string)));
-        Assert.That(dataTable.Columns["Correo"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
         Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));
     }

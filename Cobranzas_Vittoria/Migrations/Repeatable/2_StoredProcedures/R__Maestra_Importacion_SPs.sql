@@ -246,7 +246,7 @@ GO
 -- Proveedor
 -- Tabla destino: maestra.Proveedor (RazonSocial, Ruc, ..., Activo, FechaCreacion)
 -- Validaciones:
---   - 50001: RazonSocial y Ruc obligatorios.
+--   - 50001: RazonSocial obligatorio. Ruc puede ser NULL.
 --   - 50002: Rucs duplicados dentro del archivo.
 --   - 50003: Rucs que ya existen en BD.
 -- -----------------------------------------------------------------------------
@@ -265,14 +265,14 @@ BEGIN
         IF EXISTS (
             SELECT 1 FROM @Filas
             WHERE NULLIF(LTRIM(RTRIM(RazonSocial)), '') IS NULL
-               OR NULLIF(LTRIM(RTRIM(Ruc)), '') IS NULL
         )
-            THROW 50001, 'CAMPO_OBLIGATORIO: RazonSocial y Ruc son requeridos.', 1;
+            THROW 50001, 'CAMPO_OBLIGATORIO: RazonSocial es requerido.', 1;
 
         -- Validacion 2: Rucs duplicados dentro del archivo
         IF EXISTS (
-            SELECT Ruc FROM @Filas
-            GROUP BY Ruc
+            SELECT NULLIF(LTRIM(RTRIM(Ruc)), '') FROM @Filas
+            WHERE NULLIF(LTRIM(RTRIM(Ruc)), '') IS NOT NULL
+            GROUP BY NULLIF(LTRIM(RTRIM(Ruc)), '')
             HAVING COUNT(*) > 1
         )
             THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Ruc repetido en el archivo.', 1;
@@ -281,7 +281,9 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM @Filas f
-            INNER JOIN maestra.Proveedor p WITH (UPDLOCK, HOLDLOCK) ON p.Ruc = f.Ruc
+            INNER JOIN maestra.Proveedor p WITH (UPDLOCK, HOLDLOCK)
+                ON p.Ruc = NULLIF(LTRIM(RTRIM(f.Ruc)), '')
+            WHERE NULLIF(LTRIM(RTRIM(f.Ruc)), '') IS NOT NULL
         )
             THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un Proveedor con ese Ruc.', 1;
 
@@ -291,7 +293,7 @@ BEGIN
             (RazonSocial, Ruc, Contacto, Telefono, Correo, Direccion, Banco, CuentaCorriente, CCI,
              CuentaDetraccion, DescripcionServicio, Observacion, TrabajamosConProveedor, Activo, FechaCreacion)
         SELECT
-            RazonSocial, Ruc, Contacto, Telefono, Correo, Direccion, Banco, CuentaCorriente, CCI,
+            RazonSocial, NULLIF(LTRIM(RTRIM(Ruc)), ''), Contacto, Telefono, Correo, Direccion, Banco, CuentaCorriente, CCI,
             CuentaDetraccion, DescripcionServicio, Observacion, TrabajamosConProveedor, ISNULL(Activo, 1), GETDATE()
         FROM @Filas;
         SET @RowCount = @@ROWCOUNT;
@@ -306,149 +308,6 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- ProveedorGastoAdministrativo
--- Tabla destino: maestra.ProveedorGastoAdministrativo
---   (RazonSocial UNIQUE, Ruc UNIQUE si no es NULL, IdCategoriaGasto FK opcional)
--- Validaciones:
---   - 50001: RazonSocial obligatorio.
---   - 50002: RazonSocial duplicado intra-archivo.
---   - 50003: RazonSocial o Ruc ya existentes en BD.
---   - 50004: IdCategoriaGasto no existe.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorGastoAdministrativo_CargaMasiva]
-    @Filas maestra.TVP_ProveedorGastoAdministrativo READONLY,
-    @Usuario VARCHAR(100) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        BEGIN TRAN;
-
-        -- Validacion 1: obligatoriedad
-        IF EXISTS (
-            SELECT 1 FROM @Filas
-            WHERE NULLIF(LTRIM(RTRIM(RazonSocial)), '') IS NULL
-        )
-            THROW 50001, 'CAMPO_OBLIGATORIO: RazonSocial es requerida.', 1;
-
-        -- Validacion 2: RazonSocial duplicada intra-archivo
-        IF EXISTS (
-            SELECT RazonSocial FROM @Filas
-            GROUP BY RazonSocial
-            HAVING COUNT(*) > 1
-        )
-            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: RazonSocial repetida en el archivo.', 1;
-
-        -- Validacion 3: RazonSocial ya existe en BD (indice UNIQUE)
-        IF EXISTS (
-            SELECT 1
-            FROM @Filas f
-            INNER JOIN maestra.ProveedorGastoAdministrativo p WITH (UPDLOCK, HOLDLOCK) ON p.RazonSocial = f.RazonSocial
-        )
-            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un ProveedorGastoAdministrativo con esa RazonSocial.', 1;
-
-        -- Validacion 3b: Ruc ya existe en BD (solo si la fila trae Ruc)
-        IF EXISTS (
-            SELECT 1
-            FROM @Filas f
-            INNER JOIN maestra.ProveedorGastoAdministrativo p WITH (UPDLOCK, HOLDLOCK) ON p.Ruc = f.Ruc
-            WHERE NULLIF(LTRIM(RTRIM(f.Ruc)), '') IS NOT NULL
-        )
-            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un ProveedorGastoAdministrativo con ese Ruc.', 1;
-
-        -- Validacion 4: IdCategoriaGasto debe existir
-        IF EXISTS (
-            SELECT 1 FROM @Filas f
-            WHERE f.IdCategoriaGasto IS NOT NULL
-              AND NOT EXISTS (SELECT 1 FROM maestra.CategoriaGasto c WHERE c.IdCategoriaGasto = f.IdCategoriaGasto)
-        )
-            THROW 50004, 'FK_NO_EXISTE: Alguna fila referencia un IdCategoriaGasto inexistente.', 1;
-
-        -- Insert
-        DECLARE @RowCount INT = 0;
-        INSERT INTO maestra.ProveedorGastoAdministrativo
-            (RazonSocial, Ruc, Contacto, Telefono, Correo, Activo, FechaCreacion, IdCategoriaGasto)
-        SELECT
-            RazonSocial, Ruc, Contacto, Telefono, Correo, ISNULL(Activo, 1), GETDATE(), IdCategoriaGasto
-        FROM @Filas;
-        SET @RowCount = @@ROWCOUNT;
-
-        COMMIT;
-        SELECT @RowCount AS FilasInsertadas;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK;
-        THROW;
-    END CATCH
-END;
-GO
-
-
--- -----------------------------------------------------------------------------
--- ProveedorTerreno
--- Tabla destino: maestra.ProveedorTerreno
---   (RazonSocial tiene indice nonclustered, unicidad por convencion de negocio)
--- Validaciones:
---   - 50001: RazonSocial obligatorio.
---   - 50002: RazonSocial duplicada intra-archivo.
---   - 50003: RazonSocial ya existe en BD.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [maestra].[usp_ProveedorTerreno_CargaMasiva]
-    @Filas maestra.TVP_ProveedorTerreno READONLY,
-    @Usuario VARCHAR(100) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        BEGIN TRAN;
-
-        -- Validacion 1: obligatoriedad
-        IF EXISTS (
-            SELECT 1 FROM @Filas
-            WHERE NULLIF(LTRIM(RTRIM(RazonSocial)), '') IS NULL
-        )
-            THROW 50001, 'CAMPO_OBLIGATORIO: RazonSocial es requerida.', 1;
-
-        -- Validacion 2: RazonSocial duplicada intra-archivo
-        IF EXISTS (
-            SELECT RazonSocial FROM @Filas
-            GROUP BY RazonSocial
-            HAVING COUNT(*) > 1
-        )
-            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: RazonSocial repetida en el archivo.', 1;
-
-        -- Validacion 3: RazonSocial ya existe en BD
-        IF EXISTS (
-            SELECT 1
-            FROM @Filas f
-            INNER JOIN maestra.ProveedorTerreno p WITH (UPDLOCK, HOLDLOCK) ON p.RazonSocial = f.RazonSocial
-        )
-            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un ProveedorTerreno con esa RazonSocial.', 1;
-
-        -- Insert
-        DECLARE @RowCount INT = 0;
-        INSERT INTO maestra.ProveedorTerreno
-            (RazonSocial, Ruc, Contacto, Telefono, Correo, Activo, FechaCreacion)
-        SELECT
-            RazonSocial, Ruc, Contacto, Telefono, Correo, ISNULL(Activo, 1), GETDATE()
-        FROM @Filas;
-        SET @RowCount = @@ROWCOUNT;
-
-        COMMIT;
-        SELECT @RowCount AS FilasInsertadas;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK;
-        THROW;
-    END CATCH
-END;
-GO
 
 
 -- -----------------------------------------------------------------------------

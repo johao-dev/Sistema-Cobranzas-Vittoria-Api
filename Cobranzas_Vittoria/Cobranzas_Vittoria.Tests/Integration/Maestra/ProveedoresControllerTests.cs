@@ -146,7 +146,7 @@ public class ProveedoresControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Upsert_ConRucDuplicado_Retorna5xxPorThrowDelSP()
+    public async Task Upsert_ConRucDuplicado_RetornaConflict()
     {
         // Arrange - creamos el primero
         var rucDuplicado = GenerarRucUnico();
@@ -169,12 +169,46 @@ public class ProveedoresControllerTests : IntegrationTestBase
         var response = await _client.PostAsJsonAsync("/api/maestra/proveedores", duplicado);
 
         // Assert
-        // El SP hace THROW 50020, ApiExceptionMiddleware lo traduce a 500.
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
         var count = await DbHelpers.QueryScalarAsync<int>(
             "SELECT COUNT(*) FROM maestra.Proveedor WHERE Ruc = @r",
             new { r = rucDuplicado });
         Assert.That(count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task Upsert_SinRuc_RetornaOkYPersisteNull()
+    {
+        var response = await _client.PostAsJsonAsync("/api/maestra/proveedores", new ProveedorUpsertDto
+        {
+            RazonSocial = $"PROV-SIN-RUC-{Guid.NewGuid():N}"[..30],
+            Ruc = null,
+            Activo = true
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("idProveedor").GetInt32();
+        var ruc = await DbHelpers.QueryScalarAsync<string?>(
+            "SELECT Ruc FROM maestra.Proveedor WHERE IdProveedor = @id", new { id });
+        Assert.That(ruc, Is.Null);
+    }
+
+    [Test]
+    public async Task ConsolidacionLegacy_UsaMappingYConservaIdCanonicoPorRuc()
+    {
+        const string ruc = "20536557858";
+        var canonico = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT IdProveedor FROM maestra.Proveedor WHERE Ruc = @ruc", new { ruc });
+        var mappings = await DbHelpers.QueryAsync<int>("""
+            SELECT IdProveedor FROM maestra.ProveedorLegacyMap
+            WHERE RucNormalizado = @ruc ORDER BY Origen
+            """, new { ruc });
+
+        Assert.That(mappings, Is.Not.Empty);
+        Assert.That(mappings.All(x => x == canonico), Is.True);
+        Assert.That(await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM maestra.Proveedor WHERE Ruc = @ruc", new { ruc }), Is.EqualTo(1));
     }
 
     [Test]

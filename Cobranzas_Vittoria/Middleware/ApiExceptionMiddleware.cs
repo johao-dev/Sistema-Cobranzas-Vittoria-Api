@@ -230,6 +230,35 @@ namespace Cobranzas_Vittoria.Middleware
                     "RECURSO_NO_ENCONTRADO",
                     ex.Message);
             }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(
+                    "Rechazo 400 por argumento inválido en {Method} {Path}: {Mensaje}",
+                    context.Request.Method, context.Request.Path, ex.Message);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status400BadRequest,
+                    "SOLICITUD_INVALIDA",
+                    ex.Message);
+            }
+            catch (SqlException ex) when (ex.Number is >= 51500 and <= 51599)
+            {
+                var separador = ex.Message.IndexOf(':');
+                var codigo = separador > 0
+                    ? ex.Message[..separador].Trim()
+                    : "CONFLICTO_NEGOCIO_CONTABLE";
+                var mensaje = separador > 0
+                    ? ex.Message[(separador + 1)..].Trim()
+                    : "La operación contable fue rechazada.";
+                _logger.LogWarning(
+                    "Rechazo 409 de Contable en {Method} {Path}: SQL {Numero} {Codigo}",
+                    context.Request.Method, context.Request.Path, ex.Number, codigo);
+                await EscribirErrorAsync(
+                    context,
+                    StatusCodes.Status409Conflict,
+                    codigo,
+                    mensaje);
+            }
             catch (SqlException ex) when (ex.Number is >= 51400 and <= 51499)
             {
                 var separador = ex.Message.IndexOf(':');

@@ -46,14 +46,16 @@ public abstract class IntegrationTestBase
                     new Table("maestra", "Proveedor"),
                     new Table("maestra", "ProveedorTerreno"),
                     new Table("maestra", "ProveedorGastoAdministrativo"),
+                    new Table("maestra", "ProveedorLegacyMap"),
                     new Table("maestra", "ProveedorEspecialidadCotizacion"),
                     new Table("maestra", "ProveedorEspecialidad"),
                     new Table("maestra", "ProveedorReglaValorizacion"),
                     new Table("maestra", "Material"),
                     new Table("maestra", "Proyecto"),
 
-                    // contable (datos seed)
-                    new Table("contable", "CotizacionMaterialEspecialidad"),
+                    // trazabilidad de migración histórica
+                    new Table("contable", "GastoDirectoLegacyMap"),
+                    new Table("contable", "LegacyRetiroSnapshot"),
                 ]
             }).GetAwaiter().GetResult();
         }

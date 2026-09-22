@@ -13,22 +13,22 @@ namespace Cobranzas_Vittoria.Application.Importacion.Dtos;
 /// numero de fila del archivo (1-based, sin contar la fila de encabezados).
 ///
 /// Reglas de validacion (ejecutadas en el SP):
-///   - <c>RazonSocial</c>: requerido, max 200 chars.
-///   - <c>Ruc</c>: requerido, max 20 chars, unico intra-archivo y en BD.
+///   - <c>RazonSocial</c>: requerido, max 250 chars.
+///   - <c>Ruc</c>: opcional, max 20 chars; cuando existe es unico intra-archivo y en BD.
 ///   - Resto de campos: opcionales.
 /// </summary>
 public class ProveedorImportDto
 {
-    /// <summary>Razon social del proveedor. Requerido, max 200 chars.</summary>
+    /// <summary>Razon social del proveedor. Requerido, max 250 chars.</summary>
     public string RazonSocial { get; set; } = string.Empty;
 
-    /// <summary>RUC del proveedor. Requerido, max 20 chars, unico en BD.</summary>
-    public string Ruc { get; set; } = string.Empty;
+    /// <summary>RUC del proveedor. Opcional, max 20 chars; si existe es unico en BD.</summary>
+    public string? Ruc { get; set; }
 
     /// <summary>Persona de contacto. Opcional, max 150 chars.</summary>
     public string? Contacto { get; set; }
 
-    /// <summary>Telefono de contacto. Opcional, max 30 chars.</summary>
+    /// <summary>Telefono de contacto. Opcional, max 50 chars.</summary>
     public string? Telefono { get; set; }
 
     /// <summary>Correo electronico. Opcional, max 150 chars.</summary>

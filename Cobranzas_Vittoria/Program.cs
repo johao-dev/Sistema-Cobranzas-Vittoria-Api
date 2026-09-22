@@ -192,10 +192,7 @@ builder.Services.AddScoped<IKardexRepository, KardexRepository>();
 builder.Services.AddScoped<IUnidadMedidaRepository, UnidadMedidaRepository>();
 builder.Services.AddScoped<IValorizacionRepository, ValorizacionRepository>();
 builder.Services.AddScoped<ICategoriaGastoRepository, CategoriaGastoRepository>();
-builder.Services.AddScoped<IProveedorGastoAdministrativoRepository, ProveedorGastoAdministrativoRepository>();
-builder.Services.AddScoped<IGastoAdministrativoRepository, GastoAdministrativoRepository>();
-builder.Services.AddScoped<IProveedorTerrenoRepository, ProveedorTerrenoRepository>();
-builder.Services.AddScoped<IGastoProyectoRepository, GastoProyectoRepository>();
+builder.Services.AddScoped<IGastoDirectoRepository, GastoDirectoRepository>();
 
 // Services
 builder.Services.AddScoped<IEspecialidadService, EspecialidadService>();
@@ -209,10 +206,7 @@ builder.Services.AddScoped<IKardexService, KardexService>();
 builder.Services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
 builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
 builder.Services.AddScoped<ICategoriaGastoService, CategoriaGastoService>();
-builder.Services.AddScoped<IProveedorGastoAdministrativoService, ProveedorGastoAdministrativoService>();
-builder.Services.AddScoped<IGastoAdministrativoService, GastoAdministrativoService>();
-builder.Services.AddScoped<IProveedorTerrenoService, ProveedorTerrenoService>();
-builder.Services.AddScoped<IGastoProyectoService, GastoProyectoService>();
+builder.Services.AddScoped<IGastoDirectoService, GastoDirectoService>();
 builder.Services.AddScoped<ISunatService, SunatService>();
 
 // ============================================================================
@@ -225,8 +219,7 @@ builder.Services.AddScoped<ISunatService, SunatService>();
 // El ImportService se inyecta con IEnumerable<IImportProcessor> y arma un
 // diccionario modulo -> processor en su constructor. Por eso es importante
 // registrar TODOS los processors concretos de los 7 modulos soportados
-// (UnidadMedida, Especialidad, Material, Proveedor, ProveedorGastoAdministrativo,
-// ProveedorTerreno, CategoriaGasto).
+// (UnidadMedida, Especialidad, Material, Proveedor, CategoriaGasto).
 // ============================================================================
 builder.Services.AddSingleton<IFileParser, CsvFileParser>();
 builder.Services.AddSingleton<IFileParser, ExcelFileParser>();
@@ -242,8 +235,6 @@ builder.Services.AddScoped<IImportProcessor, UnidadMedidaImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, EspecialidadImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, MaterialImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, ProveedorImportProcessor>();
-builder.Services.AddScoped<IImportProcessor, ProveedorGastoAdministrativoImportProcessor>();
-builder.Services.AddScoped<IImportProcessor, ProveedorTerrenoImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, CategoriaGastoImportProcessor>();
 
 // ResolvedorEntidadesService: servicio transversal usado por MaterialImportProcessor

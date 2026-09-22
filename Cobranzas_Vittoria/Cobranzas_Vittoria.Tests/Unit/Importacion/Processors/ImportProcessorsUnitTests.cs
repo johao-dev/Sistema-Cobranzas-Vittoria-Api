@@ -304,89 +304,13 @@ public class ImportProcessorsUnitTests
     }
 
     [Test]
-    public void Proveedor_RucVacio_LanzaKeyNotFound()
+    public void Proveedor_RucVacio_SeMapeaComoNull()
     {
         var processor = new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance);
         var fila = CrearFila(1, "RazonSocial", "X", "Ruc", "");
 
-        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
-        Assert.That(ex.Message, Does.Contain("Ruc"));
-    }
-
-    // =========================================================================
-    // ProveedorGastoAdministrativoImportProcessor
-    // =========================================================================
-
-    [Test]
-    public void ProveedorGasto_FilaValidaConIdCategoria_DevuelveDtoCompleto()
-    {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "RazonSocial", "PROVEEDOR X",
-            "Ruc", "20123456789",
-            "IdCategoriaGasto", "1",
-            "Activo", "false");
-
         var dto = processor.MapearFila(fila);
-
-        Assert.That(dto._Fila, Is.EqualTo(1));
-        Assert.That(dto.RazonSocial, Is.EqualTo("PROVEEDOR X"));
-        Assert.That(dto.Ruc, Is.EqualTo("20123456789"));
-        Assert.That(dto.IdCategoriaGasto, Is.EqualTo(1));
-        Assert.That(dto.Activo, Is.False);
-    }
-
-    [Test]
-    public void ProveedorGasto_IdCategoriaInvalido_LanzaFormatException()
-    {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "RazonSocial", "X",
-            "IdCategoriaGasto", "no-es-numero");
-
-        Assert.Throws<FormatException>(() => processor.MapearFila(fila));
-    }
-
-    [Test]
-    public void ProveedorGasto_RazonSocialVacia_LanzaKeyNotFound()
-    {
-        var processor = new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance);
-        var fila = CrearFila(1, "RazonSocial", "");
-
-        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
-        Assert.That(ex.Message, Does.Contain("RazonSocial"));
-    }
-
-    // =========================================================================
-    // ProveedorTerrenoImportProcessor
-    // =========================================================================
-
-    [Test]
-    public void ProveedorTerreno_FilaValida_DevuelveDtoCompleto()
-    {
-        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance);
-        var fila = CrearFila(1,
-            "RazonSocial", "TERRENO S.A",
-            "Ruc", "20123456789",
-            "Telefono", "999111",
-            "Activo", "true");
-
-        var dto = processor.MapearFila(fila);
-
-        Assert.That(dto._Fila, Is.EqualTo(1));
-        Assert.That(dto.RazonSocial, Is.EqualTo("TERRENO S.A"));
-        Assert.That(dto.Telefono, Is.EqualTo("999111"));
-        Assert.That(dto.Activo, Is.True);
-    }
-
-    [Test]
-    public void ProveedorTerreno_RazonSocialVacia_LanzaKeyNotFound()
-    {
-        var processor = new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance);
-        var fila = CrearFila(1, "RazonSocial", "  ");
-
-        var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
-        Assert.That(ex.Message, Does.Contain("RazonSocial"));
+        Assert.That(dto.Ruc, Is.Null);
     }
 
     // =========================================================================
@@ -430,8 +354,6 @@ public class ImportProcessorsUnitTests
             Assert.That(new EspecialidadImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<EspecialidadImportProcessor>.Instance).Modulo, Is.EqualTo("especialidad"));
             Assert.That(new MaterialImportProcessor(_parserResolver, _repository, _connectionFactory, stubResolvedor, NullLogger<MaterialImportProcessor>.Instance).Modulo, Is.EqualTo("material"));
             Assert.That(new ProveedorImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor"));
-            Assert.That(new ProveedorGastoAdministrativoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorGastoAdministrativoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-gasto"));
-            Assert.That(new ProveedorTerrenoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<ProveedorTerrenoImportProcessor>.Instance).Modulo, Is.EqualTo("proveedor-terreno"));
             Assert.That(new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance).Modulo, Is.EqualTo("categoria-gasto"));
         });
     }
