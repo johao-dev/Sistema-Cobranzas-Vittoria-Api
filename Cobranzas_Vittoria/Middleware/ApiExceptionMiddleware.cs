@@ -2,6 +2,8 @@ using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Application.Compras.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
+using Cobranzas_Vittoria.Contable.GastosDirectos.Domain.Excepciones;
+using Cobranzas_Vittoria.ControlPresupuestario.Domain.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 using Microsoft.Data.SqlClient;
 
@@ -25,6 +27,9 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - IdRutaInconsistenteException    -> 400 BadRequest (codigo "ID_RUTA_INCONSISTENTE"; PUT con idRuta != idCuerpo)
     ///   - KardexNoEncontradoException     -> 404 NotFound   (codigo "KARDEX_NO_ENCONTRADO"; id de kardex inexistente)
     ///   - KeyNotFoundException            -> 404 NotFound   (codigo "RECURSO_NO_ENCONTRADO"; entidad solicitada no existe)
+    ///   - RecursoPresupuestarioNoEncontradoException -> 404 (Control Presupuestario)
+    ///   - ValidacionPresupuestariaException -> 400 (Control Presupuestario)
+    ///   - ControlPresupuestarioException   -> 409 regla presupuestaria (el repositorio traduce los SP 512xx)
     ///   - SqlException 51400-51499        -> 409 conflicto de Compras
     ///   - Otras SqlException              -> 500 SQL_ERROR
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
@@ -240,6 +245,61 @@ namespace Cobranzas_Vittoria.Middleware
                     StatusCodes.Status400BadRequest,
                     "SOLICITUD_INVALIDA",
                     ex.Message);
+            }
+            catch (GastoDirectoException ex)
+            {
+                // Excepciones de dominio de Gastos directos. Su repositorio traduce los rechazos
+                // SQL 515xx; la validacion de entrada conserva el codigo SOLICITUD_INVALIDA.
+                var status = ex switch
+                {
+                    GastoDirectoNoEncontradoException => StatusCodes.Status404NotFound,
+                    ValidacionGastoDirectoException => StatusCodes.Status400BadRequest,
+                    _ => StatusCodes.Status409Conflict
+                };
+                _logger.LogWarning(
+                    "Rechazo {Status} ({Tipo}) en {Method} {Path}: {Codigo} - {Mensaje}",
+                    status, ex.GetType().Name, context.Request.Method, context.Request.Path, ex.CodigoError, ex.Message);
+                await EscribirErrorAsync(context, status, ex.CodigoError, ex.Message);
+            }
+            catch (ControlPresupuestarioException ex)
+            {
+                // Excepciones de dominio del modulo Control Presupuestario. Su repositorio
+                // traduce los rechazos SQL 512xx; el handler lanza las de recurso inexistente.
+                var status = ex switch
+                {
+                    RecursoPresupuestarioNoEncontradoException => StatusCodes.Status404NotFound,
+                    ValidacionPresupuestariaException => StatusCodes.Status400BadRequest,
+                    _ => StatusCodes.Status409Conflict
+                };
+                _logger.LogWarning(
+                    "Rechazo {Status} ({Tipo}) en {Method} {Path}: {Codigo} - {Mensaje}",
+                    status, ex.GetType().Name, context.Request.Method, context.Request.Path, ex.CodigoError, ex.Message);
+                await EscribirErrorAsync(context, status, ex.CodigoError, ex.Message);
+            }
+            catch (SqlException ex) when (ex.Number is >= 51200 and <= 51299)
+            {
+                // Rango reservado al modulo Control Presupuestario. El SP emite
+                // 'CODIGO: detalle'. Se distingue el error de contrato (400) y el
+                // recurso inexistente (404) del conflicto de negocio (409) para no
+                // devolver siempre el mismo status ante causas distintas.
+                var separador = ex.Message.IndexOf(':');
+                var codigo = separador > 0
+                    ? ex.Message[..separador].Trim()
+                    : "CONFLICTO_NEGOCIO_PRESUPUESTARIO";
+                var mensaje = separador > 0
+                    ? ex.Message[(separador + 1)..].Trim()
+                    : "La operación presupuestaria fue rechazada.";
+                var status = ex.Number switch
+                {
+                    51200 => StatusCodes.Status400BadRequest,
+                    51201 => StatusCodes.Status400BadRequest,
+                    51203 => StatusCodes.Status404NotFound,
+                    _ => StatusCodes.Status409Conflict
+                };
+                _logger.LogWarning(
+                    "Rechazo {Status} de Control Presupuestario en {Method} {Path}: SQL {Numero} {Codigo}",
+                    status, context.Request.Method, context.Request.Path, ex.Number, codigo);
+                await EscribirErrorAsync(context, status, codigo, mensaje);
             }
             catch (SqlException ex) when (ex.Number is >= 51500 and <= 51599)
             {

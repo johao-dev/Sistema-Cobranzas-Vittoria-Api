@@ -73,6 +73,7 @@ BEGIN
         JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = oc.IdRequerimiento
             AND rd.IdMaterial = cd.IdMaterial
         WHERE cd.IdCompra = @IdCompra
+          AND od.Subtotal > 0 -- una OC sin precio no comprometió nada
         UNION ALL
         SELECT rd.IdPresupuestoDetalle, 'EJECUCION',
             CONCAT('COMPRA:', @IdCompra, ':MATERIAL:', cd.IdMaterial, ':EJECUCION'),
@@ -329,7 +330,7 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_Actualizar]
     @IdOrdenCompra INT,
     @NumeroOrdenCompra NVARCHAR(50),
     @IdRequerimiento INT,
-    @IdMoneda INT,
+    @IdMoneda INT = NULL,
     @FechaOrdenCompra DATE,
     @Descripcion NVARCHAR(500) = NULL,
     @IdUsuarioCreacion INT = NULL,
@@ -341,10 +342,13 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
     IF NOT EXISTS (SELECT 1 FROM @Items) THROW 51444, 'La orden debe tener items.', 1;
-    IF EXISTS (SELECT 1 FROM @Items WHERE IdProveedor <= 0 OR Cantidad <= 0 OR PrecioUnitario <= 0)
-        THROW 51442, 'Proveedor, cantidades y precios de la OC deben ser positivos.', 1;
+    IF EXISTS (SELECT 1 FROM @Items WHERE IdProveedor <= 0 OR Cantidad <= 0 OR ISNULL(PrecioUnitario, 0) < 0)
+        THROW 51442, 'Proveedor y cantidades de la OC deben ser positivos y los precios no pueden ser negativos.', 1;
     IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
         THROW 51071, 'No se permiten materiales repetidos en una OC.', 1;
+    -- Sin moneda explícita se conserva la de la OC (la del presupuesto, fijada al crearla).
+    IF @IdMoneda IS NULL
+        SELECT @IdMoneda = IdMoneda FROM compras.OrdenCompra WHERE IdOrdenCompra = @IdOrdenCompra;
     IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
         THROW 51070, 'La moneda no existe o está inactiva.', 1;
 
@@ -516,10 +520,12 @@ BEGIN
             FROM compras.OrdenCompraDetalle od
             JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = @IdRequerimiento
                 AND rd.IdMaterial = od.IdMaterial
-            WHERE od.IdOrdenCompra = @IdOrdenCompra;
+            WHERE od.IdOrdenCompra = @IdOrdenCompra
+              AND od.Subtotal > 0; -- sin precio en la OC el gasto se registra recién al aceptar la Compra
 
-            EXEC compras.usp_IntegracionEconomica_RegistrarLote
-                @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Compromisos;
+            IF EXISTS (SELECT 1 FROM @Compromisos)
+                EXEC compras.usp_IntegracionEconomica_RegistrarLote
+                    @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Compromisos;
         END;
 
         IF @EstadoAnterior = 'APROBADA' AND @EstadoNuevo = 'ANULADA'
@@ -536,9 +542,11 @@ BEGIN
             FROM compras.OrdenCompraDetalle od
             JOIN compras.RequerimientoDetalle rd ON rd.IdRequerimiento = @IdRequerimiento
                 AND rd.IdMaterial = od.IdMaterial
-            WHERE od.IdOrdenCompra = @IdOrdenCompra;
-            EXEC compras.usp_IntegracionEconomica_RegistrarLote
-                @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Liberaciones;
+            WHERE od.IdOrdenCompra = @IdOrdenCompra
+              AND od.Subtotal > 0;
+            IF EXISTS (SELECT 1 FROM @Liberaciones)
+                EXEC compras.usp_IntegracionEconomica_RegistrarLote
+                    @IdMoneda = @IdMoneda, @IdProyecto = @IdProyecto, @Movimientos = @Liberaciones;
         END;
 
         UPDATE compras.OrdenCompra SET Estado = @EstadoNuevo WHERE IdOrdenCompra = @IdOrdenCompra;
@@ -559,7 +567,7 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
 (
     @NumeroOrdenCompra NVARCHAR(50),
     @IdRequerimiento INT,
-    @IdMoneda INT,
+    @IdMoneda INT = NULL,
     @FechaOrdenCompra DATE,
     @Descripcion NVARCHAR(500) = NULL,
     @IdUsuarioCreacion INT = NULL,
@@ -567,6 +575,9 @@ CREATE OR ALTER PROCEDURE [compras].[usp_OrdenCompra_CrearDesdeRequerimiento]
     @Items compras.TVP_OrdenCompraDetalle READONLY
 )
 AS
+-- La OC define materiales, cantidades y proveedor; los precios se registran en la Compra
+-- (PrecioUnitario 0 = sin precio). La moneda es la del presupuesto de las partidas del
+-- requerimiento: @IdMoneda es opcional y, si llega, debe coincidir con ella.
 BEGIN
     SET
 NOCOUNT ON;
@@ -628,8 +639,8 @@ WHERE
 RETURN;
 END;
 
-IF EXISTS (SELECT 1 FROM @Items WHERE Cantidad <= 0 OR PrecioUnitario <= 0)
-    THROW 51442, 'Las cantidades y precios de la OC deben ser positivos.', 1;
+IF EXISTS (SELECT 1 FROM @Items WHERE Cantidad <= 0 OR ISNULL(PrecioUnitario, 0) < 0)
+    THROW 51442, 'Las cantidades de la OC deben ser positivas y los precios no pueden ser negativos.', 1;
 IF EXISTS
 (
     SELECT IdMaterial FROM @Items
@@ -637,6 +648,24 @@ IF EXISTS
         WHERE IdRequerimiento = @IdRequerimiento
 )
     THROW 51443, 'MATERIAL_FUERA_REQUERIMIENTO: toda línea de OC debe provenir del Requerimiento.', 1;
+
+DECLARE @MonedasPresupuesto TABLE (IdMoneda INT PRIMARY KEY);
+INSERT INTO @MonedasPresupuesto (IdMoneda)
+SELECT DISTINCT p.IdMoneda
+FROM compras.RequerimientoDetalle rd
+JOIN ControlPresupuestario.PresupuestoDetalle pd ON pd.IdPresupuestoDetalle = rd.IdPresupuestoDetalle
+JOIN ControlPresupuestario.PresupuestoVersion pv ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
+WHERE rd.IdRequerimiento = @IdRequerimiento
+  AND rd.IdMaterial IN (SELECT IdMaterial FROM @Items);
+IF (SELECT COUNT(*) FROM @MonedasPresupuesto) > 1
+    THROW 51445, 'MONEDAS_MIXTAS: las partidas del requerimiento pertenecen a presupuestos en distintas monedas; genera una OC por moneda.', 1;
+DECLARE @IdMonedaPresupuesto INT = (SELECT IdMoneda FROM @MonedasPresupuesto);
+IF @IdMonedaPresupuesto IS NOT NULL AND @IdMoneda IS NOT NULL AND @IdMoneda <> @IdMonedaPresupuesto
+    THROW 51446, 'MONEDA_DISTINTA_PRESUPUESTO: la OC debe usar la moneda del presupuesto de sus partidas.', 1;
+-- Sin partidas imputadas (no podrá aprobarse hasta tenerlas) se usa la moneda indicada o PEN.
+SET @IdMoneda = COALESCE(@IdMonedaPresupuesto, @IdMoneda,
+    (SELECT IdMoneda FROM maestra.Moneda WHERE Codigo = 'PEN'));
 IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
     THROW 51070, 'La moneda no existe o está inactiva.', 1;
 IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
@@ -689,7 +718,7 @@ INSERT
     i.IdMaterial,
     i.Cantidad,
     i.IdProveedor,
-    i.PrecioUnitario
+    ISNULL(i.PrecioUnitario, 0)
 FROM
     @Items i;
 
@@ -720,6 +749,7 @@ WHERE
 
 SELECT
             @IdOrdenCompra AS IdOrdenCompra,
+            @IdMoneda AS IdMoneda,
             CAST(ISNULL(
                 (SELECT SUM(d.Cantidad * d.PrecioUnitario)
                  FROM compras.OrdenCompraDetalle d

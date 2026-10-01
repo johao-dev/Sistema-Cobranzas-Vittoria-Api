@@ -126,13 +126,14 @@ public class NormalizacionComprasTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Oc_ExigeMonedaYRechazaDuplicadosYPrecisionSinPersistir()
+    public async Task Oc_MonedaOpcional_RechazaDuplicadosYPrecisionSinPersistir()
     {
+        // La moneda es opcional (se toma del presupuesto); un id inválido sigue siendo 400.
         var req=await RequerimientoBuilder.Nuevo().CrearEnviadoOcAsync(_client);
-        var dto=new OrdenCompraCreateDto{IdRequerimiento=req,Items=[new(){IdMaterial=2,Cantidad=1,PrecioUnitario=1,IdProveedor=2}]};
-        var sinMoneda=await _client.PostAsJsonAsync("/api/compras/ordenes-compra",dto);
-        Assert.That(sinMoneda.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
-        dto.IdMoneda=await DbHelpersMoneda.ObtenerPenAsync();
+        var dto=new OrdenCompraCreateDto{IdRequerimiento=req,IdMoneda=0,Items=[new(){IdMaterial=2,Cantidad=1,PrecioUnitario=1,IdProveedor=2}]};
+        var monedaInvalida=await _client.PostAsJsonAsync("/api/compras/ordenes-compra",dto);
+        Assert.That(monedaInvalida.StatusCode,Is.EqualTo(HttpStatusCode.BadRequest));
+        dto.IdMoneda=null;
         dto.Items.Add(dto.Items[0]);
         var repetidos=await _client.PostAsJsonAsync("/api/compras/ordenes-compra",dto);
         Assert.That(repetidos.StatusCode,Is.EqualTo(HttpStatusCode.UnprocessableEntity));

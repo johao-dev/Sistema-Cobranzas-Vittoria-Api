@@ -3,7 +3,8 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Listar
     @IdProveedor INT = NULL,
     @IdCentroCosto INT = NULL,
     @Desde DATE = NULL,
-    @Hasta DATE = NULL
+    @Hasta DATE = NULL,
+    @CodigoSeccion VARCHAR(30) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -15,6 +16,8 @@ BEGIN
         cc.IdCentroCosto, cc.Codigo AS CodigoCentroCosto, cc.Nombre AS CentroCosto,
         cc.IdProyecto, cp.IdCatalogoPartida, cp.Codigo AS CodigoPartida,
         cp.Nombre AS Partida,
+        sg.Codigo AS CodigoSeccionGasto, sg.Nombre AS NombreSeccionGasto,
+        gd.IdMonedaOriginal, mo.Codigo AS MonedaOriginal, gd.MontoOriginal, gd.TipoCambio, gd.FechaTipoCambio,
         ISNULL(doc.TotalDocumentos, 0) AS TotalDocumentos
     FROM contable.GastoDirecto gd
     JOIN maestra.Moneda m ON m.IdMoneda = gd.IdMoneda
@@ -27,6 +30,8 @@ BEGIN
         ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
     JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
+    LEFT JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = cp.IdSeccionGasto
+    LEFT JOIN maestra.Moneda mo ON mo.IdMoneda = gd.IdMonedaOriginal
     OUTER APPLY
     (
         SELECT COUNT(*) AS TotalDocumentos
@@ -38,6 +43,7 @@ BEGIN
       AND (@IdCentroCosto IS NULL OR cc.IdCentroCosto = @IdCentroCosto)
       AND (@Desde IS NULL OR gd.Fecha >= @Desde)
       AND (@Hasta IS NULL OR gd.Fecha <= @Hasta)
+      AND (@CodigoSeccion IS NULL OR sg.Codigo = @CodigoSeccion)
     ORDER BY gd.Fecha DESC, gd.IdGastoDirecto DESC;
 END;
 GO
@@ -54,7 +60,9 @@ BEGIN
         p.IdPresupuesto, p.Codigo AS CodigoPresupuesto,
         cc.IdCentroCosto, cc.Codigo AS CodigoCentroCosto, cc.Nombre AS CentroCosto,
         cc.IdProyecto, cp.IdCatalogoPartida, cp.Codigo AS CodigoPartida,
-        cp.Nombre AS Partida
+        cp.Nombre AS Partida,
+        sg.Codigo AS CodigoSeccionGasto, sg.Nombre AS NombreSeccionGasto,
+        gd.IdMonedaOriginal, mo.Codigo AS MonedaOriginal, gd.MontoOriginal, gd.TipoCambio, gd.FechaTipoCambio
     FROM contable.GastoDirecto gd
     JOIN maestra.Moneda m ON m.IdMoneda = gd.IdMoneda
     LEFT JOIN maestra.Proveedor pr ON pr.IdProveedor = gd.IdProveedor
@@ -66,6 +74,8 @@ BEGIN
         ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
     JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
     JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
+    LEFT JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = cp.IdSeccionGasto
+    LEFT JOIN maestra.Moneda mo ON mo.IdMoneda = gd.IdMonedaOriginal
     WHERE gd.IdGastoDirecto = @IdGastoDirecto;
 
     SELECT IdGastoDirectoDocumento, IdGastoDirecto, TipoDocumento,
@@ -83,13 +93,19 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Crear
     @Fecha DATE,
     @Concepto NVARCHAR(250),
     @Descripcion NVARCHAR(500) = NULL,
-    @Monto DECIMAL(18,2)
+    @Monto DECIMAL(18,2),
+    @CodigoSeccion VARCHAR(30) = NULL,
+    @IdMonedaOriginal INT = NULL,
+    @MontoOriginal DECIMAL(18,2) = NULL,
+    @TipoCambio DECIMAL(18,6) = NULL,
+    @FechaTipoCambio DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
     SET @Concepto = NULLIF(LTRIM(RTRIM(@Concepto)), '');
     SET @Descripcion = NULLIF(LTRIM(RTRIM(@Descripcion)), '');
+    SET @CodigoSeccion = NULLIF(UPPER(LTRIM(RTRIM(@CodigoSeccion))), '');
     IF @IdPresupuestoDetalle IS NULL OR @IdPresupuestoDetalle <= 0
         THROW 51500, 'CAMPO_REQUERIDO: IdPresupuestoDetalle.', 1;
     IF @IdMoneda IS NULL OR @IdMoneda <= 0
@@ -107,12 +123,52 @@ BEGIN
        (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor AND Activo = 1)
         THROW 51504, 'PROVEEDOR_INVALIDO: el proveedor no existe o está inactivo.', 1;
 
+    -- Moneda original de la factura: solo referencia, las tres juntas o ninguna.
+    IF NOT ((@IdMonedaOriginal IS NULL AND @MontoOriginal IS NULL AND @TipoCambio IS NULL)
+         OR (@IdMonedaOriginal IS NOT NULL AND @MontoOriginal IS NOT NULL AND @TipoCambio IS NOT NULL))
+        THROW 51530, 'MONEDA_REFERENCIA_INCOMPLETA: indica la moneda, el monto original y el tipo de cambio, o ninguno.', 1;
+    IF @IdMonedaOriginal IS NOT NULL
+    BEGIN
+        IF @MontoOriginal <= 0 OR @TipoCambio <= 0
+            THROW 51530, 'MONEDA_REFERENCIA_INVALIDA: el monto original y el tipo de cambio deben ser mayores a cero.', 1;
+        IF @IdMonedaOriginal = @IdMoneda
+            THROW 51530, 'MONEDA_REFERENCIA_INVALIDA: la moneda original debe ser distinta a la del presupuesto.', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMonedaOriginal AND Activo = 1)
+            THROW 51503, 'MONEDA_INVALIDA: la moneda original no existe o está inactiva.', 1;
+    END;
+    IF @FechaTipoCambio IS NOT NULL AND @IdMonedaOriginal IS NULL
+        THROW 51530, 'MONEDA_REFERENCIA_INCOMPLETA: la fecha del tipo de cambio solo aplica a una factura en otra moneda.', 1;
+
+    -- Sección de gasto (pantalla de Gastos del proyecto): la partida debe ser de
+    -- la sección y el tipo de centro de costo debe estar admitido por ella.
+    IF @CodigoSeccion IS NOT NULL
+    BEGIN
+        DECLARE @IdSeccion INT = (SELECT IdSeccionGasto FROM ControlPresupuestario.SeccionGasto
+                                  WHERE Codigo = @CodigoSeccion AND Activo = 1);
+        IF @IdSeccion IS NULL
+            THROW 51531, 'SECCION_INVALIDA: la sección de gasto no existe o está inactiva.', 1;
+        IF NOT EXISTS (
+            SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle pd
+            JOIN ControlPresupuestario.CatalogoPartida cp ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
+            WHERE pd.IdPresupuestoDetalle = @IdPresupuestoDetalle AND cp.IdSeccionGasto = @IdSeccion)
+            THROW 51531, 'SECCION_INVALIDA: la partida no pertenece a esta sección de gasto.', 1;
+        IF NOT EXISTS (
+            SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle pd
+            JOIN ControlPresupuestario.PresupuestoVersion pv ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
+            JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
+            JOIN ControlPresupuestario.SeccionGastoTipoCentroCosto st
+                ON st.IdTipoCentroCosto = cc.IdTipoCentroCosto AND st.IdSeccionGasto = @IdSeccion
+            WHERE pd.IdPresupuestoDetalle = @IdPresupuestoDetalle)
+            THROW 51531, 'SECCION_INVALIDA: el centro de costo no corresponde a esta sección de gasto.', 1;
+    END;
+
     INSERT INTO contable.GastoDirecto
         (IdPresupuestoDetalle, IdProveedor, IdMoneda, Fecha, Concepto,
-         Descripcion, Monto, Estado)
+         Descripcion, Monto, Estado, IdMonedaOriginal, MontoOriginal, TipoCambio, FechaTipoCambio)
     VALUES
         (@IdPresupuestoDetalle, @IdProveedor, @IdMoneda, @Fecha, @Concepto,
-         @Descripcion, @Monto, 'REGISTRADO');
+         @Descripcion, @Monto, 'REGISTRADO', @IdMonedaOriginal, @MontoOriginal, @TipoCambio, @FechaTipoCambio);
     SELECT CONVERT(INT, SCOPE_IDENTITY()) AS IdGastoDirecto;
 END;
 GO
@@ -125,13 +181,19 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Actualizar
     @Fecha DATE,
     @Concepto NVARCHAR(250),
     @Descripcion NVARCHAR(500) = NULL,
-    @Monto DECIMAL(18,2)
+    @Monto DECIMAL(18,2),
+    @CodigoSeccion VARCHAR(30) = NULL,
+    @IdMonedaOriginal INT = NULL,
+    @MontoOriginal DECIMAL(18,2) = NULL,
+    @TipoCambio DECIMAL(18,6) = NULL,
+    @FechaTipoCambio DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
     SET @Concepto = NULLIF(LTRIM(RTRIM(@Concepto)), '');
     SET @Descripcion = NULLIF(LTRIM(RTRIM(@Descripcion)), '');
+    SET @CodigoSeccion = NULLIF(UPPER(LTRIM(RTRIM(@CodigoSeccion))), '');
     IF @Concepto IS NULL OR @Monto IS NULL OR @Monto <= 0
         THROW 51501, 'DATOS_INVALIDOS: Concepto y monto positivo son requeridos.', 1;
     IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle
@@ -143,10 +205,52 @@ BEGIN
        (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor AND Activo = 1)
         THROW 51504, 'PROVEEDOR_INVALIDO: el proveedor no existe o está inactivo.', 1;
 
+    -- Moneda original de la factura: solo referencia, las tres juntas o ninguna.
+    IF NOT ((@IdMonedaOriginal IS NULL AND @MontoOriginal IS NULL AND @TipoCambio IS NULL)
+         OR (@IdMonedaOriginal IS NOT NULL AND @MontoOriginal IS NOT NULL AND @TipoCambio IS NOT NULL))
+        THROW 51530, 'MONEDA_REFERENCIA_INCOMPLETA: indica la moneda, el monto original y el tipo de cambio, o ninguno.', 1;
+    IF @IdMonedaOriginal IS NOT NULL
+    BEGIN
+        IF @MontoOriginal <= 0 OR @TipoCambio <= 0
+            THROW 51530, 'MONEDA_REFERENCIA_INVALIDA: el monto original y el tipo de cambio deben ser mayores a cero.', 1;
+        IF @IdMonedaOriginal = @IdMoneda
+            THROW 51530, 'MONEDA_REFERENCIA_INVALIDA: la moneda original debe ser distinta a la del presupuesto.', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMonedaOriginal AND Activo = 1)
+            THROW 51503, 'MONEDA_INVALIDA: la moneda original no existe o está inactiva.', 1;
+    END;
+    IF @FechaTipoCambio IS NOT NULL AND @IdMonedaOriginal IS NULL
+        THROW 51530, 'MONEDA_REFERENCIA_INCOMPLETA: la fecha del tipo de cambio solo aplica a una factura en otra moneda.', 1;
+
+    -- Sección de gasto (pantalla de Gastos del proyecto): la partida debe ser de
+    -- la sección y el tipo de centro de costo debe estar admitido por ella.
+    IF @CodigoSeccion IS NOT NULL
+    BEGIN
+        DECLARE @IdSeccion INT = (SELECT IdSeccionGasto FROM ControlPresupuestario.SeccionGasto
+                                  WHERE Codigo = @CodigoSeccion AND Activo = 1);
+        IF @IdSeccion IS NULL
+            THROW 51531, 'SECCION_INVALIDA: la sección de gasto no existe o está inactiva.', 1;
+        IF NOT EXISTS (
+            SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle pd
+            JOIN ControlPresupuestario.CatalogoPartida cp ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
+            WHERE pd.IdPresupuestoDetalle = @IdPresupuestoDetalle AND cp.IdSeccionGasto = @IdSeccion)
+            THROW 51531, 'SECCION_INVALIDA: la partida no pertenece a esta sección de gasto.', 1;
+        IF NOT EXISTS (
+            SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle pd
+            JOIN ControlPresupuestario.PresupuestoVersion pv ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
+            JOIN ControlPresupuestario.CentroCosto cc ON cc.IdCentroCosto = p.IdCentroCosto
+            JOIN ControlPresupuestario.SeccionGastoTipoCentroCosto st
+                ON st.IdTipoCentroCosto = cc.IdTipoCentroCosto AND st.IdSeccionGasto = @IdSeccion
+            WHERE pd.IdPresupuestoDetalle = @IdPresupuestoDetalle)
+            THROW 51531, 'SECCION_INVALIDA: el centro de costo no corresponde a esta sección de gasto.', 1;
+    END;
+
     UPDATE contable.GastoDirecto
     SET IdPresupuestoDetalle = @IdPresupuestoDetalle,
         IdProveedor = @IdProveedor, IdMoneda = @IdMoneda, Fecha = @Fecha,
         Concepto = @Concepto, Descripcion = @Descripcion, Monto = @Monto,
+        IdMonedaOriginal = @IdMonedaOriginal, MontoOriginal = @MontoOriginal, TipoCambio = @TipoCambio,
+        FechaTipoCambio = @FechaTipoCambio,
         FechaActualizacion = SYSUTCDATETIME()
     WHERE IdGastoDirecto = @IdGastoDirecto AND Estado = 'REGISTRADO';
     IF @@ROWCOUNT = 0
@@ -156,6 +260,84 @@ BEGIN
         THROW 51506, 'ESTADO_INVALIDO: sólo un gasto REGISTRADO puede editarse.', 1;
     END;
     SELECT @IdGastoDirecto AS IdGastoDirecto;
+END;
+GO
+
+/*
+    Centros de costo activos que admite una sección de gasto (según el tipo de
+    centro de costo). Alimenta el selector de cada pantalla de Gastos del proyecto.
+*/
+CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_CentrosCostoPorSeccion
+    @CodigoSeccion VARCHAR(30)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT cc.IdCentroCosto, cc.Codigo, cc.Nombre, cc.IdProyecto, tcc.Codigo AS CodigoTipoCentroCosto
+    FROM ControlPresupuestario.CentroCosto cc
+    JOIN ControlPresupuestario.TipoCentroCosto tcc ON tcc.IdTipoCentroCosto = cc.IdTipoCentroCosto
+    JOIN ControlPresupuestario.SeccionGastoTipoCentroCosto st ON st.IdTipoCentroCosto = cc.IdTipoCentroCosto
+    JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = st.IdSeccionGasto
+    WHERE sg.Codigo = UPPER(LTRIM(RTRIM(@CodigoSeccion))) AND sg.Activo = 1 AND cc.Activo = 1
+    ORDER BY cc.Codigo;
+END;
+GO
+
+/*
+    Partidas de una sección con saldo en la versión APROBADA del centro de costo.
+    Usa vw_ControlPresupuestarioVigente: el saldo acumula toda la cadena de
+    versiones de la partida, igual que el bloqueo al confirmar.
+*/
+CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_PartidasDisponibles
+    @CodigoSeccion VARCHAR(30),
+    @IdCentroCosto INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT v.IdPresupuestoDetalle, v.IdPresupuesto, v.CodigoPresupuesto, v.IdPresupuestoVersion,
+        v.NumeroVersion, v.IdCatalogoPartida, v.CodigoPartida, v.NombrePartida,
+        v.IdMoneda, v.CodigoMoneda, v.SimboloMoneda,
+        v.MontoPresupuestado, v.MontoComprometido, v.MontoEjecutado, v.SaldoDisponible
+    FROM ControlPresupuestario.vw_ControlPresupuestarioVigente v
+    JOIN ControlPresupuestario.CatalogoPartida cp ON cp.IdCatalogoPartida = v.IdCatalogoPartida
+    JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = cp.IdSeccionGasto
+    WHERE sg.Codigo = UPPER(LTRIM(RTRIM(@CodigoSeccion))) AND v.IdCentroCosto = @IdCentroCosto
+    ORDER BY v.CodigoPartida, v.CodigoPresupuesto;
+END;
+GO
+
+/*
+    Proveedores activos para una sección. DeLaSeccion = 1 marca a los que antes
+    pertenecían a sus categorías (proveedores de gasto administrativo por
+    categoría, o de terreno), para ofrecerlos primero como en las pantallas
+    antiguas. El resto también se devuelve: un proveedor nuevo del catálogo
+    único todavía no tiene categoría y no debe quedar fuera.
+*/
+CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_ProveedoresPorSeccion
+    @CodigoSeccion VARCHAR(30)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET @CodigoSeccion = UPPER(LTRIM(RTRIM(@CodigoSeccion)));
+
+    WITH DeLaSeccion AS
+    (
+        SELECT lm.IdProveedor
+        FROM maestra.ProveedorLegacyMap lm
+        JOIN maestra.ProveedorGastoAdministrativo pga ON pga.IdProveedorGastoAdministrativo = lm.IdLegacy
+        JOIN ControlPresupuestario.SeccionGastoCategoriaGasto sc ON sc.IdCategoriaGasto = pga.IdCategoriaGasto
+        JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = sc.IdSeccionGasto
+        WHERE lm.Origen = 'PROVEEDOR_GASTO_ADMIN' AND sg.Codigo = @CodigoSeccion
+        UNION
+        SELECT lm.IdProveedor
+        FROM maestra.ProveedorLegacyMap lm
+        WHERE lm.Origen = 'PROVEEDOR_TERRENO' AND @CodigoSeccion = 'TERRENO'
+    )
+    SELECT p.IdProveedor, p.RazonSocial, p.Ruc,
+        CONVERT(BIT, CASE WHEN d.IdProveedor IS NULL THEN 0 ELSE 1 END) AS DeLaSeccion
+    FROM maestra.Proveedor p
+    LEFT JOIN (SELECT DISTINCT IdProveedor FROM DeLaSeccion) d ON d.IdProveedor = p.IdProveedor
+    WHERE p.Activo = 1
+    ORDER BY CASE WHEN d.IdProveedor IS NULL THEN 1 ELSE 0 END, p.RazonSocial;
 END;
 GO
 

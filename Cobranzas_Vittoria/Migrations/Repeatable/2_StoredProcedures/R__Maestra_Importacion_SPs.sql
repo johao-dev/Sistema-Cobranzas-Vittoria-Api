@@ -175,6 +175,70 @@ GO
 --   - 50002: Codigos duplicados dentro del archivo.
 --   - 50003: Codigos que ya existen en BD.
 -- -----------------------------------------------------------------------------
+-- -----------------------------------------------------------------------------
+-- Material v3: igual que v2 más IdCatalogoPartida (partida por defecto).
+-- La API resuelve el código de partida y reporta los errores por fila; aquí se
+-- revalida como defensa (hoja, activa). NULL = material sin partida por defecto.
+-- -----------------------------------------------------------------------------
+CREATE OR ALTER PROCEDURE [maestra].[usp_Material_CargaMasiva_v3]
+    @Filas maestra.TVP_Material_v3 READONLY,
+    @Usuario VARCHAR(100) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRAN;
+
+        IF EXISTS (
+            SELECT 1 FROM @Filas
+            WHERE IdEspecialidad IS NULL
+               OR NULLIF(LTRIM(RTRIM(Codigo)), '') IS NULL
+               OR NULLIF(LTRIM(RTRIM(Descripcion)), '') IS NULL
+               OR NULLIF(LTRIM(RTRIM(UnidadMedida)), '') IS NULL
+        )
+            THROW 50001, 'CAMPO_OBLIGATORIO: Codigo, Descripcion y UnidadMedida son requeridos.', 1;
+
+        IF EXISTS (SELECT Codigo FROM @Filas GROUP BY Codigo HAVING COUNT(*) > 1)
+            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Codigo de Material repetido en el archivo.', 1;
+
+        IF EXISTS (
+            SELECT 1 FROM @Filas f
+            INNER JOIN maestra.Material m WITH (UPDLOCK, HOLDLOCK) ON m.Codigo = f.Codigo
+        )
+            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe un Material con ese Codigo.', 1;
+
+        IF EXISTS (
+            SELECT 1 FROM @Filas f
+            LEFT JOIN ControlPresupuestario.CatalogoPartida p ON p.IdCatalogoPartida = f.IdCatalogoPartida
+            WHERE f.IdCatalogoPartida IS NOT NULL
+              AND (p.IdCatalogoPartida IS NULL OR p.Activo = 0
+                   OR EXISTS (SELECT 1 FROM ControlPresupuestario.CatalogoPartida h
+                              WHERE h.IdPartidaPadre = f.IdCatalogoPartida))
+        )
+            THROW 50004, 'FK_NO_EXISTE: la partida debe existir, estar activa y no tener partidas hijas.', 1;
+
+        DECLARE @RowCount INT = 0;
+        INSERT INTO maestra.Material
+            (IdEspecialidad, Codigo, Descripcion, UnidadMedida, StockMinimo, Activo, FechaCreacion,
+             IdUnidadMedida, IdCatalogoPartida)
+        SELECT
+            f.IdEspecialidad, LTRIM(RTRIM(f.Codigo)), f.Descripcion, f.UnidadMedida, 0, 1, GETDATE(),
+            f.IdUnidadMedida, f.IdCatalogoPartida
+        FROM @Filas f;
+        SET @RowCount = @@ROWCOUNT;
+
+        COMMIT;
+        SELECT @RowCount AS FilasInsertadas;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() <> 0 ROLLBACK;
+        THROW;
+    END CATCH
+END;
+GO
+
 CREATE OR ALTER PROCEDURE [maestra].[usp_Material_CargaMasiva_v2]
     @Filas maestra.TVP_Material_v2 READONLY,
     @Usuario VARCHAR(100) = NULL

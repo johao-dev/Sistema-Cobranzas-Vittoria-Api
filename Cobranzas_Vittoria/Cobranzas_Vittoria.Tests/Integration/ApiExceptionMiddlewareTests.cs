@@ -1,8 +1,10 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Cobranzas_Vittoria.Dtos.Valorizaciones;
+using Cobranzas_Vittoria.Seguridad.Authorization;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 
 namespace Cobranzas_Vittoria.Tests.Integration;
@@ -13,6 +15,9 @@ public class ApiExceptionMiddlewareTests : IntegrationTestBase
     [Test]
     public async Task Get_EstadoContableInvalido_Devuelve400Seguro()
     {
+        // El listado de gastos directos exige control_presupuestario.ver.
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            JwtTestTokenFactory.CrearToken(permisos: new[] { Permisos.GastoDirecto.Ver }));
         var response = await _client.GetAsync(
             "/api/contable/gastos-directos?estado=estado-inexistente");
 

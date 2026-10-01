@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoDetalle.Eliminar;
+
+public sealed record EliminarPresupuestoDetalleCommand(int IdPresupuesto, int IdPresupuestoVersion, int IdPresupuestoDetalle);

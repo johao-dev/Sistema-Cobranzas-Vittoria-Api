@@ -435,3 +435,39 @@ CROSS APPLY
         - COALESCE(m.MontoEjecutado, 0) AS SaldoDisponible
 ) saldo;
 GO
+
+
+/*
+===============================================================================
+Objeto      : vw_EjecucionDiariaPorPartida
+Descripción : Efecto neto diario sobre lo ejecutado, por presupuesto y partida.
+-------------------------------------------------------------------------------
+Suma las EJECUCION y los AJUSTE de ejecución (INCREMENTO suma, DECREMENTO resta)
+de la cadena APROBADO/HISTORICO, con el mismo criterio que
+vw_ControlPresupuestarioVigente. Alimenta la curva acumulada del dashboard.
+===============================================================================
+*/
+CREATE OR ALTER VIEW ControlPresupuestario.vw_EjecucionDiariaPorPartida
+AS
+SELECT
+    pv.IdPresupuesto,
+    pd.IdCatalogoPartida,
+    CONVERT(DATE, mp.Fecha) AS Fecha,
+    CAST(SUM(CASE
+        WHEN tm.Codigo = 'EJECUCION' THEN mp.Monto
+        WHEN mp.Direccion = 'INCREMENTO' THEN mp.Monto
+        ELSE -mp.Monto
+    END) AS DECIMAL(28,2)) AS MontoEjecutado
+FROM ControlPresupuestario.MovimientoPresupuestal mp
+INNER JOIN ControlPresupuestario.TipoMovimientoPresupuestal tm
+    ON tm.IdTipoMovimientoPresupuestal = mp.IdTipoMovimientoPresupuestal
+INNER JOIN ControlPresupuestario.PresupuestoDetalle pd
+    ON pd.IdPresupuestoDetalle = mp.IdPresupuestoDetalle
+INNER JOIN ControlPresupuestario.PresupuestoVersion pv
+    ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+INNER JOIN ControlPresupuestario.EstadoPresupuesto ep
+    ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
+WHERE ep.Codigo IN ('APROBADO', 'HISTORICO')
+  AND (tm.Codigo = 'EJECUCION' OR (tm.Codigo = 'AJUSTE' AND mp.Afectacion = 'EJECUCION'))
+GROUP BY pv.IdPresupuesto, pd.IdCatalogoPartida, CONVERT(DATE, mp.Fecha);
+GO

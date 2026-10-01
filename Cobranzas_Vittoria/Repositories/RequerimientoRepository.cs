@@ -116,6 +116,8 @@ SELECT
     rd.IdRequerimiento,
     rd.IdMaterial,
     rd.IdPresupuestoDetalle,
+    cp.Codigo AS CodigoPartida,
+    cp.Nombre AS NombrePartida,
     m.IdEspecialidad,
     e.Nombre AS Especialidad,
     m.Descripcion AS Material,
@@ -125,6 +127,10 @@ SELECT
 FROM compras.RequerimientoDetalle rd
 INNER JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
 INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd
+    ON pd.IdPresupuestoDetalle = rd.IdPresupuestoDetalle
+LEFT JOIN ControlPresupuestario.CatalogoPartida cp
+    ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
 WHERE rd.IdRequerimiento = @IdRequerimiento
 ORDER BY rd.IdRequerimientoDetalle;";
 

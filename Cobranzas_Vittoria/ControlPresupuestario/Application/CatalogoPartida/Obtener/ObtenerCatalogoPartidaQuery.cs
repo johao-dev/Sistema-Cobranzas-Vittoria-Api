@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.CatalogoPartida.Obtener;
+
+public sealed record ObtenerCatalogoPartidaQuery(int IdCatalogoPartida);

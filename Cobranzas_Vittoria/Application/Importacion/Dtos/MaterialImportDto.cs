@@ -45,6 +45,9 @@ public class MaterialImportDto
     /// <summary>Codigo del material. Requerido, no vacio, max 50 chars. Lo trae el usuario; el sistema NO lo autogenera.</summary>
     public string Codigo { get; set; } = string.Empty;
 
+    /// <summary>Código de la partida por defecto (columna opcional "Partida"); null si no viene.</summary>
+    public string? Partida { get; set; }
+
     /// <summary>Numero de fila del archivo (1-based, sin contar encabezados). Metadata, no se persiste.</summary>
     public int _Fila { get; set; }
 }

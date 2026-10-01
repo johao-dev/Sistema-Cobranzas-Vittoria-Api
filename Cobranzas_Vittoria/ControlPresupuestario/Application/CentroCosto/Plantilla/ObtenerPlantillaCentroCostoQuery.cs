@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.CentroCosto.Plantilla;
+
+public sealed record ObtenerPlantillaCentroCostoQuery;

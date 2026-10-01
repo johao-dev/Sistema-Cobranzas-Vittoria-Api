@@ -111,13 +111,65 @@ public class IntegracionEconomicaComprasTests : IntegrationTestBase
         Assert.That(respuesta.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
         Assert.That(await EstadoOc(sinPartida.IdOrdenCompra), Is.EqualTo("REGISTRADA"));
 
+        // Una OC en otra moneda que la del presupuesto ya no llega a crearse.
         await ResetDatabaseBeforeEachTest();
-        var monedaDistinta = await CrearOrdenAsync(montoPresupuestado: 1_000m, precioOc: 10m,
-            aprobar: false, usarUsd: true);
-        respuesta = await CambiarEstadoAsync(monedaDistinta.IdOrdenCompra, "APROBADA");
-        Assert.That(respuesta.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        Assert.That(await EstadoOc(monedaDistinta.IdOrdenCompra), Is.EqualTo("REGISTRADA"));
+        var idDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync(monto: 1_000m);
+        var idReq = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterial, 10m, idPresupuestoDetalle: idDetalle)
+            .CrearEnviadoOcAsync(_client);
+        var usd = await DbHelpers.QueryScalarAsync<int>("SELECT IdMoneda FROM maestra.Moneda WHERE Codigo='USD'");
+        var enUsd = await _client.PostAsJsonAsync("/api/compras/ordenes-compra", new OrdenCompraCreateDto
+        {
+            IdRequerimiento = idReq,
+            IdMoneda = usd,
+            FechaOrdenCompra = DateTime.Today,
+            Items = [new() { IdMaterial = IdMaterial, Cantidad = 10m, IdProveedor = IdProveedor, PrecioUnitario = 10m }]
+        });
+        Assert.That(enUsd.StatusCode, Is.EqualTo(HttpStatusCode.Conflict), await enUsd.Content.ReadAsStringAsync());
+        Assert.That(await enUsd.Content.ReadAsStringAsync(), Does.Contain("moneda del presupuesto"));
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM compras.OrdenCompra"), Is.Zero);
         Assert.That(await CantidadMovimientos(), Is.Zero);
+    }
+
+    [Test]
+    public async Task OcSinPrecioNiMoneda_TomaLaMonedaDelPresupuesto_YElGastoSeEjecutaAlAceptarLaCompra()
+    {
+        // Flujo de la bandeja de OC: solo proveedor y cantidades; el precio llega con la Compra.
+        var idDetalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync(monto: 1_000m);
+        var idReq = await RequerimientoBuilder.Nuevo()
+            .ConItem(IdMaterial, 10m, idPresupuestoDetalle: idDetalle)
+            .CrearEnviadoOcAsync(_client);
+        var crear = await _client.PostAsJsonAsync("/api/compras/ordenes-compra", new
+        {
+            idRequerimiento = idReq,
+            fechaOrdenCompra = DateTime.Today,
+            items = new[] { new { idMaterial = IdMaterial, cantidad = 10m, idProveedor = IdProveedor } }
+        });
+        Assert.That(crear.StatusCode, Is.EqualTo(HttpStatusCode.OK), await crear.Content.ReadAsStringAsync());
+        var idOc = (await crear.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("idOrdenCompra").GetInt32();
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("""
+            SELECT COUNT(*) FROM compras.OrdenCompra oc
+            JOIN ControlPresupuestario.PresupuestoDetalle pd ON pd.IdPresupuestoDetalle = @idDetalle
+            JOIN ControlPresupuestario.PresupuestoVersion pv ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
+            WHERE oc.IdOrdenCompra = @idOc AND oc.IdMoneda = p.IdMoneda AND oc.Total = 0
+            """, new { idOc, idDetalle }), Is.EqualTo(1), "La OC toma la moneda del presupuesto y nace sin importe.");
+
+        var aprobar = await CambiarEstadoAsync(idOc, "APROBADA");
+        Assert.That(aprobar.StatusCode, Is.EqualTo(HttpStatusCode.OK), await aprobar.Content.ReadAsStringAsync());
+        Assert.That(await CantidadMovimientos(), Is.Zero, "Sin precio en la OC no hay compromiso que registrar.");
+
+        var idCompra = await CrearCompraAsync(idOc, precioReal: 12m);
+        var aceptar = await AceptarCompraAsync(idCompra);
+        Assert.That(aceptar.StatusCode, Is.EqualTo(HttpStatusCode.OK), await aceptar.Content.ReadAsStringAsync());
+        var movimientos = (await DbHelpers.QueryAsync<MovimientoRow>("""
+            SELECT tm.Codigo AS Tipo, mp.Monto
+            FROM ControlPresupuestario.MovimientoPresupuestal mp
+            JOIN ControlPresupuestario.TipoMovimientoPresupuestal tm
+                ON tm.IdTipoMovimientoPresupuestal = mp.IdTipoMovimientoPresupuestal;
+            """)).ToArray();
+        Assert.That(movimientos.Select(x => (x.Tipo, x.Monto)), Is.EqualTo(new[] { ("EJECUCION", 120m) }));
+        Assert.That(await EstadoOc(idOc), Is.EqualTo("ATENDIDA"));
     }
 
     [Test]

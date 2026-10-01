@@ -8,6 +8,9 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5000 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git libgdiplus procps \
     && mkdir -p /tmp/dotnet /tmp/nuget/packages /workspace \
+        /workspace/Cobranzas_Vittoria/obj /workspace/Cobranzas_Vittoria/bin \
+        /workspace/Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/obj \
+        /workspace/Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/bin \
     && chmod -R 777 /tmp/dotnet /tmp/nuget /workspace \
     && rm -rf /var/lib/apt/lists/*
 

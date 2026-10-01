@@ -94,6 +94,7 @@ BEGIN
         v.IdEstadoPresupuesto, e.Codigo AS EstadoPresupuesto, e.Nombre AS NombreEstadoPresupuesto,
         v.Descripcion, v.MotivoCambio, v.FechaCreacion, v.FechaAprobacion,
         v.UsuarioCreacion, v.UsuarioAprobacion,
+        v.MotivoAnulacion, v.FechaAnulacion, v.UsuarioAnulacion,
         p.Codigo AS CodigoPresupuesto, p.Nombre AS NombrePresupuesto,
         p.IdCentroCosto, p.IdMoneda, m.Codigo AS CodigoMoneda, m.Simbolo AS SimboloMoneda
     FROM ControlPresupuestario.PresupuestoVersion v
@@ -115,6 +116,7 @@ BEGIN
         v.IdEstadoPresupuesto, e.Codigo AS EstadoPresupuesto, e.Nombre AS NombreEstadoPresupuesto,
         v.Descripcion, v.MotivoCambio, v.FechaCreacion, v.FechaAprobacion,
         v.UsuarioCreacion, v.UsuarioAprobacion,
+        v.MotivoAnulacion, v.FechaAnulacion, v.UsuarioAnulacion,
         p.Codigo AS CodigoPresupuesto, p.Nombre AS NombrePresupuesto,
         p.IdCentroCosto, p.IdMoneda, m.Codigo AS CodigoMoneda, m.Simbolo AS SimboloMoneda
     FROM ControlPresupuestario.PresupuestoVersion v
@@ -191,7 +193,8 @@ CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_CatalogoPartida_Listar
     @IdPartidaPadre INT = NULL,
     @SoloRaices BIT = 0,
     @EsHoja BIT = NULL,
-    @Busqueda NVARCHAR(200) = NULL
+    @Busqueda NVARCHAR(200) = NULL,
+    @IdSeccionGasto INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -201,10 +204,12 @@ BEGIN
     SELECT x.IdCatalogoPartida, x.Codigo, x.Nombre, x.Descripcion,
         x.IdPartidaPadre, padre.Codigo AS CodigoPartidaPadre, padre.Nombre AS NombrePartidaPadre,
         x.Nivel, x.IdTipoPartida, t.Codigo AS CodigoTipoPartida, t.Nombre AS NombreTipoPartida,
-        x.Activo, hoja.EsHoja, x.FechaCreacion, x.FechaActualizacion
+        x.Activo, hoja.EsHoja, x.FechaCreacion, x.FechaActualizacion,
+        x.IdSeccionGasto, sg.Codigo AS CodigoSeccionGasto, sg.Nombre AS NombreSeccionGasto
     FROM ControlPresupuestario.CatalogoPartida x
     LEFT JOIN ControlPresupuestario.CatalogoPartida padre ON padre.IdCatalogoPartida = x.IdPartidaPadre
     JOIN ControlPresupuestario.TipoPartida t ON t.IdTipoPartida = x.IdTipoPartida
+    LEFT JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = x.IdSeccionGasto
     CROSS APPLY (SELECT CONVERT(BIT, CASE WHEN EXISTS
         (SELECT 1 FROM ControlPresupuestario.CatalogoPartida h WHERE h.IdPartidaPadre = x.IdCatalogoPartida)
         THEN 0 ELSE 1 END) AS EsHoja) hoja
@@ -213,6 +218,7 @@ BEGIN
         AND (@IdPartidaPadre IS NULL OR x.IdPartidaPadre = @IdPartidaPadre)
         AND (ISNULL(@SoloRaices, 0) = 0 OR x.IdPartidaPadre IS NULL)
         AND (@EsHoja IS NULL OR hoja.EsHoja = @EsHoja)
+        AND (@IdSeccionGasto IS NULL OR x.IdSeccionGasto = @IdSeccionGasto)
         AND (@Busqueda IS NULL OR CHARINDEX(@Busqueda, x.Codigo) > 0 OR CHARINDEX(@Busqueda, x.Nombre) > 0)
     ORDER BY x.Codigo, x.IdCatalogoPartida;
 END;
@@ -228,10 +234,12 @@ BEGIN
     SELECT x.IdCatalogoPartida, x.Codigo, x.Nombre, x.Descripcion,
         x.IdPartidaPadre, padre.Codigo AS CodigoPartidaPadre, padre.Nombre AS NombrePartidaPadre,
         x.Nivel, x.IdTipoPartida, t.Codigo AS CodigoTipoPartida, t.Nombre AS NombreTipoPartida,
-        x.Activo, hoja.EsHoja, x.FechaCreacion, x.FechaActualizacion
+        x.Activo, hoja.EsHoja, x.FechaCreacion, x.FechaActualizacion,
+        x.IdSeccionGasto, sg.Codigo AS CodigoSeccionGasto, sg.Nombre AS NombreSeccionGasto
     FROM ControlPresupuestario.CatalogoPartida x
     LEFT JOIN ControlPresupuestario.CatalogoPartida padre ON padre.IdCatalogoPartida = x.IdPartidaPadre
     JOIN ControlPresupuestario.TipoPartida t ON t.IdTipoPartida = x.IdTipoPartida
+    LEFT JOIN ControlPresupuestario.SeccionGasto sg ON sg.IdSeccionGasto = x.IdSeccionGasto
     CROSS APPLY (SELECT CONVERT(BIT, CASE WHEN EXISTS
         (SELECT 1 FROM ControlPresupuestario.CatalogoPartida h WHERE h.IdPartidaPadre = x.IdCatalogoPartida)
         THEN 0 ELSE 1 END) AS EsHoja) hoja
@@ -328,6 +336,27 @@ BEGIN
     FROM ControlPresupuestario.TipoPartida
     WHERE @Activo IS NULL OR Activo = @Activo
     ORDER BY Codigo, IdTipoPartida;
+END;
+GO
+
+CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_SeccionGasto_Listar
+    @Activo BIT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- CodigosTipoCentroCosto: tipos de centro de costo admitidos, separados por coma.
+    SELECT s.IdSeccionGasto, s.Codigo, s.Nombre, s.Descripcion, s.Orden, s.Activo,
+        tipos.CodigosTipoCentroCosto
+    FROM ControlPresupuestario.SeccionGasto s
+    OUTER APPLY (
+        SELECT STRING_AGG(t.Codigo, ',') WITHIN GROUP (ORDER BY t.Codigo) AS CodigosTipoCentroCosto
+        FROM ControlPresupuestario.SeccionGastoTipoCentroCosto st
+        JOIN ControlPresupuestario.TipoCentroCosto t ON t.IdTipoCentroCosto = st.IdTipoCentroCosto
+        WHERE st.IdSeccionGasto = s.IdSeccionGasto
+    ) tipos
+    WHERE @Activo IS NULL OR s.Activo = @Activo
+    ORDER BY s.Orden, s.IdSeccionGasto;
 END;
 GO
 

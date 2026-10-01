@@ -11,4 +11,9 @@ public class Material
     public decimal StockMinimo { get; set; }
     public bool Activo { get; set; }
     public DateTime FechaCreacion { get; set; }
+
+    /// <summary>Partida presupuestal por defecto: se propone al agregar el material a un requerimiento.</summary>
+    public int? IdCatalogoPartida { get; set; }
+    public string? CodigoPartida { get; set; }
+    public string? NombrePartida { get; set; }
 }

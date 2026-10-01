@@ -110,11 +110,16 @@ SELECT
         m.UnidadMedida,
         m.StockMinimo,
         m.Activo,
-        m.FechaCreacion
+        m.FechaCreacion,
+        m.IdCatalogoPartida,
+        cp.Codigo AS CodigoPartida,
+        cp.Nombre AS NombrePartida
 FROM
     maestra.Material m
 INNER JOIN maestra.Especialidad e ON
     e.IdEspecialidad = m.IdEspecialidad
+LEFT JOIN ControlPresupuestario.CatalogoPartida cp ON
+    cp.IdCatalogoPartida = m.IdCatalogoPartida
 WHERE
     m.IdMaterial = @IdMaterial;
 END;
@@ -138,11 +143,16 @@ SELECT
         m.UnidadMedida,
         m.StockMinimo,
         m.Activo,
-        m.FechaCreacion
+        m.FechaCreacion,
+        m.IdCatalogoPartida,
+        cp.Codigo AS CodigoPartida,
+        cp.Nombre AS NombrePartida
 FROM
     maestra.Material m
 INNER JOIN maestra.Especialidad e ON
     e.IdEspecialidad = m.IdEspecialidad
+LEFT JOIN ControlPresupuestario.CatalogoPartida cp ON
+    cp.IdCatalogoPartida = m.IdCatalogoPartida
 WHERE
     (@Activo IS NULL
         OR m.Activo = @Activo)
@@ -162,11 +172,29 @@ CREATE OR ALTER PROCEDURE maestra.usp_Material_Upsert
     @Descripcion VARCHAR(250),
     @UnidadMedida VARCHAR(50),
     @StockMinimo DECIMAL(18, 2) = 0,
-    @Activo BIT = 1
+    @Activo BIT = 1,
+    @IdCatalogoPartida INT = NULL
 AS
 BEGIN
     SET
 NOCOUNT ON;
+
+-- Partida por defecto del material: debe existir, estar activa y no tener hijas
+-- (solo las hojas reciben montos). Se conserva una partida que ya tenía el
+-- material aunque luego se haya desactivado, para no bloquear otras ediciones.
+IF @IdCatalogoPartida IS NOT NULL
+BEGIN
+    DECLARE @PartidaActiva BIT, @PartidaAnterior INT;
+    SELECT @PartidaActiva = Activo FROM ControlPresupuestario.CatalogoPartida
+    WHERE IdCatalogoPartida = @IdCatalogoPartida;
+    SELECT @PartidaAnterior = IdCatalogoPartida FROM maestra.Material WHERE IdMaterial = @IdMaterial;
+    IF @PartidaActiva IS NULL
+        THROW 51251, 'PARTIDA_INVALIDA: la partida presupuestal no existe.', 1;
+    IF @PartidaActiva = 0 AND ISNULL(@PartidaAnterior, 0) <> @IdCatalogoPartida
+        THROW 51251, 'PARTIDA_INVALIDA: la partida presupuestal está inactiva.', 1;
+    IF EXISTS (SELECT 1 FROM ControlPresupuestario.CatalogoPartida WHERE IdPartidaPadre = @IdCatalogoPartida)
+        THROW 51251, 'PARTIDA_INVALIDA: la partida tiene partidas hijas; elige una partida sin hijas.', 1;
+END;
 
 SET
 @Codigo = NULLIF(LTRIM(RTRIM(@Codigo)), '');
@@ -198,7 +226,8 @@ INSERT
             UnidadMedida,
             StockMinimo,
             Activo,
-            FechaCreacion
+            FechaCreacion,
+            IdCatalogoPartida
         )
 VALUES
         (
@@ -209,7 +238,8 @@ VALUES
             @UnidadMedida,
             ISNULL(@StockMinimo, 0),
             ISNULL(@Activo, 1),
-            GETDATE()
+            GETDATE(),
+            @IdCatalogoPartida
         );
 
 SELECT
@@ -227,7 +257,8 @@ SET
         Descripcion = @Descripcion,
         UnidadMedida = @UnidadMedida,
         StockMinimo = ISNULL(@StockMinimo, 0),
-        Activo = ISNULL(@Activo, 1)
+        Activo = ISNULL(@Activo, 1),
+        IdCatalogoPartida = @IdCatalogoPartida
 WHERE
     IdMaterial = @IdMaterial;
 

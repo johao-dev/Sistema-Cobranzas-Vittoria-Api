@@ -357,7 +357,7 @@ public class ImportControllerMaterialV2Tests : IntegrationTestBase
         var texto = Encoding.UTF8.GetString(bytes);
         if (texto.Length > 0 && texto[0] == '\uFEFF') texto = texto[1..]; // remover BOM
         var primeraLinea = texto.Replace("\r", string.Empty).Split('\n')[0];
-        Assert.That(primeraLinea, Is.EqualTo("Especialidad;Nombre;UnidadMedida;Codigo"));
+        Assert.That(primeraLinea, Is.EqualTo("Especialidad;Nombre;UnidadMedida;Codigo;Partida"));
 
         // Solo 1 linea (header); no debe haber filas de ejemplo.
         var totalLineas = texto.Replace("\r", string.Empty)

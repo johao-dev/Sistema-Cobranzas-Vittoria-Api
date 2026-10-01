@@ -1,10 +1,12 @@
 using System.Data;
 using Cobranzas_Vittoria.Application.Importacion.Dtos;
+using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
 using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Services;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Domain.Importacion;
+using Dapper;
 
 namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 
@@ -34,7 +36,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// </list>
 /// </para>
 /// </summary>
-public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, MaterialImportTvpDto>
+public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, MaterialImportTvpV3Dto>
 {
     public const string ModuloNombre = "material";
 
@@ -53,8 +55,9 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, Ma
 
     public override string Modulo => ModuloNombre;
 
-    protected override string SpName => "maestra.usp_Material_CargaMasiva_v2";
-    protected override string TvpTypeName => "maestra.TVP_Material_v2";
+    // v3 = v2 + partida por defecto (columna opcional "Partida" con el código de la partida).
+    protected override string SpName => "maestra.usp_Material_CargaMasiva_v3";
+    protected override string TvpTypeName => "maestra.TVP_Material_v3";
 
     protected override string[] EncabezadosRequeridos => new[]
     {
@@ -84,13 +87,17 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, Ma
         if (string.IsNullOrWhiteSpace(codigo))
             throw new KeyNotFoundException("La columna 'Codigo' es requerida y no puede estar vacia.");
 
+        // Partida: opcional. Código de una partida hoja del catálogo presupuestal.
+        var partida = fila.ContieneColumna("Partida") ? fila.GetString("Partida")?.Trim() : null;
+
         return new MaterialImportDto
         {
             _Fila = fila.NumeroFila,
             Especialidad = especialidad.Trim(),
             Nombre = nombre.Trim(),
             UnidadMedida = unidadMedida.Trim(),
-            Codigo = codigo.Trim()
+            Codigo = codigo.Trim(),
+            Partida = string.IsNullOrEmpty(partida) ? null : partida
         };
     }
 
@@ -100,13 +107,15 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, Ma
     /// transaccion que abrio la base. Si una creacion choca con UNIQUE por
     /// concurrencia, el <see cref="ResolvedorEntidadesService"/> reintenta.
     /// </summary>
-    protected override async Task<IReadOnlyList<MaterialImportTvpDto>> OnConstruirTvpAsync(
+    protected override async Task<IReadOnlyList<MaterialImportTvpV3Dto>> OnConstruirTvpAsync(
         IReadOnlyList<MaterialImportDto> archivos,
         IDbConnection cn,
         IDbTransaction tx,
         CancellationToken ct)
     {
-        var tvps = new List<MaterialImportTvpDto>(archivos.Count);
+        var partidas = await ResolverPartidasAsync(archivos, cn, tx, ct);
+
+        var tvps = new List<MaterialImportTvpV3Dto>(archivos.Count);
         foreach (var a in archivos)
         {
             var idEspecialidad = await _resolvedor.ResolverIdEspecialidadAsync(
@@ -114,16 +123,56 @@ public class MaterialImportProcessor : ImportProcessorBase<MaterialImportDto, Ma
             var idUnidadMedida = await _resolvedor.ResolverIdUnidadMedidaAsync(
                 a.UnidadMedida, cn, tx, ct);
 
-            tvps.Add(new MaterialImportTvpDto
+            tvps.Add(new MaterialImportTvpV3Dto
             {
                 _Fila = a._Fila,
                 IdEspecialidad = idEspecialidad,
                 Codigo = a.Codigo,
                 Descripcion = a.Nombre,
                 IdUnidadMedida = idUnidadMedida,
-                UnidadMedida = a.UnidadMedida
+                UnidadMedida = a.UnidadMedida,
+                IdCatalogoPartida = a.Partida is null ? null : partidas[a.Partida]
             });
         }
         return tvps;
+    }
+
+    /// <summary>
+    /// Resuelve los códigos de la columna Partida. Cada código debe existir, estar
+    /// activo y no tener partidas hijas; si alguno falla se informan todas las filas
+    /// con error y no se importa nada.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<string, int>> ResolverPartidasAsync(
+        IReadOnlyList<MaterialImportDto> archivos, IDbConnection cn, IDbTransaction tx, CancellationToken ct)
+    {
+        var resueltas = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        if (!archivos.Any(a => a.Partida is not null)) return resueltas;
+
+        var catalogo = (await cn.QueryAsync<(int Id, string Codigo, bool Activo, bool TieneHijas)>(
+            new CommandDefinition("""
+                SELECT p.IdCatalogoPartida, p.Codigo, p.Activo,
+                    CONVERT(BIT, CASE WHEN EXISTS (SELECT 1 FROM ControlPresupuestario.CatalogoPartida h
+                        WHERE h.IdPartidaPadre = p.IdCatalogoPartida) THEN 1 ELSE 0 END)
+                FROM ControlPresupuestario.CatalogoPartida p
+                """, transaction: tx, cancellationToken: ct)))
+            .ToDictionary(p => p.Codigo, StringComparer.OrdinalIgnoreCase);
+
+        var errores = new List<DetalleErrorFila>();
+        foreach (var a in archivos.Where(a => a.Partida is not null))
+        {
+            var motivo = !catalogo.TryGetValue(a.Partida!, out var p) ? "no existe en el catálogo"
+                : !p.Activo ? "está inactiva"
+                : p.TieneHijas ? "tiene partidas hijas; usa una partida sin hijas"
+                : null;
+            if (motivo is null) resueltas[a.Partida!] = p.Id;
+            else errores.Add(new DetalleErrorFila(a._Fila, "Partida", CodigosError.Fila.ReglaNegocio,
+                $"La partida {a.Partida} {motivo}."));
+        }
+
+        if (errores.Count > 0)
+            throw new DatosInvalidosException(
+                $"El archivo contiene {errores.Count} fila(s) con una partida inválida. No se realizo ninguna insercion.",
+                errores);
+        return resueltas;
     }
 }

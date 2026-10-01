@@ -193,13 +193,13 @@ public class ImportControllerUnitTests
         Assert.That(file.FileContents[1], Is.EqualTo((byte)0xBB));
         Assert.That(file.FileContents[2], Is.EqualTo((byte)0xBF));
 
-        // Cuerpo decodificado: una sola linea con los 4 headers separados por ';'.
+        // Cuerpo decodificado: una sola linea con los headers (4 requeridos + Partida opcional) separados por ';'.
         // El BOM UTF-8 (3 bytes) se decodifica como U+FEFF (zero-width no-break
         // space). Lo removemos antes de comparar.
         var texto = System.Text.Encoding.UTF8.GetString(file.FileContents);
         if (texto.Length > 0 && texto[0] == '\uFEFF') texto = texto[1..];
         var primeraLineaReal = texto.Replace("\r", string.Empty).Split('\n')[0];
-        Assert.That(primeraLineaReal, Is.EqualTo("Especialidad;Nombre;UnidadMedida;Codigo"));
+        Assert.That(primeraLineaReal, Is.EqualTo("Especialidad;Nombre;UnidadMedida;Codigo;Partida"));
     }
 
     [Test]
