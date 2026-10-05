@@ -40,4 +40,7 @@ public sealed class MaterialImportPlantillaRow
 
     [ExcelColumn(Header = "Codigo",        Order = 4, Width = 18)]
     public string Codigo { get; set; } = string.Empty;
+
+    [ExcelColumn(Header = "Partida",       Order = 5, Width = 16)]
+    public string Partida { get; set; } = string.Empty;
 }

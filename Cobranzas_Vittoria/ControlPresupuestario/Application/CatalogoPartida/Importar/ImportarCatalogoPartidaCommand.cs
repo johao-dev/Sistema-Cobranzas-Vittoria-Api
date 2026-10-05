@@ -1,0 +1,5 @@
+using Cobranzas_Vittoria.ControlPresupuestario.Application.Common;
+
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.CatalogoPartida.Importar;
+
+public sealed record ImportarCatalogoPartidaCommand(ArchivoTabular Archivo);

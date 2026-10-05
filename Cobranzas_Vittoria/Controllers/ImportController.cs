@@ -194,7 +194,9 @@ public class ImportController : ControllerBase
         var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
         var preamble = encoding.GetPreamble();
         var sb = new StringBuilder();
-        sb.Append("Especialidad;Nombre;UnidadMedida;Codigo");
+        // "Partida" (código de la partida por defecto) es opcional y va al final
+        // para que los archivos con las 4 columnas originales sigan siendo válidos.
+        sb.Append("Especialidad;Nombre;UnidadMedida;Codigo;Partida");
         sb.Append("\r\n");
         // SIN filas de ejemplo por decision de diseno (Fase 4): el operador
         // escribe los datos desde cero. Esto evita que datos ficticios

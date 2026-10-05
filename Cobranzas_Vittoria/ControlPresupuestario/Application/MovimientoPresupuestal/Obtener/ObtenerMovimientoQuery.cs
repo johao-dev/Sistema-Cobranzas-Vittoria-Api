@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.MovimientoPresupuestal.Obtener;
+
+public sealed record ObtenerMovimientoQuery(long IdMovimientoPresupuestal);

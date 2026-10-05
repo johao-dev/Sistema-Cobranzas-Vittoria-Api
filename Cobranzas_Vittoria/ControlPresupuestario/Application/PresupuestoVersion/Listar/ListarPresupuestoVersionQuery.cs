@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoVersion.Listar;
+
+public sealed record ListarPresupuestoVersionQuery(int IdPresupuesto);

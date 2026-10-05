@@ -4,8 +4,9 @@ public class OrdenCompraCreateDto
 {
     public string NumeroOrdenCompra { get; set; } = string.Empty;
     public int IdRequerimiento { get; set; }
+    /// <summary>Opcional: la OC usa la moneda del presupuesto de las partidas del requerimiento.</summary>
     [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
-    public int IdMoneda { get; set; }
+    public int? IdMoneda { get; set; }
     public DateTime FechaOrdenCompra { get; set; }
     public string? Descripcion { get; set; }
     public int? IdUsuarioCreacion { get; set; }
@@ -18,5 +19,6 @@ public class OrdenCompraDetalleCreateDto
     public int IdMaterial { get; set; }
     public decimal Cantidad { get; set; }
     public int IdProveedor { get; set; }
+    /// <summary>Opcional en la OC (0 = sin precio): el precio se registra en la Compra.</summary>
     public decimal PrecioUnitario { get; set; }
 }

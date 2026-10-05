@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.CatalogoPartida.Plantilla;
+
+public sealed record ObtenerPlantillaCatalogoPartidaQuery;

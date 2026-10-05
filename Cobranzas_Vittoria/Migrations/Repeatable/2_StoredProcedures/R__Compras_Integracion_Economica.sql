@@ -45,7 +45,7 @@ BEGIN
                 ON cc.IdCentroCosto = p.IdCentroCosto
             WHERE pd.IdPresupuestoDetalle IS NULL
                OR ep.Codigo NOT IN ('APROBADO', 'HISTORICO')
-               OR p.Activo <> 1
+               OR (p.Activo <> 1 AND m.TipoMovimiento <> 'LIBERACION')
                OR p.IdMoneda <> @IdMoneda
                OR cc.IdProyecto IS NULL
                OR cc.IdProyecto <> @IdProyecto

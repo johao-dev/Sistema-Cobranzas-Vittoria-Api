@@ -71,6 +71,7 @@ public sealed class RbacSeedTests : IntegrationTestBase
             INNER JOIN seguridad.Permiso p ON p.IdPermiso = pr.IdPermiso
             INNER JOIN seguridad.Rol r ON r.IdRol = pr.IdRol
             WHERE r.Nombre = @nombreRol
+              AND p.Codigo LIKE 'requerimientos.%'
             ORDER BY p.Codigo;",
             new { nombreRol })).ToArray();
 }

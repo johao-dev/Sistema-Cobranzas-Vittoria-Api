@@ -51,7 +51,8 @@ namespace Cobranzas_Vittoria.Repositories
                 dto.Descripcion,
                 dto.UnidadMedida,
                 dto.StockMinimo,
-                dto.Activo
+                dto.Activo,
+                IdCatalogoPartida = dto.IdCatalogoPartida is > 0 ? dto.IdCatalogoPartida : null
             }, commandType: CommandType.StoredProcedure);
         }
 

@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoDetalle.Plantilla;
+
+public sealed record ObtenerPlantillaPresupuestoQuery(int IdPresupuesto, int IdPresupuestoVersion);

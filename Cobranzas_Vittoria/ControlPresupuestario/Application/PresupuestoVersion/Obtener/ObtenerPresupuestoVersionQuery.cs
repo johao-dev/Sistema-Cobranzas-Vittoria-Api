@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoVersion.Obtener;
+
+public sealed record ObtenerPresupuestoVersionQuery(int IdPresupuesto, int IdPresupuestoVersion);

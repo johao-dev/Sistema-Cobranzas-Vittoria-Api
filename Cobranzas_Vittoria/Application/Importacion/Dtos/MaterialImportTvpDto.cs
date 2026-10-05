@@ -42,3 +42,18 @@ public class MaterialImportTvpDto
     /// <summary>Numero de fila del archivo (1-based, sin contar encabezados). Metadata, no se persiste.</summary>
     public int _Fila { get; set; }
 }
+
+/// <summary>
+/// Fila del TVP maestra.TVP_Material_v3: igual que v2 más la partida por defecto.
+/// El orden de las propiedades DEBE coincidir con el de las columnas del tipo.
+/// </summary>
+public class MaterialImportTvpV3Dto
+{
+    public int IdEspecialidad { get; set; }
+    public string Codigo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+    public int? IdUnidadMedida { get; set; }
+    public string UnidadMedida { get; set; } = string.Empty;
+    public int? IdCatalogoPartida { get; set; }
+    public int _Fila { get; set; }
+}

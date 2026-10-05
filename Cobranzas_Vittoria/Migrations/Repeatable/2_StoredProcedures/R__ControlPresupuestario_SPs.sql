@@ -541,8 +541,12 @@ BEGIN
         END;
         ELSE
         BEGIN
+            -- Un presupuesto inactivo no admite nuevo consumo, pero sí las reversiones
+            -- (liberar un compromiso, anular un gasto): así no quedan gastos imposibles de anular.
             IF @PresupuestoActivo = 0
-                THROW 51202, 'RECURSO_INACTIVO: Presupuesto.', 1;
+               AND NOT (@TipoMovimiento = 'LIBERACION'
+                        OR (@TipoMovimiento = 'AJUSTE' AND @Direccion = 'DECREMENTO'))
+                THROW 51202, 'RECURSO_INACTIVO: el presupuesto está inactivo; solo admite reversiones (liberaciones y ajustes a la baja).', 1;
             IF @TipoActivo = 0
                 THROW 51202, 'RECURSO_INACTIVO: TipoMovimientoPresupuestal.', 1;
             IF @EstadoPresupuesto NOT IN ('APROBADO', 'HISTORICO')

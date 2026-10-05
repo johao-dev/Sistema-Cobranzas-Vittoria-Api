@@ -39,6 +39,12 @@ services:
     volumes:
       - .:/workspace/Cobranzas_Vittoria
       - ./wwwroot/uploads:/workspace/Cobranzas_Vittoria/wwwroot/uploads
+      # obj/bin propios del contenedor: los del host (Visual Studio, servicio
+      # test como root) no son escribibles por el usuario de la app.
+      - app_obj:/workspace/Cobranzas_Vittoria/obj
+      - app_bin:/workspace/Cobranzas_Vittoria/bin
+      - app_tests_obj:/workspace/Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/obj
+      - app_tests_bin:/workspace/Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/bin
       - nuget_cache:/tmp/nuget/packages
       - dotnet_cli_home:/tmp/dotnet
     depends_on:
@@ -79,3 +85,11 @@ volumes:
     name: nuget_cache_vittoria
   dotnet_cli_home:
     name: dotnet_cli_home_vittoria
+  app_obj:
+    name: app_obj_vittoria
+  app_bin:
+    name: app_bin_vittoria
+  app_tests_obj:
+    name: app_tests_obj_vittoria
+  app_tests_bin:
+    name: app_tests_bin_vittoria

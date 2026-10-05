@@ -1,0 +1,3 @@
+namespace Cobranzas_Vittoria.ControlPresupuestario.Application.MovimientoPresupuestal.ListarPorDetalle;
+
+public sealed record ListarMovimientosPorDetalleQuery(int IdPresupuesto, int IdPresupuestoVersion, int IdPresupuestoDetalle);

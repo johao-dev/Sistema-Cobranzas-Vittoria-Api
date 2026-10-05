@@ -9,4 +9,10 @@ public class MaterialUpsertDto
     public string UnidadMedida { get; set; } = string.Empty;
     public decimal StockMinimo { get; set; }
     public bool Activo { get; set; } = true;
+
+    /// <summary>
+    /// Partida presupuestal por defecto (una hoja del catálogo). NULL = sin partida.
+    /// El PUT reemplaza el material completo: quien edite debe reenviar la partida.
+    /// </summary>
+    public int? IdCatalogoPartida { get; set; }
 }

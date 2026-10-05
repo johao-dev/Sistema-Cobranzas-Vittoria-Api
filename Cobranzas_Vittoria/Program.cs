@@ -9,6 +9,8 @@ using Cobranzas_Vittoria.Application.Importacion.Validators;
 using Cobranzas_Vittoria.Application.Inventario.Persistence;
 using Cobranzas_Vittoria.Application.Inventario.Services;
 using Cobranzas_Vittoria.Application.Inventario.Validators;
+using Cobranzas_Vittoria.ControlPresupuestario;
+using Cobranzas_Vittoria.Contable.GastosDirectos;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
 using Cobranzas_Vittoria.Infrastructure.Repositories.Inventario;
@@ -184,6 +186,8 @@ builder.Services.AddScoped<QuitarRolHandler>();
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();
 builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();
+builder.Services.AddScoped<IProveedorGastoAdministrativoRepository, ProveedorGastoAdministrativoRepository>();
+builder.Services.AddScoped<IProveedorTerrenoRepository, ProveedorTerrenoRepository>();
 builder.Services.AddScoped<IMaterialRepository, MaterialRepository>();
 builder.Services.AddScoped<IRequerimientoRepository, RequerimientoRepository>();
 builder.Services.AddScoped<IOrdenCompraRepository, OrdenCompraRepository>();
@@ -192,12 +196,13 @@ builder.Services.AddScoped<IKardexRepository, KardexRepository>();
 builder.Services.AddScoped<IUnidadMedidaRepository, UnidadMedidaRepository>();
 builder.Services.AddScoped<IValorizacionRepository, ValorizacionRepository>();
 builder.Services.AddScoped<ICategoriaGastoRepository, CategoriaGastoRepository>();
-builder.Services.AddScoped<IGastoDirectoRepository, GastoDirectoRepository>();
 
 // Services
 builder.Services.AddScoped<IEspecialidadService, EspecialidadService>();
 builder.Services.AddScoped<IProyectoService, ProyectoService>();
 builder.Services.AddScoped<IProveedorService, ProveedorService>();
+builder.Services.AddScoped<IProveedorGastoAdministrativoService, ProveedorGastoAdministrativoService>();
+builder.Services.AddScoped<IProveedorTerrenoService, ProveedorTerrenoService>();
 builder.Services.AddScoped<IMaterialService, MaterialService>();
 builder.Services.AddScoped<IRequerimientoService, RequerimientoService>();
 builder.Services.AddScoped<IOrdenCompraService, OrdenCompraService>();
@@ -206,7 +211,6 @@ builder.Services.AddScoped<IKardexService, KardexService>();
 builder.Services.AddScoped<IUnidadMedidaService, UnidadMedidaService>();
 builder.Services.AddScoped<IValorizacionService, ValorizacionService>();
 builder.Services.AddScoped<ICategoriaGastoService, CategoriaGastoService>();
-builder.Services.AddScoped<IGastoDirectoService, GastoDirectoService>();
 builder.Services.AddScoped<ISunatService, SunatService>();
 
 // ============================================================================
@@ -236,6 +240,15 @@ builder.Services.AddScoped<IImportProcessor, EspecialidadImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, MaterialImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, ProveedorImportProcessor>();
 builder.Services.AddScoped<IImportProcessor, CategoriaGastoImportProcessor>();
+
+// Modulo Control Presupuestario (arquitectura hexagonal): repositorios, adaptadores de
+// importacion y casos de uso. Sus importaciones de maestros NO se registran como
+// IImportProcessor para que no queden expuestas en /api/import/{modulo}, que no exige
+// autenticacion; se invocan desde sus controllers con permisos del modulo.
+builder.Services.AddControlPresupuestario();
+
+// Modulo Gastos directos (arquitectura hexagonal): registro por seccion de Gastos del proyecto.
+builder.Services.AddGastosDirectos();
 
 // ResolvedorEntidadesService: servicio transversal usado por MaterialImportProcessor
 // para resolver IDs de catalogos (Especialidad, UnidadMedida) dentro de la
