@@ -253,8 +253,8 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
 
         var dtos = new[]
         {
-            new CategoriaGastoImportDto { _Fila = 2, Nombre = $"{prefijo}-A", Activo = true },
-            new CategoriaGastoImportDto { _Fila = 3, Nombre = $"{prefijo}-B", Activo = true }
+            new CategoriaGastoImportDto { _Fila = 2, Codigo = $"{prefijo}_A", Nombre = $"{prefijo}-A", Activo = true },
+            new CategoriaGastoImportDto { _Fila = 3, Codigo = $"{prefijo}_B", Nombre = $"{prefijo}-B", Activo = true }
         };
 
         using var connection = AbrirConexion();
@@ -271,8 +271,8 @@ public class ImportRepositoryModulosExtTests : IntegrationTestBase
 
         var dtos = new[]
         {
-            new CategoriaGastoImportDto { _Fila = 2, Nombre = $"{prefijo}-A", Activo = true },
-            new CategoriaGastoImportDto { _Fila = 3, Nombre = "",             Activo = true }
+            new CategoriaGastoImportDto { _Fila = 2, Codigo = $"{prefijo}_A", Nombre = $"{prefijo}-A", Activo = true },
+            new CategoriaGastoImportDto { _Fila = 3, Codigo = $"{prefijo}_B", Nombre = "",             Activo = true }
         };
 
         using var connection = AbrirConexion();

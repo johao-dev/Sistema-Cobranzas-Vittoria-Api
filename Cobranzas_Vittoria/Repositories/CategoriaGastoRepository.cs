@@ -16,6 +16,7 @@ public class CategoriaGastoRepository : RepositoryBase, ICategoriaGastoRepositor
         const string sql = @"
 SELECT
     IdCategoriaGasto,
+    Codigo,
     Nombre,
     Activo
 FROM maestra.CategoriaGasto
@@ -28,8 +29,11 @@ ORDER BY Nombre;";
     {
         using var db = Open();
         var nombre = (dto.Nombre ?? string.Empty).Trim();
+        var codigo = (dto.Codigo ?? string.Empty).Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(nombre))
             throw new InvalidOperationException("Debes ingresar el nombre de la categoría.");
+        if (string.IsNullOrWhiteSpace(codigo) || codigo.Length > 30 || codigo.Any(c => !(char.IsAsciiLetterOrDigit(c) || c == '_')))
+            throw new InvalidOperationException("El código es requerido y solo admite letras, números y guion bajo (máximo 30 caracteres).");
 
         const string duplicatedSql = @"
 SELECT TOP 1 IdCategoriaGasto
@@ -39,22 +43,36 @@ WHERE Nombre = @Nombre AND (@IdCategoriaGasto IS NULL OR IdCategoriaGasto <> @Id
         if (duplicated.HasValue)
             throw new InvalidOperationException("Ya existe una categoría con ese nombre.");
 
+        var duplicatedCode = await db.QueryFirstOrDefaultAsync<int?>("""
+            SELECT TOP 1 IdCategoriaGasto FROM maestra.CategoriaGasto
+            WHERE Codigo = @Codigo AND (@IdCategoriaGasto IS NULL OR IdCategoriaGasto <> @IdCategoriaGasto);
+            """, new { Codigo = codigo, dto.IdCategoriaGasto });
+        if (duplicatedCode.HasValue)
+            throw new InvalidOperationException("Ya existe una categoría con ese código.");
+
         if (dto.IdCategoriaGasto.HasValue && dto.IdCategoriaGasto.Value > 0)
         {
+            var codigoActual = await db.QueryFirstOrDefaultAsync<string?>(
+                "SELECT Codigo FROM maestra.CategoriaGasto WHERE IdCategoriaGasto = @IdCategoriaGasto",
+                new { dto.IdCategoriaGasto });
+            if (codigoActual is not null && !string.Equals(codigoActual, codigo, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("El código estable de una categoría no puede modificarse.");
+
             const string updateSql = @"
 UPDATE maestra.CategoriaGasto
-SET Nombre = @Nombre,
+SET Codigo = COALESCE(Codigo, @Codigo),
+    Nombre = @Nombre,
     Activo = @Activo
 WHERE IdCategoriaGasto = @IdCategoriaGasto;
 SELECT @IdCategoriaGasto;";
-            return await db.ExecuteScalarAsync<int>(updateSql, new { dto.IdCategoriaGasto, Nombre = nombre, dto.Activo });
+            return await db.ExecuteScalarAsync<int>(updateSql, new { dto.IdCategoriaGasto, Codigo = codigo, Nombre = nombre, dto.Activo });
         }
 
         const string insertSql = @"
-INSERT INTO maestra.CategoriaGasto (Nombre, Activo, FechaCreacion)
-VALUES (@Nombre, @Activo, GETDATE());
+INSERT INTO maestra.CategoriaGasto (Codigo, Nombre, Activo, FechaCreacion)
+VALUES (@Codigo, @Nombre, @Activo, GETDATE());
 SELECT CAST(SCOPE_IDENTITY() AS INT);";
-        return await db.ExecuteScalarAsync<int>(insertSql, new { Nombre = nombre, dto.Activo });
+        return await db.ExecuteScalarAsync<int>(insertSql, new { Codigo = codigo, Nombre = nombre, dto.Activo });
     }
 
     public async Task DeleteAsync(int idCategoriaGasto)

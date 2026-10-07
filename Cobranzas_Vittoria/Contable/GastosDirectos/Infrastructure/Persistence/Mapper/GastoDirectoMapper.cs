@@ -7,7 +7,9 @@ public static class GastoDirectoMapper
 {
     public static GastoDirecto ToDomain(GastoDirectoEntity e) => new()
     {
-        IdGastoDirecto = e.IdGastoDirecto, IdPresupuestoDetalle = e.IdPresupuestoDetalle, IdProveedor = e.IdProveedor,
+        IdGastoDirecto = e.IdGastoDirecto, IdPresupuestoDetalle = e.IdPresupuestoDetalle,
+        IdCategoriaGasto = e.IdCategoriaGasto, CodigoCategoriaGasto = e.CodigoCategoriaGasto,
+        NombreCategoriaGasto = e.NombreCategoriaGasto, IdProveedor = e.IdProveedor,
         Proveedor = e.Proveedor, IdMoneda = e.IdMoneda, Moneda = e.Moneda, Fecha = e.Fecha, Concepto = e.Concepto,
         Descripcion = e.Descripcion, Monto = e.Monto, Estado = e.Estado, FechaCreacion = e.FechaCreacion,
         FechaActualizacion = e.FechaActualizacion, IdPresupuesto = e.IdPresupuesto, CodigoPresupuesto = e.CodigoPresupuesto,
@@ -22,6 +24,9 @@ public static class GastoDirectoMapper
         e.IdGastoDirecto, e.TipoDocumento, e.NombreArchivo, e.RutaArchivo, e.Extension, e.FechaCreacion);
 
     public static ProveedorGastoDirecto ToDomain(ProveedorGastoDirectoEntity e) => new(e.IdProveedor, e.RazonSocial, e.Ruc);
+
+    public static CategoriaGastoDirecto ToDomain(CategoriaGastoDirectoEntity e)
+        => new(e.IdCategoriaGasto, e.Codigo, e.Nombre);
 
     public static CentroCostoGastoDirecto ToDomain(CentroCostoGastoDirectoEntity e)
         => new(e.IdCentroCosto, e.Codigo, e.Nombre, e.IdProyecto, e.CodigoTipoCentroCosto);

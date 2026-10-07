@@ -10,7 +10,7 @@ namespace Cobranzas_Vittoria.Application.Importacion.Processors;
 /// <summary>
 /// Processor de importacion masiva para <c>maestra.CategoriaGasto</c>.
 ///
-/// Encabezados requeridos: <c>Nombre</c>.
+/// Encabezados requeridos: <c>Codigo</c>, <c>Nombre</c>.
 /// Opcionales: <c>Activo</c> (default true).
 /// </summary>
 public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoImportDto, CategoriaGastoImportDto>
@@ -29,11 +29,14 @@ public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoI
     protected override string SpName => "maestra.usp_CategoriaGasto_CargaMasiva";
     protected override string TvpTypeName => "maestra.TVP_CategoriaGasto";
 
-    protected override string[] EncabezadosRequeridos => new[] { "Nombre" };
+    protected override string[] EncabezadosRequeridos => new[] { "Codigo", "Nombre" };
 
     internal override CategoriaGastoImportDto MapearFila(SpreadsheetRow fila)
     {
+        var codigo = fila.GetString("Codigo");
         var nombre = fila.GetString("Nombre");
+        if (string.IsNullOrWhiteSpace(codigo))
+            throw new KeyNotFoundException("La columna 'Codigo' es requerida y no puede estar vacia.");
         if (string.IsNullOrWhiteSpace(nombre))
             throw new KeyNotFoundException("La columna 'Nombre' es requerida y no puede estar vacia.");
 
@@ -42,6 +45,7 @@ public class CategoriaGastoImportProcessor : ImportProcessorBase<CategoriaGastoI
         return new CategoriaGastoImportDto
         {
             _Fila = fila.NumeroFila,
+            Codigo = codigo.Trim().ToUpperInvariant(),
             Nombre = nombre.Trim(),
             Activo = activo
         };

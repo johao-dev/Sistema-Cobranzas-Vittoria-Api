@@ -16,7 +16,10 @@ public sealed class ListarGastosDirectosHandler
         var estado = EstadoGastoDirecto.Normalizar(q.Estado);
         if (q.Desde.HasValue && q.Hasta.HasValue && q.Hasta.Value.Date < q.Desde.Value.Date)
             throw new ValidacionGastoDirectoException("Hasta no puede ser anterior a Desde.");
+        if (q.IdCategoriaGasto?.Any(id => id <= 0) == true)
+            throw new ValidacionGastoDirectoException("IdCategoriaGasto debe contener identificadores positivos.");
+        var categorias = q.IdCategoriaGasto?.Distinct().ToArray();
         return _repository.ListarAsync(new FiltroGastosDirectos(estado, q.IdProveedor, q.IdCentroCosto, q.Desde?.Date,
-            q.Hasta?.Date));
+            q.Hasta?.Date, categorias is { Length: > 0 } ? categorias : null));
     }
 }

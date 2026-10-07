@@ -5,6 +5,9 @@ public sealed record GastoDirecto
 {
     public int IdGastoDirecto { get; init; }
     public int IdPresupuestoDetalle { get; init; }
+    public int? IdCategoriaGasto { get; init; }
+    public string? CodigoCategoriaGasto { get; init; }
+    public string? NombreCategoriaGasto { get; init; }
     public int? IdProveedor { get; init; }
     public string? Proveedor { get; init; }
     public int IdMoneda { get; init; }
@@ -42,6 +45,9 @@ public sealed record DocumentoNuevo(string TipoDocumento, string NombreArchivo, 
 /// <summary>Proveedor canónico activo disponible para registrar un gasto directo.</summary>
 public sealed record ProveedorGastoDirecto(int IdProveedor, string RazonSocial, string? Ruc);
 
+/// <summary>Categoría descriptiva activa disponible para clasificar un gasto directo.</summary>
+public sealed record CategoriaGastoDirecto(int IdCategoriaGasto, string Codigo, string Nombre);
+
 /// <summary>Centro de costo activo disponible para registrar un gasto directo.</summary>
 public sealed record CentroCostoGastoDirecto(int IdCentroCosto, string Codigo, string Nombre, int? IdProyecto,
     string? CodigoTipoCentroCosto);
@@ -53,4 +59,4 @@ public sealed record PartidaDisponibleGasto(int IdPresupuestoDetalle, int IdPres
     decimal MontoEjecutado, decimal SaldoDisponible);
 
 public sealed record FiltroGastosDirectos(string? Estado, int? IdProveedor, int? IdCentroCosto, DateTime? Desde,
-    DateTime? Hasta);
+    DateTime? Hasta, IReadOnlyCollection<int>? IdsCategoriaGasto);

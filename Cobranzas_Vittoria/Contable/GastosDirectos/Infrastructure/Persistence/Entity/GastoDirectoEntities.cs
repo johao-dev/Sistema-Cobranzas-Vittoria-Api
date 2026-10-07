@@ -5,6 +5,9 @@ public sealed class GastoDirectoEntity
 {
     public int IdGastoDirecto { get; set; }
     public int IdPresupuestoDetalle { get; set; }
+    public int? IdCategoriaGasto { get; set; }
+    public string? CodigoCategoriaGasto { get; set; }
+    public string? NombreCategoriaGasto { get; set; }
     public int? IdProveedor { get; set; }
     public string? Proveedor { get; set; }
     public int IdMoneda { get; set; }
@@ -49,6 +52,13 @@ public sealed class ProveedorGastoDirectoEntity
     public int IdProveedor { get; set; }
     public string RazonSocial { get; set; } = string.Empty;
     public string? Ruc { get; set; }
+}
+
+public sealed class CategoriaGastoDirectoEntity
+{
+    public int IdCategoriaGasto { get; set; }
+    public string Codigo { get; set; } = string.Empty;
+    public string Nombre { get; set; } = string.Empty;
 }
 
 public sealed class CentroCostoGastoDirectoEntity

@@ -174,7 +174,8 @@ public class TvpMapperTests
     {
         var dataTable = TvpMapper.ToDataTable(Array.Empty<CategoriaGastoImportDto>());
 
-        Assert.That(dataTable.Columns.Count, Is.EqualTo(3));
+        Assert.That(dataTable.Columns.Count, Is.EqualTo(4));
+        Assert.That(dataTable.Columns["Codigo"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Nombre"]!.DataType, Is.EqualTo(typeof(string)));
         Assert.That(dataTable.Columns["Activo"]!.DataType, Is.EqualTo(typeof(bool)));
         Assert.That(dataTable.Columns["_Fila"]!.DataType, Is.EqualTo(typeof(int)));

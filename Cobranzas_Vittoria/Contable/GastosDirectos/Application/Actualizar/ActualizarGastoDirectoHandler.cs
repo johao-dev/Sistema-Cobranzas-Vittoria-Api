@@ -12,7 +12,7 @@ public sealed class ActualizarGastoDirectoHandler
     public Task<int> HandleAsync(ActualizarGastoDirectoCommand c)
     {
         GastoDirectoValidator.ValidarId(c.IdGastoDirecto);
-        return _repository.ActualizarAsync(c.IdGastoDirecto, RegistroGastoDirecto.Crear(c.IdPresupuestoDetalle, c.IdProveedor, c.IdMoneda, c.Fecha, c.Concepto,
+        return _repository.ActualizarAsync(c.IdGastoDirecto, RegistroGastoDirecto.Crear(c.IdPresupuestoDetalle, c.IdCategoriaGasto, c.IdProveedor, c.IdMoneda, c.Fecha, c.Concepto,
             c.Descripcion, c.Monto, c.IdMonedaOriginal, c.MontoOriginal, c.TipoCambio, c.FechaTipoCambio));
     }
 }

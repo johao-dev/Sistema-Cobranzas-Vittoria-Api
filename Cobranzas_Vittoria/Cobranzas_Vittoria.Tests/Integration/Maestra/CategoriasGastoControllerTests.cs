@@ -41,6 +41,7 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
         // Arrange - creamos una categoria inactiva
         var inactiva = new CategoriaGastoUpsertDto
         {
+            Codigo = $"CAT_INA_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
             Nombre = $"CAT-INACTIVA-{Guid.NewGuid():N}".Substring(0, 20),
             Activo = false
         };
@@ -62,6 +63,7 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
         // Arrange
         var dto = new CategoriaGastoUpsertDto
         {
+            Codigo = $"CAT_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
             Nombre = $"CAT-{Guid.NewGuid():N}".Substring(0, 20),
             Activo = true
         };
@@ -91,6 +93,7 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
         // que ApiExceptionMiddleware mapea a 500.
         var dto = new CategoriaGastoUpsertDto
         {
+            Codigo = $"VACIA_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
             Nombre = "",
             Activo = true
         };
@@ -113,6 +116,7 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
         // Arrange
         var dtoOriginal = new CategoriaGastoUpsertDto
         {
+            Codigo = $"UPD_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
             Nombre = $"CAT-UPD-{Guid.NewGuid():N}".Substring(0, 20),
             Activo = true
         };
@@ -124,6 +128,7 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
         {
             // PUT lleva el id en el body
             IdCategoriaGasto = id,
+            Codigo = dtoOriginal.Codigo,
             Nombre = dtoOriginal.Nombre,
             Activo = false
         };
@@ -141,11 +146,39 @@ public class CategoriasGastoControllerTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Update_NoPermiteCambiarCodigoEstable()
+    {
+        var original = new CategoriaGastoUpsertDto
+        {
+            Codigo = $"EST_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
+            Nombre = $"CAT-EST-{Guid.NewGuid():N}"[..20],
+            Activo = true
+        };
+        var create = await _client.PostAsJsonAsync("/api/maestra/categorias-gasto", original);
+        var id = (await create.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("idCategoriaGasto").GetInt32();
+        var modificado = new CategoriaGastoUpsertDto
+        {
+            Codigo = $"OTRO_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
+            Nombre = original.Nombre,
+            Activo = true
+        };
+
+        var response = await _client.PutAsJsonAsync($"/api/maestra/categorias-gasto/{id}", modificado);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
+        Assert.That(await DbHelpers.QueryScalarAsync<string>(
+            "SELECT Codigo FROM maestra.CategoriaGasto WHERE IdCategoriaGasto=@id", new { id }),
+            Is.EqualTo(original.Codigo));
+    }
+
+    [Test]
     public async Task Delete_ConIdExistente_RetornaOkYMarcaInactivoEnBD()
     {
         // Arrange
         var dto = new CategoriaGastoUpsertDto
         {
+            Codigo = $"DEL_{Guid.NewGuid():N}"[..20].ToUpperInvariant(),
             Nombre = $"CAT-DEL-{Guid.NewGuid():N}".Substring(0, 20),
             Activo = true
         };

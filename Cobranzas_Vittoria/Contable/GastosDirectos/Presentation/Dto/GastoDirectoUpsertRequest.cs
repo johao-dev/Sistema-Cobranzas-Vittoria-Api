@@ -8,6 +8,9 @@ public sealed class GastoDirectoUpsertRequest
     public int IdPresupuestoDetalle { get; set; }
 
     [Range(1, int.MaxValue)]
+    public int IdCategoriaGasto { get; set; }
+
+    [Range(1, int.MaxValue)]
     public int? IdProveedor { get; set; }
 
     [Range(1, int.MaxValue)]

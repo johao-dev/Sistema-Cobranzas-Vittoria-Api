@@ -8,6 +8,7 @@ public interface IGastoDirectoRepository
     Task<IReadOnlyList<GastoDirecto>> ListarAsync(FiltroGastosDirectos filtro);
     Task<IReadOnlyList<CentroCostoGastoDirecto>> ListarCentrosCostoAsync();
     Task<IReadOnlyList<ProveedorGastoDirecto>> ListarProveedoresAsync();
+    Task<IReadOnlyList<CategoriaGastoDirecto>> ListarCategoriasAsync();
     Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(int idCentroCosto);
     Task<(GastoDirecto? Gasto, IReadOnlyList<GastoDirectoDocumento> Documentos)> ObtenerAsync(int idGastoDirecto);
     Task<int> CrearAsync(RegistroGastoDirecto registro);

@@ -23,7 +23,15 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
     {
         using var db = Open();
         var filas = await db.QueryAsync<GastoDirectoEntity>("contable.usp_GastoDirecto_Listar",
-            new { f.Estado, f.IdProveedor, f.IdCentroCosto, f.Desde, f.Hasta },
+            new
+            {
+                f.Estado,
+                f.IdProveedor,
+                f.IdCentroCosto,
+                f.Desde,
+                f.Hasta,
+                IdsCategoriaGasto = f.IdsCategoriaGasto is null ? null : string.Join(',', f.IdsCategoriaGasto)
+            },
             commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
@@ -40,6 +48,14 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
     {
         using var db = Open();
         var filas = await db.QueryAsync<ProveedorGastoDirectoEntity>("contable.usp_GastoDirecto_Proveedores",
+            commandType: CommandType.StoredProcedure);
+        return filas.Select(GastoDirectoMapper.ToDomain).ToList();
+    });
+
+    public Task<IReadOnlyList<CategoriaGastoDirecto>> ListarCategoriasAsync() => Ejecutar<IReadOnlyList<CategoriaGastoDirecto>>(async () =>
+    {
+        using var db = Open();
+        var filas = await db.QueryAsync<CategoriaGastoDirectoEntity>("contable.usp_GastoDirecto_Categorias",
             commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
@@ -114,6 +130,7 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
     {
         var p = new DynamicParameters();
         p.Add("IdPresupuestoDetalle", r.IdPresupuestoDetalle);
+        p.Add("IdCategoriaGasto", r.IdCategoriaGasto);
         p.Add("IdProveedor", r.IdProveedor);
         p.Add("IdMoneda", r.IdMoneda);
         p.Add("Fecha", r.Fecha);

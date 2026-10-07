@@ -24,7 +24,9 @@ public class NormalizacionMigracionesTests
             { InitialCatalog = _database }.ConnectionString;
         var result = Upgrade(name => name.Contains(".Migrations.Versioned.")
             && !name.Contains(".V2_1_") && !name.Contains(".V2_2_")
-            && !name.Contains(".V2_3_"));
+            && !name.Contains(".V2_3_")
+            // Este fixture construye una línea histórica parcial sin GastoDirecto.
+            && !name.Contains(".V2_7_1__"));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
     }
 

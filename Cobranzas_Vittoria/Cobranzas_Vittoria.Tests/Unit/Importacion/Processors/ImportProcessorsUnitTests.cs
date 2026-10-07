@@ -321,11 +321,12 @@ public class ImportProcessorsUnitTests
     public void CategoriaGasto_FilaValida_DevuelveDtoCompleto()
     {
         var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance);
-        var fila = CrearFila(1, "Nombre", "MARKETING Y VENTAS", "Activo", "true");
+        var fila = CrearFila(1, "Codigo", "marketing_ventas", "Nombre", "MARKETING Y VENTAS", "Activo", "true");
 
         var dto = processor.MapearFila(fila);
 
         Assert.That(dto._Fila, Is.EqualTo(1));
+        Assert.That(dto.Codigo, Is.EqualTo("MARKETING_VENTAS"));
         Assert.That(dto.Nombre, Is.EqualTo("MARKETING Y VENTAS"));
         Assert.That(dto.Activo, Is.True);
     }
@@ -334,7 +335,7 @@ public class ImportProcessorsUnitTests
     public void CategoriaGasto_NombreVacio_LanzaKeyNotFound()
     {
         var processor = new CategoriaGastoImportProcessor(_parserResolver, _repository, _connectionFactory, NullLogger<CategoriaGastoImportProcessor>.Instance);
-        var fila = CrearFila(1, "Nombre", "");
+        var fila = CrearFila(1, "Codigo", "PRUEBA", "Nombre", "");
 
         var ex = Assert.Throws<KeyNotFoundException>(() => processor.MapearFila(fila))!;
         Assert.That(ex.Message, Does.Contain("Nombre"));

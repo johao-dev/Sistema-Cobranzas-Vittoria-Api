@@ -3,11 +3,13 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Listar
     @IdProveedor INT = NULL,
     @IdCentroCosto INT = NULL,
     @Desde DATE = NULL,
-    @Hasta DATE = NULL
+    @Hasta DATE = NULL,
+    @IdsCategoriaGasto VARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT gd.IdGastoDirecto, gd.IdPresupuestoDetalle, gd.IdProveedor,
+    SELECT gd.IdGastoDirecto, gd.IdPresupuestoDetalle, gd.IdCategoriaGasto,
+        cg.Codigo AS CodigoCategoriaGasto, cg.Nombre AS NombreCategoriaGasto, gd.IdProveedor,
         pr.RazonSocial AS Proveedor, gd.IdMoneda, m.Codigo AS Moneda,
         gd.Fecha, gd.Concepto, gd.Descripcion, gd.Monto, gd.Estado,
         gd.FechaCreacion, gd.FechaActualizacion,
@@ -18,6 +20,7 @@ BEGIN
         gd.IdMonedaOriginal, mo.Codigo AS MonedaOriginal, gd.MontoOriginal, gd.TipoCambio, gd.FechaTipoCambio,
         ISNULL(doc.TotalDocumentos, 0) AS TotalDocumentos
     FROM contable.GastoDirecto gd
+    LEFT JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = gd.IdCategoriaGasto
     JOIN maestra.Moneda m ON m.IdMoneda = gd.IdMoneda
     LEFT JOIN maestra.Proveedor pr ON pr.IdProveedor = gd.IdProveedor
     JOIN ControlPresupuestario.PresupuestoDetalle pd
@@ -40,6 +43,9 @@ BEGIN
       AND (@IdCentroCosto IS NULL OR cc.IdCentroCosto = @IdCentroCosto)
       AND (@Desde IS NULL OR gd.Fecha >= @Desde)
       AND (@Hasta IS NULL OR gd.Fecha <= @Hasta)
+      AND (@IdsCategoriaGasto IS NULL OR EXISTS
+          (SELECT 1 FROM STRING_SPLIT(@IdsCategoriaGasto, ',') f
+           WHERE TRY_CONVERT(INT, f.value) = gd.IdCategoriaGasto))
     ORDER BY gd.Fecha DESC, gd.IdGastoDirecto DESC;
 END;
 GO
@@ -49,7 +55,8 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Obtener
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT gd.IdGastoDirecto, gd.IdPresupuestoDetalle, gd.IdProveedor,
+    SELECT gd.IdGastoDirecto, gd.IdPresupuestoDetalle, gd.IdCategoriaGasto,
+        cg.Codigo AS CodigoCategoriaGasto, cg.Nombre AS NombreCategoriaGasto, gd.IdProveedor,
         pr.RazonSocial AS Proveedor, gd.IdMoneda, m.Codigo AS Moneda,
         gd.Fecha, gd.Concepto, gd.Descripcion, gd.Monto, gd.Estado,
         gd.FechaCreacion, gd.FechaActualizacion,
@@ -59,6 +66,7 @@ BEGIN
         cp.Nombre AS Partida,
         gd.IdMonedaOriginal, mo.Codigo AS MonedaOriginal, gd.MontoOriginal, gd.TipoCambio, gd.FechaTipoCambio
     FROM contable.GastoDirecto gd
+    LEFT JOIN maestra.CategoriaGasto cg ON cg.IdCategoriaGasto = gd.IdCategoriaGasto
     JOIN maestra.Moneda m ON m.IdMoneda = gd.IdMoneda
     LEFT JOIN maestra.Proveedor pr ON pr.IdProveedor = gd.IdProveedor
     JOIN ControlPresupuestario.PresupuestoDetalle pd
@@ -82,6 +90,7 @@ GO
 
 CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Crear
     @IdPresupuestoDetalle INT,
+    @IdCategoriaGasto INT,
     @IdProveedor INT = NULL,
     @IdMoneda INT,
     @Fecha DATE,
@@ -100,6 +109,8 @@ BEGIN
     SET @Descripcion = NULLIF(LTRIM(RTRIM(@Descripcion)), '');
     IF @IdPresupuestoDetalle IS NULL OR @IdPresupuestoDetalle <= 0
         THROW 51500, 'CAMPO_REQUERIDO: IdPresupuestoDetalle.', 1;
+    IF @IdCategoriaGasto IS NULL OR @IdCategoriaGasto <= 0
+        THROW 51500, 'CAMPO_REQUERIDO: IdCategoriaGasto.', 1;
     IF @IdMoneda IS NULL OR @IdMoneda <= 0
         THROW 51500, 'CAMPO_REQUERIDO: IdMoneda.', 1;
     IF @Fecha IS NULL THROW 51500, 'CAMPO_REQUERIDO: Fecha.', 1;
@@ -109,6 +120,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle
                    WHERE IdPresupuestoDetalle = @IdPresupuestoDetalle)
         THROW 51502, 'PARTIDA_INVALIDA: PresupuestoDetalle no existe.', 1;
+    IF NOT EXISTS (SELECT 1 FROM maestra.CategoriaGasto
+                   WHERE IdCategoriaGasto = @IdCategoriaGasto AND Activo = 1 AND Codigo IS NOT NULL)
+        THROW 51507, 'CATEGORIA_GASTO_INVALIDA: la categoría no existe, está inactiva o no tiene código conciliado.', 1;
     IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
         THROW 51503, 'MONEDA_INVALIDA: la moneda no existe o está inactiva.', 1;
     IF @IdProveedor IS NOT NULL AND NOT EXISTS
@@ -132,10 +146,10 @@ BEGIN
         THROW 51530, 'MONEDA_REFERENCIA_INCOMPLETA: la fecha del tipo de cambio solo aplica a una factura en otra moneda.', 1;
 
     INSERT INTO contable.GastoDirecto
-        (IdPresupuestoDetalle, IdProveedor, IdMoneda, Fecha, Concepto,
+        (IdPresupuestoDetalle, IdCategoriaGasto, IdProveedor, IdMoneda, Fecha, Concepto,
          Descripcion, Monto, Estado, IdMonedaOriginal, MontoOriginal, TipoCambio, FechaTipoCambio)
     VALUES
-        (@IdPresupuestoDetalle, @IdProveedor, @IdMoneda, @Fecha, @Concepto,
+        (@IdPresupuestoDetalle, @IdCategoriaGasto, @IdProveedor, @IdMoneda, @Fecha, @Concepto,
          @Descripcion, @Monto, 'REGISTRADO', @IdMonedaOriginal, @MontoOriginal, @TipoCambio, @FechaTipoCambio);
     SELECT CONVERT(INT, SCOPE_IDENTITY()) AS IdGastoDirecto;
 END;
@@ -144,6 +158,7 @@ GO
 CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Actualizar
     @IdGastoDirecto INT,
     @IdPresupuestoDetalle INT,
+    @IdCategoriaGasto INT,
     @IdProveedor INT = NULL,
     @IdMoneda INT,
     @Fecha DATE,
@@ -165,6 +180,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle
                    WHERE IdPresupuestoDetalle = @IdPresupuestoDetalle)
         THROW 51502, 'PARTIDA_INVALIDA: PresupuestoDetalle no existe.', 1;
+    IF NOT EXISTS (SELECT 1 FROM maestra.CategoriaGasto
+                   WHERE IdCategoriaGasto = @IdCategoriaGasto AND Activo = 1 AND Codigo IS NOT NULL)
+        THROW 51507, 'CATEGORIA_GASTO_INVALIDA: la categoría no existe, está inactiva o no tiene código conciliado.', 1;
     IF NOT EXISTS (SELECT 1 FROM maestra.Moneda WHERE IdMoneda = @IdMoneda AND Activo = 1)
         THROW 51503, 'MONEDA_INVALIDA: la moneda no existe o está inactiva.', 1;
     IF @IdProveedor IS NOT NULL AND NOT EXISTS
@@ -189,6 +207,7 @@ BEGIN
 
     UPDATE contable.GastoDirecto
     SET IdPresupuestoDetalle = @IdPresupuestoDetalle,
+        IdCategoriaGasto = @IdCategoriaGasto,
         IdProveedor = @IdProveedor, IdMoneda = @IdMoneda, Fecha = @Fecha,
         Concepto = @Concepto, Descripcion = @Descripcion, Monto = @Monto,
         IdMonedaOriginal = @IdMonedaOriginal, MontoOriginal = @MontoOriginal, TipoCambio = @TipoCambio,
@@ -255,6 +274,18 @@ BEGIN
     FROM maestra.Proveedor p
     WHERE p.Activo = 1
     ORDER BY p.RazonSocial, p.IdProveedor;
+END;
+GO
+
+/* Catálogo descriptivo; no impone relaciones con presupuesto, centro, partida o proveedor. */
+CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Categorias
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT IdCategoriaGasto, Codigo, Nombre
+    FROM maestra.CategoriaGasto
+    WHERE Activo = 1 AND Codigo IS NOT NULL
+    ORDER BY Nombre, IdCategoriaGasto;
 END;
 GO
 

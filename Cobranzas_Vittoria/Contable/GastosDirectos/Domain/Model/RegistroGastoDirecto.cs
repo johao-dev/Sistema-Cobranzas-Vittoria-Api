@@ -9,6 +9,7 @@ namespace Cobranzas_Vittoria.Contable.GastosDirectos.Domain.Model;
 public sealed class RegistroGastoDirecto
 {
     public int IdPresupuestoDetalle { get; }
+    public int IdCategoriaGasto { get; }
     public int? IdProveedor { get; }
     public int IdMoneda { get; }
     public DateTime Fecha { get; }
@@ -17,10 +18,11 @@ public sealed class RegistroGastoDirecto
     public decimal Monto { get; }
     public MonedaReferencia? MonedaReferencia { get; }
 
-    private RegistroGastoDirecto(int idPresupuestoDetalle, int? idProveedor, int idMoneda, DateTime fecha, string concepto,
+    private RegistroGastoDirecto(int idPresupuestoDetalle, int idCategoriaGasto, int? idProveedor, int idMoneda, DateTime fecha, string concepto,
         string? descripcion, decimal monto, MonedaReferencia? monedaReferencia)
     {
         IdPresupuestoDetalle = idPresupuestoDetalle;
+        IdCategoriaGasto = idCategoriaGasto;
         IdProveedor = idProveedor;
         IdMoneda = idMoneda;
         Fecha = fecha;
@@ -30,12 +32,12 @@ public sealed class RegistroGastoDirecto
         MonedaReferencia = monedaReferencia;
     }
 
-    public static RegistroGastoDirecto Crear(int idPresupuestoDetalle, int? idProveedor, int idMoneda, DateTime fecha,
+    public static RegistroGastoDirecto Crear(int idPresupuestoDetalle, int idCategoriaGasto, int? idProveedor, int idMoneda, DateTime fecha,
         string? concepto, string? descripcion, decimal monto, int? idMonedaOriginal, decimal? montoOriginal,
         decimal? tipoCambio, DateTime? fechaTipoCambio)
     {
         var referencia = MonedaReferencia.Crear(idMoneda, idMonedaOriginal, montoOriginal, tipoCambio, fechaTipoCambio);
-        return new RegistroGastoDirecto(idPresupuestoDetalle, idProveedor, idMoneda, fecha.Date, concepto?.Trim() ?? string.Empty,
+        return new RegistroGastoDirecto(idPresupuestoDetalle, idCategoriaGasto, idProveedor, idMoneda, fecha.Date, concepto?.Trim() ?? string.Empty,
             string.IsNullOrWhiteSpace(descripcion) ? null : descripcion.Trim(),
             decimal.Round(monto, 2, MidpointRounding.AwayFromZero), referencia);
     }

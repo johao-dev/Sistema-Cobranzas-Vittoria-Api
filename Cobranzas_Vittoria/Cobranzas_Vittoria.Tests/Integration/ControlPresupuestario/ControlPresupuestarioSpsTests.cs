@@ -212,12 +212,18 @@ public partial class ControlPresupuestarioSpsTests : IntegrationTestBase
             // Una referencia activa no demuestra cierre ni define por sí sola
             // un estado económico pendiente. Aprobar no debe inferirlo aquí.
             await connection.ExecuteAsync("""
-                INSERT INTO maestra.CategoriaGasto (Nombre) VALUES (@nombre);
+                INSERT INTO maestra.CategoriaGasto (Codigo, Nombre)
+                VALUES (@codigo, @nombre);
                 DECLARE @categoria INT = CONVERT(INT, SCOPE_IDENTITY());
                 INSERT INTO contable.GastoAdministrativo
                     (IdCategoriaGasto, Fecha, Monto, IdPresupuestoDetalle)
                 VALUES (@categoria, '20260917', 1, @detalle);
-                """, new { nombre = "CP-Test-" + Guid.NewGuid().ToString("N"), detalle });
+                """, new
+                {
+                    codigo = "CP_" + Guid.NewGuid().ToString("N")[..20].ToUpperInvariant(),
+                    nombre = "CP-Test-" + Guid.NewGuid().ToString("N"),
+                    detalle
+                });
         }
         var revision = await CrearNueva(connection, presupuesto.IdPresupuesto);
         await SustituirPartida(connection, revision.IdPresupuestoVersion);

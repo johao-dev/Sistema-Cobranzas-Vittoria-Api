@@ -13,11 +13,15 @@ namespace Cobranzas_Vittoria.Application.Importacion.Dtos;
 /// numero de fila del archivo (1-based, sin contar la fila de encabezados).
 ///
 /// Reglas de validacion (ejecutadas en el SP):
+///   - <c>Codigo</c>: requerido, max 30 chars, único intra-archivo y en BD.
 ///   - <c>Nombre</c>: requerido, max 150 chars, unico intra-archivo y en BD.
 ///   - <c>Activo</c>: requerido, default true.
 /// </summary>
 public class CategoriaGastoImportDto
 {
+    /// <summary>Código estable de negocio.</summary>
+    public string Codigo { get; set; } = string.Empty;
+
     /// <summary>Nombre de la categoria de gasto. Requerido, max 150 chars, unico en BD.</summary>
     public string Nombre { get; set; } = string.Empty;
 

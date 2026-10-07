@@ -376,12 +376,11 @@ GO
 
 -- -----------------------------------------------------------------------------
 -- CategoriaGasto
--- Tabla destino: maestra.CategoriaGasto (Nombre, Activo, FechaCreacion)
+-- Tabla destino: maestra.CategoriaGasto (Codigo, Nombre, Activo, FechaCreacion)
 -- Validaciones:
---   - 50001: Nombre obligatorio.
---   - 50002: Nombre duplicado intra-archivo.
---   - 50003: Nombre ya existe en BD (no hay UNIQUE explicita pero la
---            convencion de negocio exige unicidad de Nombre).
+--   - 50001: Codigo y Nombre obligatorios.
+--   - 50002: Codigo o Nombre duplicado intra-archivo.
+--   - 50003: Codigo o Nombre ya existe en BD.
 -- -----------------------------------------------------------------------------
 CREATE OR ALTER PROCEDURE [maestra].[usp_CategoriaGasto_CargaMasiva]
     @Filas maestra.TVP_CategoriaGasto READONLY,
@@ -397,30 +396,39 @@ BEGIN
         -- Validacion 1: obligatoriedad
         IF EXISTS (
             SELECT 1 FROM @Filas
-            WHERE NULLIF(LTRIM(RTRIM(Nombre)), '') IS NULL
+            WHERE NULLIF(LTRIM(RTRIM(Codigo)), '') IS NULL
+               OR NULLIF(LTRIM(RTRIM(Nombre)), '') IS NULL
         )
-            THROW 50001, 'CAMPO_OBLIGATORIO: Nombre es requerido.', 1;
+            THROW 50001, 'CAMPO_OBLIGATORIO: Codigo y Nombre son requeridos.', 1;
+
+        IF EXISTS (SELECT 1 FROM @Filas WHERE LEN(LTRIM(RTRIM(Codigo))) > 30
+                   OR Codigo LIKE '%[^A-Za-z0-9_]%')
+            THROW 50001, 'FORMATO_INVALIDO: Codigo admite máximo 30 caracteres alfanuméricos o guion bajo.', 1;
 
         -- Validacion 2: Nombres duplicados dentro del archivo
         IF EXISTS (
-            SELECT Nombre FROM @Filas
-            GROUP BY Nombre
+            SELECT UPPER(LTRIM(RTRIM(Codigo))) FROM @Filas
+            GROUP BY UPPER(LTRIM(RTRIM(Codigo)))
             HAVING COUNT(*) > 1
         )
+            THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Codigo de CategoriaGasto repetido en el archivo.', 1;
+
+        IF EXISTS (SELECT Nombre FROM @Filas GROUP BY Nombre HAVING COUNT(*) > 1)
             THROW 50002, 'VALOR_DUPLICADO_EN_ARCHIVO: Nombre de CategoriaGasto repetido en el archivo.', 1;
 
         -- Validacion 3: Nombres que ya existen en BD
         IF EXISTS (
             SELECT 1
             FROM @Filas f
-            INNER JOIN maestra.CategoriaGasto c WITH (UPDLOCK, HOLDLOCK) ON c.Nombre = f.Nombre
+            INNER JOIN maestra.CategoriaGasto c WITH (UPDLOCK, HOLDLOCK)
+              ON c.Nombre = f.Nombre OR c.Codigo = UPPER(LTRIM(RTRIM(f.Codigo)))
         )
-            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe una CategoriaGasto con ese Nombre.', 1;
+            THROW 50003, 'VALOR_YA_EXISTE_EN_BD: Ya existe una CategoriaGasto con ese Codigo o Nombre.', 1;
 
         -- Insert
         DECLARE @RowCount INT = 0;
-        INSERT INTO maestra.CategoriaGasto (Nombre, Activo, FechaCreacion)
-        SELECT Nombre, ISNULL(Activo, 1), GETDATE()
+        INSERT INTO maestra.CategoriaGasto (Codigo, Nombre, Activo, FechaCreacion)
+        SELECT UPPER(LTRIM(RTRIM(Codigo))), Nombre, ISNULL(Activo, 1), GETDATE()
         FROM @Filas;
         SET @RowCount = @@ROWCOUNT;
 
