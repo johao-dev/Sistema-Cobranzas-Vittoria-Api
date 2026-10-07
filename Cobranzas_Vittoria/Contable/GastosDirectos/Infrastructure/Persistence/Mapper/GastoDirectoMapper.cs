@@ -13,17 +13,17 @@ public static class GastoDirectoMapper
         FechaActualizacion = e.FechaActualizacion, IdPresupuesto = e.IdPresupuesto, CodigoPresupuesto = e.CodigoPresupuesto,
         IdCentroCosto = e.IdCentroCosto, CodigoCentroCosto = e.CodigoCentroCosto, CentroCosto = e.CentroCosto,
         IdProyecto = e.IdProyecto, IdCatalogoPartida = e.IdCatalogoPartida, CodigoPartida = e.CodigoPartida,
-        Partida = e.Partida, TotalDocumentos = e.TotalDocumentos, CodigoSeccionGasto = e.CodigoSeccionGasto,
-        NombreSeccionGasto = e.NombreSeccionGasto, IdMonedaOriginal = e.IdMonedaOriginal, MonedaOriginal = e.MonedaOriginal,
+        Partida = e.Partida, TotalDocumentos = e.TotalDocumentos,
+        IdMonedaOriginal = e.IdMonedaOriginal, MonedaOriginal = e.MonedaOriginal,
         MontoOriginal = e.MontoOriginal, TipoCambio = e.TipoCambio, FechaTipoCambio = e.FechaTipoCambio
     };
 
     public static GastoDirectoDocumento ToDomain(GastoDirectoDocumentoEntity e) => new(e.IdGastoDirectoDocumento,
         e.IdGastoDirecto, e.TipoDocumento, e.NombreArchivo, e.RutaArchivo, e.Extension, e.FechaCreacion);
 
-    public static ProveedorSeccion ToDomain(ProveedorSeccionEntity e) => new(e.IdProveedor, e.RazonSocial, e.Ruc, e.DeLaSeccion);
+    public static ProveedorGastoDirecto ToDomain(ProveedorGastoDirectoEntity e) => new(e.IdProveedor, e.RazonSocial, e.Ruc);
 
-    public static CentroCostoSeccion ToDomain(CentroCostoSeccionEntity e)
+    public static CentroCostoGastoDirecto ToDomain(CentroCostoGastoDirectoEntity e)
         => new(e.IdCentroCosto, e.Codigo, e.Nombre, e.IdProyecto, e.CodigoTipoCentroCosto);
 
     public static PartidaDisponibleGasto ToDomain(PartidaDisponibleGastoEntity e) => new(e.IdPresupuestoDetalle,

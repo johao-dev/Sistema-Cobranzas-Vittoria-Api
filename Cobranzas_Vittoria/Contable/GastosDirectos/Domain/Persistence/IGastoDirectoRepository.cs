@@ -6,9 +6,9 @@ namespace Cobranzas_Vittoria.Contable.GastosDirectos.Domain.Persistence;
 public interface IGastoDirectoRepository
 {
     Task<IReadOnlyList<GastoDirecto>> ListarAsync(FiltroGastosDirectos filtro);
-    Task<IReadOnlyList<CentroCostoSeccion>> ListarCentrosCostoAsync(string seccion);
-    Task<IReadOnlyList<ProveedorSeccion>> ListarProveedoresAsync(string seccion);
-    Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(string seccion, int idCentroCosto);
+    Task<IReadOnlyList<CentroCostoGastoDirecto>> ListarCentrosCostoAsync();
+    Task<IReadOnlyList<ProveedorGastoDirecto>> ListarProveedoresAsync();
+    Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(int idCentroCosto);
     Task<(GastoDirecto? Gasto, IReadOnlyList<GastoDirectoDocumento> Documentos)> ObtenerAsync(int idGastoDirecto);
     Task<int> CrearAsync(RegistroGastoDirecto registro);
     Task<int> ActualizarAsync(int idGastoDirecto, RegistroGastoDirecto registro);

@@ -17,7 +17,7 @@ public sealed class CrearCatalogoPartidaHandler
     public async Task<CatalogoPartidaResult> HandleAsync(CrearCatalogoPartidaCommand command)
     {
         var partida = Domain.Model.CatalogoPartida.Crear(command.Codigo, command.Nombre, command.IdTipoPartida,
-            command.IdPartidaPadre, command.Descripcion, command.IdSeccionGasto);
+            command.IdPartidaPadre, command.Descripcion);
         var id = await _repository.CrearAsync(partida);
         _logger.LogInformation("Partida creada: IdCatalogoPartida={Id}, Codigo={Codigo}", id, partida.Codigo);
         var creada = await _repository.ObtenerAsync(id) ?? throw new CatalogoPartidaNoEncontradoException(id);

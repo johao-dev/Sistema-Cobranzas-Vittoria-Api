@@ -2,7 +2,7 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Infrastructure.Importacion.Dt
 
 /// <summary>
 /// Fila del archivo de importación del catálogo de partidas, tal como la
-/// escribe el usuario: tipo y sección llegan como código o nombre y el padre
+/// escribe el usuario: tipo llega como código o nombre y el padre
 /// como código (puede ser otra fila del mismo archivo).
 /// </summary>
 public sealed class CatalogoPartidaImportDto
@@ -11,7 +11,6 @@ public sealed class CatalogoPartidaImportDto
     public string Nombre { get; set; } = string.Empty;
     public string Tipo { get; set; } = string.Empty;
     public string? CodigoPadre { get; set; }
-    public string? Seccion { get; set; }
     public string? Descripcion { get; set; }
     public int _Fila { get; set; }
 
@@ -32,7 +31,6 @@ public sealed class CatalogoPartidaImportTvpDto
     public string Nombre { get; set; } = string.Empty;
     public int IdTipoPartida { get; set; }
     public string? CodigoPadre { get; set; }
-    public int? IdSeccionGasto { get; set; }
     public string? Descripcion { get; set; }
     public int _Fila { get; set; }
 }

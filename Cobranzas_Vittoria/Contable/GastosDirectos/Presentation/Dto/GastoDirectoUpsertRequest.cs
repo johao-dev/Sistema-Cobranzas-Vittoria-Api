@@ -24,13 +24,6 @@ public sealed class GastoDirectoUpsertRequest
     [Range(typeof(decimal), "0.01", "9999999999999999.99")]
     public decimal Monto { get; set; }
 
-    /// <summary>
-    /// Sección de Gastos del proyecto (ADMINISTRATIVO, TERRENO, MARKETING_VENTAS, OTROS, MUNICIPAL). Si
-    /// viene, SQL exige que la partida pertenezca a esa sección y que el centro de costo sea de un tipo admitido.
-    /// </summary>
-    [StringLength(30)]
-    public string? Seccion { get; set; }
-
     /// <summary>Moneda original de la factura, solo como referencia (no se convierte).</summary>
     [Range(1, int.MaxValue)]
     public int? IdMonedaOriginal { get; set; }

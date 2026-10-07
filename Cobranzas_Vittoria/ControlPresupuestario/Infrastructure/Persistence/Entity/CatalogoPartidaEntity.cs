@@ -18,7 +18,4 @@ public sealed class CatalogoPartidaEntity
     public bool EsHoja { get; set; }
     public DateTime? FechaCreacion { get; set; }
     public DateTime? FechaActualizacion { get; set; }
-    public int? IdSeccionGasto { get; set; }
-    public string? CodigoSeccionGasto { get; set; }
-    public string? NombreSeccionGasto { get; set; }
 }

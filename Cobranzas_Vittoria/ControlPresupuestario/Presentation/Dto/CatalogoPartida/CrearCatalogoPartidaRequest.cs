@@ -19,7 +19,4 @@ public sealed class CrearCatalogoPartidaRequest
     [StringLength(500)]
     public string? Descripcion { get; set; }
 
-    /// <summary>Sección de gasto directo; solo aplica a partidas sin hijas.</summary>
-    [Range(1, int.MaxValue)]
-    public int? IdSeccionGasto { get; set; }
 }

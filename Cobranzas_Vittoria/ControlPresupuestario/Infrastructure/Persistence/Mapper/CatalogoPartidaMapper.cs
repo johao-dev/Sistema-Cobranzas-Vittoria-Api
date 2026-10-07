@@ -8,5 +8,5 @@ public static class CatalogoPartidaMapper
     public static CatalogoPartida ToDomain(CatalogoPartidaEntity e) => CatalogoPartida.Reconstruir(
         e.IdCatalogoPartida, e.Codigo, e.Nombre, e.Descripcion, e.IdPartidaPadre, e.CodigoPartidaPadre,
         e.NombrePartidaPadre, e.Nivel, e.IdTipoPartida, e.CodigoTipoPartida, e.NombreTipoPartida, e.Activo, e.EsHoja,
-        e.IdSeccionGasto, e.CodigoSeccionGasto, e.NombreSeccionGasto, e.FechaCreacion, e.FechaActualizacion);
+        e.FechaCreacion, e.FechaActualizacion);
 }

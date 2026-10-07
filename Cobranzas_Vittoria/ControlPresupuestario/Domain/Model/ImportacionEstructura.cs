@@ -2,7 +2,7 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Domain.Model;
 
 /// <summary>Partida que la importación crea en el catálogo; el padre puede ser otra partida nueva del mismo lote.</summary>
 public sealed record PartidaNuevaEstructura(string Codigo, string Nombre, int IdTipoPartida, string? CodigoPadre,
-    int? IdSeccionGasto, int Fila);
+    int Fila);
 
 /// <summary>Monto de una partida hoja, identificada por código porque puede nacer en la misma importación.</summary>
 public sealed record MontoEstructura(string CodigoPartida, decimal Monto, string? Observacion, int Fila);

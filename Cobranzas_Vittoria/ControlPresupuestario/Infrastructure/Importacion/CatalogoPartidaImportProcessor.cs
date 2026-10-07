@@ -20,8 +20,8 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Infrastructure.Importacion;
 /// genérico /api/import/{modulo} no exige autenticación. Se invoca desde
 /// CatalogoPartidaController (vía IImportadorMaestros), protegido por el permiso de crear partidas.
 ///
-/// Columnas: Codigo, Nombre, Tipo (requeridas); CodigoPadre, Seccion,
-/// Descripcion (opcionales). Tipo y Seccion aceptan el código o el nombre.
+/// Columnas: Codigo, Nombre, Tipo (requeridas); CodigoPadre y Descripcion
+/// (opcionales). Tipo acepta el código o el nombre.
 /// Las hijas pueden venir antes que sus padres: el SP resuelve el orden.
 /// </summary>
 public sealed class CatalogoPartidaImportProcessor
@@ -30,7 +30,7 @@ public sealed class CatalogoPartidaImportProcessor
     public const string ModuloNombre = "partida";
 
     public static readonly string[] Columnas =
-        { "Codigo", "Nombre", "Tipo", "CodigoPadre", "Seccion", "Descripcion" };
+        { "Codigo", "Nombre", "Tipo", "CodigoPadre", "Descripcion" };
 
     public CatalogoPartidaImportProcessor(
         FileParserResolver parserResolver,
@@ -53,7 +53,6 @@ public sealed class CatalogoPartidaImportProcessor
         var nombre = Leer(fila, "Nombre", 200, requerido: true, errores);
         var tipo = Leer(fila, "Tipo", 100, requerido: true, errores);
         var padre = Leer(fila, "CodigoPadre", 50, requerido: false, errores);
-        var seccion = Leer(fila, "Seccion", 100, requerido: false, errores);
         var descripcion = Leer(fila, "Descripcion", 500, requerido: false, errores);
 
         var dto = new CatalogoPartidaImportDto
@@ -63,7 +62,6 @@ public sealed class CatalogoPartidaImportProcessor
             Nombre = nombre ?? string.Empty,
             Tipo = tipo ?? string.Empty,
             CodigoPadre = padre,
-            Seccion = seccion,
             Descripcion = descripcion
         };
         dto.ErroresFormato.AddRange(errores);
@@ -79,11 +77,8 @@ public sealed class CatalogoPartidaImportProcessor
         var tipos = (await cn.QueryAsync<ReferenciaCatalogo>(new CommandDefinition(
             "SELECT IdTipoPartida AS Id, Codigo, Nombre, Activo FROM ControlPresupuestario.TipoPartida",
             transaction: tx, cancellationToken: ct))).AsList();
-        var secciones = (await cn.QueryAsync<ReferenciaCatalogo>(new CommandDefinition(
-            "SELECT IdSeccionGasto AS Id, Codigo, Nombre, Activo FROM ControlPresupuestario.SeccionGasto",
-            transaction: tx, cancellationToken: ct))).AsList();
         var existentes = (await cn.QueryAsync<PartidaExistente>(new CommandDefinition("""
-            SELECT p.Codigo, p.Activo, p.IdSeccionGasto,
+            SELECT p.Codigo, p.Activo,
                 CONVERT(BIT, CASE WHEN EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle d
                     WHERE d.IdCatalogoPartida = p.IdCatalogoPartida) THEN 1 ELSE 0 END) AS TieneMontos
             FROM ControlPresupuestario.CatalogoPartida p
@@ -98,11 +93,6 @@ public sealed class CatalogoPartidaImportProcessor
                 errores.Add(Error(fila, "Codigo", CodigosError.Sp.ValorDuplicadoEnArchivo,
                     $"El código {fila.Codigo} ya aparece en la fila {porCodigo[fila.Codigo]._Fila}."));
         }
-        var codigosPadre = archivos
-            .Where(f => f.CodigoPadre is not null)
-            .Select(f => f.CodigoPadre!)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         var tvps = new List<CatalogoPartidaImportTvpDto>(archivos.Count);
         foreach (var fila in archivos)
         {
@@ -119,21 +109,6 @@ public sealed class CatalogoPartidaImportProcessor
                 errores.Add(Error(fila, "Tipo", CodigosError.Fila.ReglaNegocio,
                     $"El tipo '{fila.Tipo}' está inactivo."));
 
-            ReferenciaCatalogo? seccion = null;
-            if (fila.Seccion is not null)
-            {
-                seccion = Resolver(secciones, fila.Seccion);
-                if (seccion is null)
-                    errores.Add(Error(fila, "Seccion", CodigosError.Sp.FkNoExiste,
-                        $"La sección '{fila.Seccion}' no existe. Use una de: {Listar(secciones)}."));
-                else if (!seccion.Activo)
-                    errores.Add(Error(fila, "Seccion", CodigosError.Fila.ReglaNegocio,
-                        $"La sección '{fila.Seccion}' está inactiva."));
-                else if (codigosPadre.Contains(fila.Codigo))
-                    errores.Add(Error(fila, "Seccion", CodigosError.Fila.ReglaNegocio,
-                        $"La partida {fila.Codigo} tiene hijas en el archivo; solo una partida sin hijas puede tener sección."));
-            }
-
             if (fila.CodigoPadre is not null)
                 ValidarPadre(fila, porCodigo, existentes, errores);
 
@@ -143,7 +118,6 @@ public sealed class CatalogoPartidaImportProcessor
                 Nombre = fila.Nombre,
                 IdTipoPartida = tipo?.Id ?? 0,
                 CodigoPadre = fila.CodigoPadre,
-                IdSeccionGasto = seccion?.Id,
                 Descripcion = fila.Descripcion,
                 _Fila = fila._Fila
             });
@@ -176,7 +150,6 @@ public sealed class CatalogoPartidaImportProcessor
         if (existentes.TryGetValue(padre, out var enBd))
         {
             var motivo = !enBd.Activo ? "está inactiva"
-                : enBd.IdSeccionGasto is not null ? "tiene sección de gasto y no puede tener hijas"
                 : enBd.TieneMontos ? "ya tiene montos presupuestados y no puede convertirse en agrupadora"
                 : null;
             if (motivo is not null)
@@ -218,7 +191,6 @@ public sealed class CatalogoPartidaImportProcessor
     {
         public string Codigo { get; set; } = string.Empty;
         public bool Activo { get; set; }
-        public int? IdSeccionGasto { get; set; }
         public bool TieneMontos { get; set; }
     }
 }

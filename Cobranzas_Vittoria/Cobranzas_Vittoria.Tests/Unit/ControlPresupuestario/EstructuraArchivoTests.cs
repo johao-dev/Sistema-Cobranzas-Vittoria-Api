@@ -34,13 +34,13 @@ public class EstructuraArchivoTests
     [Test]
     public void ColumnaCodigo_SeAceptaConNombreYMonto()
     {
-        var (filas, errores) = EstructuraArchivo.Leer(Archivo(new[] { "Codigo", "Nombre", "Monto", "Tipo", "Seccion", "Observacion" },
-            new[] { "01", "Terreno", null, "INDIRECTOS", null, null },
-            new[] { "01.01", "Compra", "S/ 1,250.50", null, "TERRENO", "Escritura" }));
+        var (filas, errores) = EstructuraArchivo.Leer(Archivo(new[] { "Codigo", "Nombre", "Monto", "Tipo", "Observacion" },
+            new[] { "01", "Terreno", null, "INDIRECTOS", null },
+            new[] { "01.01", "Compra", "S/ 1,250.50", null, "Escritura" }));
 
         Assert.That(errores, Is.Empty);
         Assert.That(filas[1].Monto, Is.EqualTo(1250.50m));
-        Assert.That((filas[0].Tipo, filas[1].Seccion, filas[1].Observacion), Is.EqualTo(("INDIRECTOS", "TERRENO", "Escritura")));
+        Assert.That((filas[0].Tipo, filas[1].Observacion), Is.EqualTo(("INDIRECTOS", "Escritura")));
     }
 
     [Test]

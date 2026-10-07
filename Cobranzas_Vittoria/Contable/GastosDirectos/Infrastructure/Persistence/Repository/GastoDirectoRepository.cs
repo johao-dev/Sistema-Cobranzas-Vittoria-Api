@@ -23,33 +23,33 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
     {
         using var db = Open();
         var filas = await db.QueryAsync<GastoDirectoEntity>("contable.usp_GastoDirecto_Listar",
-            new { f.Estado, f.IdProveedor, f.IdCentroCosto, f.Desde, f.Hasta, CodigoSeccion = f.Seccion },
+            new { f.Estado, f.IdProveedor, f.IdCentroCosto, f.Desde, f.Hasta },
             commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
 
-    public Task<IReadOnlyList<CentroCostoSeccion>> ListarCentrosCostoAsync(string seccion) => Ejecutar<IReadOnlyList<CentroCostoSeccion>>(async () =>
+    public Task<IReadOnlyList<CentroCostoGastoDirecto>> ListarCentrosCostoAsync() => Ejecutar<IReadOnlyList<CentroCostoGastoDirecto>>(async () =>
     {
         using var db = Open();
-        var filas = await db.QueryAsync<CentroCostoSeccionEntity>("contable.usp_GastoDirecto_CentrosCostoPorSeccion",
-            new { CodigoSeccion = seccion }, commandType: CommandType.StoredProcedure);
+        var filas = await db.QueryAsync<CentroCostoGastoDirectoEntity>("contable.usp_GastoDirecto_CentrosCosto",
+            commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
 
-    public Task<IReadOnlyList<ProveedorSeccion>> ListarProveedoresAsync(string seccion) => Ejecutar<IReadOnlyList<ProveedorSeccion>>(async () =>
+    public Task<IReadOnlyList<ProveedorGastoDirecto>> ListarProveedoresAsync() => Ejecutar<IReadOnlyList<ProveedorGastoDirecto>>(async () =>
     {
         using var db = Open();
-        var filas = await db.QueryAsync<ProveedorSeccionEntity>("contable.usp_GastoDirecto_ProveedoresPorSeccion",
-            new { CodigoSeccion = seccion }, commandType: CommandType.StoredProcedure);
+        var filas = await db.QueryAsync<ProveedorGastoDirectoEntity>("contable.usp_GastoDirecto_Proveedores",
+            commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
 
-    public Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(string seccion, int idCentroCosto)
+    public Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(int idCentroCosto)
         => Ejecutar<IReadOnlyList<PartidaDisponibleGasto>>(async () =>
     {
         using var db = Open();
         var filas = await db.QueryAsync<PartidaDisponibleGastoEntity>("contable.usp_GastoDirecto_PartidasDisponibles",
-            new { CodigoSeccion = seccion, IdCentroCosto = idCentroCosto }, commandType: CommandType.StoredProcedure);
+            new { IdCentroCosto = idCentroCosto }, commandType: CommandType.StoredProcedure);
         return filas.Select(GastoDirectoMapper.ToDomain).ToList();
     });
 
@@ -120,7 +120,6 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
         p.Add("Concepto", r.Concepto);
         p.Add("Descripcion", r.Descripcion);
         p.Add("Monto", r.Monto);
-        p.Add("CodigoSeccion", r.Seccion);
         p.Add("IdMonedaOriginal", r.MonedaReferencia?.IdMonedaOriginal);
         p.Add("MontoOriginal", r.MonedaReferencia?.MontoOriginal);
         p.Add("TipoCambio", r.MonedaReferencia?.TipoCambio);

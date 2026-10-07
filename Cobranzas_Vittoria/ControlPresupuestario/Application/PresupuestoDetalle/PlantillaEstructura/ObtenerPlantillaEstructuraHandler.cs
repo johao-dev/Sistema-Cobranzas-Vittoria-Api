@@ -7,7 +7,7 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoDetall
 public sealed record ObtenerPlantillaEstructuraQuery(int IdPresupuesto, int IdPresupuestoVersion);
 
 /// <summary>Fila de la plantilla jerárquica. Monto va vacío en las categorías; Subtotal es informativo y solo va en ellas.</summary>
-public sealed record PlantillaEstructuraFila(string Codigo, string Nombre, string? Tipo, string? Seccion, decimal? Monto,
+public sealed record PlantillaEstructuraFila(string Codigo, string Nombre, string? Tipo, decimal? Monto,
     decimal? Subtotal, string? Observacion);
 
 /// <summary>
@@ -56,11 +56,11 @@ public sealed class ObtenerPlantillaEstructuraHandler
                 detalles.TryGetValue(partida.IdCatalogoPartida, out var d);
                 var monto = d?.MontoPresupuestado ?? 0m;
                 filas[posicion] = new PlantillaEstructuraFila(partida.Codigo, partida.Nombre, partida.CodigoTipoPartida,
-                    partida.CodigoSeccionGasto, monto, null, d?.Observacion);
+                    monto, null, d?.Observacion);
                 return monto;
             }
             var subtotal = propias.Sum(Visitar);
-            filas[posicion] = new PlantillaEstructuraFila(partida.Codigo, partida.Nombre, partida.CodigoTipoPartida, null, null,
+            filas[posicion] = new PlantillaEstructuraFila(partida.Codigo, partida.Nombre, partida.CodigoTipoPartida, null,
                 subtotal, null);
             return subtotal;
         }

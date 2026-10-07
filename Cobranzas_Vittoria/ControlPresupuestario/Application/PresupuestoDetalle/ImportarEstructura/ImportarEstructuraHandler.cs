@@ -55,7 +55,6 @@ public sealed class ImportarEstructuraHandler
         var catalogo = (await _partidas.ListarAsync(new FiltroPartidas()))
             .ToDictionary(p => p.Codigo, StringComparer.OrdinalIgnoreCase);
         var tipos = await _catalogos.ListarTiposPartidaAsync(true);
-        var secciones = await _catalogos.ListarSeccionesGastoAsync(true);
         var enArchivo = filas.GroupBy(f => f.Codigo, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
@@ -111,15 +110,7 @@ public sealed class ImportarEstructuraHandler
                     errores.Add(new(n, "Tipo", CodigosError.Fila.CampoRequerido,
                         $"Indica el Tipo de la partida {fila.Codigo} o de su categoría raíz; las hijas lo heredan."));
 
-                int? idSeccion = null;
-                if (fila.Seccion is not null && !esCategoria)
-                {
-                    idSeccion = secciones.FirstOrDefault(s => Coincide(s.Codigo, s.Nombre, fila.Seccion))?.IdSeccionGasto;
-                    if (idSeccion is null)
-                        errores.Add(new(n, "Seccion", CodigosError.Sp.FkNoExiste,
-                            $"La sección '{fila.Seccion}' no existe. Usa una de: {string.Join(", ", secciones.Select(s => s.Codigo))}."));
-                }
-                nuevas.Add(new PartidaNuevaEstructura(fila.Codigo, fila.Nombre, tipo ?? 0, fila.CodigoPadre, idSeccion, n));
+                nuevas.Add(new PartidaNuevaEstructura(fila.Codigo, fila.Nombre, tipo ?? 0, fila.CodigoPadre, n));
             }
 
             if (!esCategoria)
@@ -147,7 +138,7 @@ public sealed class ImportarEstructuraHandler
             lote.PartidasEnVersion, lote.MontoTotal, resultado.PartidasCreadas);
     }
 
-    /// <summary>Un tipo o sección se indica por código (MANO_OBRA) o por nombre (Mano de obra), sin tildes ni mayúsculas.</summary>
+    /// <summary>Un tipo se indica por código (MANO_OBRA) o por nombre (Mano de obra), sin tildes ni mayúsculas.</summary>
     private static bool Coincide(string codigo, string nombre, string valor)
         => string.Equals(codigo, valor.Trim().Replace(' ', '_'), StringComparison.OrdinalIgnoreCase)
             || EstructuraArchivo.MismoNombre(nombre, valor);

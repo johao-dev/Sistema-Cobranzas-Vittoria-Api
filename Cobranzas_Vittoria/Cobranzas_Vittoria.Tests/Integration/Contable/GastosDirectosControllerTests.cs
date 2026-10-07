@@ -50,57 +50,55 @@ public sealed class GastosDirectosControllerTests : IntegrationTestBase
             Is.EqualTo(HttpStatusCode.Forbidden));
     }
 
-    // ---------------------------------------------------------------- secciones
+    // ------------------------------------------------------------ contrato sin clasificación de UI
 
     [Test]
-    public async Task Seccion_PartidaDeLaSeccion_SeRegistraYSoloApareceEnSuSeccion()
+    public async Task Crear_UsaSoloDetallePresupuestario_YNoExponeClasificacionDePantalla()
     {
         var detalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
         var moneda = await DbHelpersMoneda.ObtenerPenAsync();
-        await AsignarSeccionAsync(detalle, "OTROS");
 
-        var response = await _client.PostAsJsonAsync("/api/contable/gastos-directos",
-            Dto(detalle, moneda, 30m, seccion: "OTROS"));
+        var response = await _client.PostAsJsonAsync("/api/contable/gastos-directos", Dto(detalle, moneda, 30m));
+
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created), await response.Content.ReadAsStringAsync());
         var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("idGastoDirecto").GetInt32();
-
-        var otros = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos?seccion=OTROS");
-        var terreno = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos?seccion=TERRENO");
-        Assert.That(otros.EnumerateArray().Any(g => g.GetProperty("idGastoDirecto").GetInt32() == id), Is.True);
-        Assert.That(terreno.EnumerateArray().Any(g => g.GetProperty("idGastoDirecto").GetInt32() == id), Is.False);
+        var gasto = (await _client.GetFromJsonAsync<JsonElement>($"/api/contable/gastos-directos/{id}"))
+            .GetProperty("gasto");
+        Assert.That(gasto.GetProperty("idPresupuestoDetalle").GetInt32(), Is.EqualTo(detalle));
     }
 
     [Test]
-    public async Task Seccion_PartidaDeOtraSeccion_Rechaza409SinPersistir()
+    public async Task CentrosCosto_DevuelveActivosSinFiltroDePantalla()
     {
         var detalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
-        var moneda = await DbHelpersMoneda.ObtenerPenAsync();
-        await AsignarSeccionAsync(detalle, "OTROS");
-        var antes = await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM contable.GastoDirecto");
+        var centro = await DbHelpers.QueryScalarAsync<int>("""
+            SELECT p.IdCentroCosto FROM ControlPresupuestario.PresupuestoDetalle d
+            JOIN ControlPresupuestario.PresupuestoVersion v ON v.IdPresupuestoVersion=d.IdPresupuestoVersion
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto=v.IdPresupuesto
+            WHERE d.IdPresupuestoDetalle=@detalle
+            """, new { detalle });
 
-        var response = await _client.PostAsJsonAsync("/api/contable/gastos-directos",
-            Dto(detalle, moneda, 30m, seccion: "TERRENO"));
+        var centros = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos/centros-costo");
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.That(body.GetProperty("error").GetString(), Is.EqualTo("SECCION_INVALIDA"));
-        Assert.That(await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM contable.GastoDirecto"), Is.EqualTo(antes));
+        Assert.That(centros.EnumerateArray().Any(c => c.GetProperty("idCentroCosto").GetInt32() == centro), Is.True);
     }
 
     [Test]
-    public async Task Seccion_CentroCostoNoAdmitido_Rechaza409()
+    public async Task PartidasDisponibles_UsaCentroYDevuelveDetalleEconomicamenteValido()
     {
         var detalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
-        var moneda = await DbHelpersMoneda.ObtenerPenAsync();
-        // El detalle es de un centro de costo PROYECTO y ADMINISTRATIVO solo admite áreas.
-        await AsignarSeccionAsync(detalle, "ADMINISTRATIVO", tiposAdmitidos: "ADMINISTRACION");
+        var centro = await DbHelpers.QueryScalarAsync<int>("""
+            SELECT p.IdCentroCosto FROM ControlPresupuestario.PresupuestoDetalle d
+            JOIN ControlPresupuestario.PresupuestoVersion v ON v.IdPresupuestoVersion=d.IdPresupuestoVersion
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto=v.IdPresupuesto
+            WHERE d.IdPresupuestoDetalle=@detalle
+            """, new { detalle });
 
-        var response = await _client.PostAsJsonAsync("/api/contable/gastos-directos",
-            Dto(detalle, moneda, 30m, seccion: "ADMINISTRATIVO"));
+        var partidas = await _client.GetFromJsonAsync<JsonElement>(
+            $"/api/contable/gastos-directos/partidas-disponibles?idCentroCosto={centro}");
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        Assert.That((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("message").GetString(),
-            Does.Contain("centro de costo"));
+        Assert.That(partidas.EnumerateArray().Any(p =>
+            p.GetProperty("idPresupuestoDetalle").GetInt32() == detalle), Is.True);
     }
 
     [Test]
@@ -166,67 +164,19 @@ public sealed class GastosDirectosControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Proveedores_PrimeroLosDeLaSeccionPorSuCategoriaAntigua()
+    public async Task Proveedores_DevuelveCanonicosActivosSinMarcaLegacy()
     {
-        // Proveedor antiguo de gasto administrativo con categoría GASTOS MUNICIPALES, migrado al catálogo único.
-        await AsignarSeccionAsync(await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync(), "MUNICIPAL");
         var sufijo = Guid.NewGuid().ToString("N")[..8];
         var idProveedor = await DbHelpers.QueryScalarAsync<int>("""
-            IF NOT EXISTS (SELECT 1 FROM maestra.CategoriaGasto WHERE Nombre = N'GASTOS MUNICIPALES')
-                INSERT INTO maestra.CategoriaGasto (Nombre, Activo) VALUES (N'GASTOS MUNICIPALES', 1);
-            DECLARE @cat INT = (SELECT TOP (1) IdCategoriaGasto FROM maestra.CategoriaGasto WHERE Nombre = N'GASTOS MUNICIPALES');
-            INSERT INTO ControlPresupuestario.SeccionGastoCategoriaGasto (IdSeccionGasto, IdCategoriaGasto)
-            SELECT s.IdSeccionGasto, @cat FROM ControlPresupuestario.SeccionGasto s
-            WHERE s.Codigo = 'MUNICIPAL'
-              AND NOT EXISTS (SELECT 1 FROM ControlPresupuestario.SeccionGastoCategoriaGasto x WHERE x.IdCategoriaGasto = @cat);
-            INSERT INTO maestra.ProveedorGastoAdministrativo (RazonSocial, Activo, IdCategoriaGasto)
-            VALUES (@razon, 1, @cat);
-            DECLARE @legacy INT = CONVERT(INT, SCOPE_IDENTITY());
             INSERT INTO maestra.Proveedor (RazonSocial, Activo) VALUES (@razon, 1);
-            DECLARE @nuevo INT = CONVERT(INT, SCOPE_IDENTITY());
-            INSERT INTO maestra.ProveedorLegacyMap (Origen, IdLegacy, IdProveedor, Criterio)
-            VALUES ('PROVEEDOR_GASTO_ADMIN', @legacy, @nuevo, 'IDENTIDAD_NUEVA');
-            SELECT @nuevo;
-            """, new { razon = "ZZ MUNICIPAL " + sufijo });
+            SELECT CONVERT(INT, SCOPE_IDENTITY());
+            """, new { razon = "ZZ CANONICO " + sufijo });
 
-        var municipal = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos/proveedores?seccion=MUNICIPAL");
-        var marketing = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos/proveedores?seccion=MARKETING_VENTAS");
-
-        var enMunicipal = municipal.EnumerateArray().First(p => p.GetProperty("idProveedor").GetInt32() == idProveedor);
-        Assert.That(enMunicipal.GetProperty("deLaSeccion").GetBoolean(), Is.True);
-        Assert.That(municipal.EnumerateArray().First().GetProperty("deLaSeccion").GetBoolean(), Is.True,
-            "Los de la sección van primero.");
-        var enMarketing = marketing.EnumerateArray().First(p => p.GetProperty("idProveedor").GetInt32() == idProveedor);
-        Assert.That(enMarketing.GetProperty("deLaSeccion").GetBoolean(), Is.False,
-            "En otra sección sigue disponible, pero no como propio.");
-    }
-
-    /// <summary>Crea las secciones (Respawn las borra) y pone la partida del detalle en la sección indicada.</summary>
-    private static async Task AsignarSeccionAsync(int detalle, string seccion, string tiposAdmitidos = "PROYECTO")
-    {
-        await using var cn = await DbHelpers.OpenTestConnectionAsync();
-        await cn.ExecuteAsync("""
-            INSERT INTO ControlPresupuestario.SeccionGasto (Codigo, Nombre, Orden)
-            SELECT v.Codigo, v.Codigo, v.Orden FROM (VALUES ('ADMINISTRATIVO', 1), ('TERRENO', 2),
-                ('MARKETING_VENTAS', 3), ('OTROS', 4), ('MUNICIPAL', 5)) v(Codigo, Orden)
-            WHERE NOT EXISTS (SELECT 1 FROM ControlPresupuestario.SeccionGasto s WHERE s.Codigo = v.Codigo);
-
-            IF NOT EXISTS (SELECT 1 FROM ControlPresupuestario.TipoCentroCosto WHERE Codigo = 'ADMINISTRACION')
-                INSERT INTO ControlPresupuestario.TipoCentroCosto (Codigo, Nombre) VALUES ('ADMINISTRACION', N'Administración');
-
-            INSERT INTO ControlPresupuestario.SeccionGastoTipoCentroCosto (IdSeccionGasto, IdTipoCentroCosto)
-            SELECT s.IdSeccionGasto, t.IdTipoCentroCosto
-            FROM ControlPresupuestario.SeccionGasto s
-            JOIN ControlPresupuestario.TipoCentroCosto t ON t.Codigo = @tiposAdmitidos
-            WHERE s.Codigo = @seccion AND NOT EXISTS (
-                SELECT 1 FROM ControlPresupuestario.SeccionGastoTipoCentroCosto x
-                WHERE x.IdSeccionGasto = s.IdSeccionGasto AND x.IdTipoCentroCosto = t.IdTipoCentroCosto);
-
-            UPDATE cp SET IdSeccionGasto = (SELECT IdSeccionGasto FROM ControlPresupuestario.SeccionGasto WHERE Codigo = @seccion)
-            FROM ControlPresupuestario.CatalogoPartida cp
-            JOIN ControlPresupuestario.PresupuestoDetalle pd ON pd.IdCatalogoPartida = cp.IdCatalogoPartida
-            WHERE pd.IdPresupuestoDetalle = @detalle;
-            """, new { detalle, seccion, tiposAdmitidos });
+        var proveedores = await _client.GetFromJsonAsync<JsonElement>("/api/contable/gastos-directos/proveedores");
+        var proveedor = proveedores.EnumerateArray().Single(p => p.GetProperty("idProveedor").GetInt32() == idProveedor);
+        Assert.That(proveedor.GetProperty("razonSocial").GetString(), Does.Contain(sufijo));
+        Assert.That(proveedor.EnumerateObject().Select(p => p.Name),
+            Is.EquivalentTo(new[] { "idProveedor", "razonSocial", "ruc" }));
     }
 
     [Test]
@@ -410,15 +360,14 @@ public sealed class GastosDirectosControllerTests : IntegrationTestBase
     }
 
     private static GastoDirectoUpsertRequest Dto(int detalle, int moneda, decimal monto,
-        string concepto = "SERVICIO DIRECTO", string? seccion = null) => new()
+        string concepto = "SERVICIO DIRECTO") => new()
     {
         IdPresupuestoDetalle = detalle,
         IdMoneda = moneda,
         Fecha = DateTime.Today,
         Concepto = concepto,
         Descripcion = "Prueba de integración",
-        Monto = monto,
-        Seccion = seccion
+        Monto = monto
     };
 
     private static Task<int> ContarMovimientosAsync(int id, string? tipo = null)

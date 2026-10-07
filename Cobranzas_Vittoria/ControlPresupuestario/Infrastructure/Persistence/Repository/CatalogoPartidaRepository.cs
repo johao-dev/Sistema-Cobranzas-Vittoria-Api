@@ -23,7 +23,7 @@ public sealed class CatalogoPartidaRepository : RepositoryBase, ICatalogoPartida
         var filas = await db.QueryAsync<CatalogoPartidaEntity>(Schema + "usp_CatalogoPartida_Listar",
             new
             {
-                f.Activo, f.IdTipoPartida, f.IdPartidaPadre, f.SoloRaices, f.EsHoja, f.Busqueda, f.IdSeccionGasto
+                f.Activo, f.IdTipoPartida, f.IdPartidaPadre, f.SoloRaices, f.EsHoja, f.Busqueda
             }, commandType: CommandType.StoredProcedure);
         return filas.Select(CatalogoPartidaMapper.ToDomain).ToList();
     });
@@ -40,7 +40,7 @@ public sealed class CatalogoPartidaRepository : RepositoryBase, ICatalogoPartida
     {
         using var db = Open();
         return await db.ExecuteScalarAsync<int>(Schema + "usp_CatalogoPartida_Crear",
-            new { p.Codigo, p.Nombre, p.IdTipoPartida, p.IdPartidaPadre, p.Descripcion, p.IdSeccionGasto },
+            new { p.Codigo, p.Nombre, p.IdTipoPartida, p.IdPartidaPadre, p.Descripcion },
             commandType: CommandType.StoredProcedure);
     });
 
@@ -48,7 +48,7 @@ public sealed class CatalogoPartidaRepository : RepositoryBase, ICatalogoPartida
     {
         using var db = Open();
         await db.ExecuteAsync(Schema + "usp_CatalogoPartida_Actualizar",
-            new { p.IdCatalogoPartida, p.Nombre, p.IdTipoPartida, p.Activo, p.IdPartidaPadre, p.Descripcion, p.IdSeccionGasto },
+            new { p.IdCatalogoPartida, p.Nombre, p.IdTipoPartida, p.Activo, p.IdPartidaPadre, p.Descripcion },
             commandType: CommandType.StoredProcedure);
     });
 }

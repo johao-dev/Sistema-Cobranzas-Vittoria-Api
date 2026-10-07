@@ -18,6 +18,4 @@ public sealed class ActualizarCatalogoPartidaRequest
     [StringLength(500)]
     public string? Descripcion { get; set; }
 
-    [Range(1, int.MaxValue)]
-    public int? IdSeccionGasto { get; set; }
 }

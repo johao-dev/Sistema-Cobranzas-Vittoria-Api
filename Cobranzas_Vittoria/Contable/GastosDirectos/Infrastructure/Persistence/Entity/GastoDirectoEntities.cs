@@ -26,8 +26,6 @@ public sealed class GastoDirectoEntity
     public string CodigoPartida { get; set; } = string.Empty;
     public string Partida { get; set; } = string.Empty;
     public int TotalDocumentos { get; set; }
-    public string? CodigoSeccionGasto { get; set; }
-    public string? NombreSeccionGasto { get; set; }
     public int? IdMonedaOriginal { get; set; }
     public string? MonedaOriginal { get; set; }
     public decimal? MontoOriginal { get; set; }
@@ -46,15 +44,14 @@ public sealed class GastoDirectoDocumentoEntity
     public DateTime FechaCreacion { get; set; }
 }
 
-public sealed class ProveedorSeccionEntity
+public sealed class ProveedorGastoDirectoEntity
 {
     public int IdProveedor { get; set; }
     public string RazonSocial { get; set; } = string.Empty;
     public string? Ruc { get; set; }
-    public bool DeLaSeccion { get; set; }
 }
 
-public sealed class CentroCostoSeccionEntity
+public sealed class CentroCostoGastoDirectoEntity
 {
     public int IdCentroCosto { get; set; }
     public string Codigo { get; set; } = string.Empty;

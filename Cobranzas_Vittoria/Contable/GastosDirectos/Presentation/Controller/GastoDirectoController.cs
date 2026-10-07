@@ -19,8 +19,7 @@ using GD = Cobranzas_Vittoria.Seguridad.Authorization.Permisos.GastoDirecto;
 namespace Cobranzas_Vittoria.Contable.GastosDirectos.Presentation.Controller;
 
 /// <summary>
-/// Gastos directos. Se registran desde cada sección de Operaciones → Gastos del proyecto
-/// (parámetro seccion). Consultar exige gasto_directo.ver y operar exige gasto_directo.operar.
+/// Gastos directos. Consultar exige gasto_directo.ver y operar exige gasto_directo.operar.
 /// </summary>
 [ApiController]
 [Route("api/contable/gastos-directos")]
@@ -29,28 +28,27 @@ public sealed class GastoDirectoController : ControllerBase
     [HttpGet]
     [AuthorizePermission(GD.Ver)]
     public async Task<IActionResult> Listar([FromServices] ListarGastosDirectosHandler handler, [FromQuery] string? estado,
-        [FromQuery] int? idProveedor, [FromQuery] int? idCentroCosto, [FromQuery] DateTime? desde, [FromQuery] DateTime? hasta,
-        [FromQuery] string? seccion)
-        => Ok(await handler.HandleAsync(new ListarGastosDirectosQuery(estado, idProveedor, idCentroCosto, desde, hasta, seccion)));
+        [FromQuery] int? idProveedor, [FromQuery] int? idCentroCosto, [FromQuery] DateTime? desde, [FromQuery] DateTime? hasta)
+        => Ok(await handler.HandleAsync(new ListarGastosDirectosQuery(estado, idProveedor, idCentroCosto, desde, hasta)));
 
-    /// <summary>Centros de costo que admite la sección (por tipo de centro de costo).</summary>
+    /// <summary>Centros de costo activos disponibles para registrar gastos.</summary>
     [HttpGet("centros-costo")]
     [AuthorizePermission(GD.Ver)]
-    public async Task<IActionResult> CentrosCosto([FromServices] ListarCentrosCostoSeccionHandler handler, [FromQuery] string? seccion)
-        => Ok(await handler.HandleAsync(new ListarCentrosCostoSeccionQuery(seccion)));
+    public async Task<IActionResult> CentrosCosto([FromServices] ListarCentrosCostoHandler handler)
+        => Ok(await handler.HandleAsync(new ListarCentrosCostoQuery()));
 
-    /// <summary>Proveedores activos: primero los de las categorías antiguas de la sección (deLaSeccion = true).</summary>
+    /// <summary>Proveedores canónicos activos.</summary>
     [HttpGet("proveedores")]
     [AuthorizePermission(GD.Ver)]
-    public async Task<IActionResult> Proveedores([FromServices] ListarProveedoresSeccionHandler handler, [FromQuery] string? seccion)
-        => Ok(await handler.HandleAsync(new ListarProveedoresSeccionQuery(seccion)));
+    public async Task<IActionResult> Proveedores([FromServices] ListarProveedoresHandler handler)
+        => Ok(await handler.HandleAsync(new ListarProveedoresQuery()));
 
-    /// <summary>Partidas de la sección con su saldo en la versión aprobada del centro de costo.</summary>
+    /// <summary>Partidas económicamente disponibles en la versión aprobada del centro de costo.</summary>
     [HttpGet("partidas-disponibles")]
     [AuthorizePermission(GD.Ver)]
     public async Task<IActionResult> PartidasDisponibles([FromServices] ListarPartidasDisponiblesHandler handler,
-        [FromQuery] string? seccion, [FromQuery] int idCentroCosto)
-        => Ok(await handler.HandleAsync(new ListarPartidasDisponiblesQuery(seccion, idCentroCosto)));
+        [FromQuery] int idCentroCosto)
+        => Ok(await handler.HandleAsync(new ListarPartidasDisponiblesQuery(idCentroCosto)));
 
     [HttpGet("{id:int}", Name = "ObtenerGastoDirecto")]
     [AuthorizePermission(GD.Ver)]
@@ -65,7 +63,7 @@ public sealed class GastoDirectoController : ControllerBase
     public async Task<IActionResult> Crear([FromServices] CrearGastoDirectoHandler handler, [FromBody] GastoDirectoUpsertRequest r)
     {
         var id = await handler.HandleAsync(new CrearGastoDirectoCommand(r.IdPresupuestoDetalle, r.IdProveedor, r.IdMoneda, r.Fecha,
-            r.Concepto, r.Descripcion, r.Monto, r.Seccion, r.IdMonedaOriginal, r.MontoOriginal, r.TipoCambio, r.FechaTipoCambio));
+            r.Concepto, r.Descripcion, r.Monto, r.IdMonedaOriginal, r.MontoOriginal, r.TipoCambio, r.FechaTipoCambio));
         return CreatedAtRoute("ObtenerGastoDirecto", new { id }, new { IdGastoDirecto = id });
     }
 
@@ -76,7 +74,7 @@ public sealed class GastoDirectoController : ControllerBase
         => Ok(new
         {
             IdGastoDirecto = await handler.HandleAsync(new ActualizarGastoDirectoCommand(id, r.IdPresupuestoDetalle, r.IdProveedor,
-                r.IdMoneda, r.Fecha, r.Concepto, r.Descripcion, r.Monto, r.Seccion, r.IdMonedaOriginal, r.MontoOriginal,
+                r.IdMoneda, r.Fecha, r.Concepto, r.Descripcion, r.Monto, r.IdMonedaOriginal, r.MontoOriginal,
                 r.TipoCambio, r.FechaTipoCambio))
         });
 

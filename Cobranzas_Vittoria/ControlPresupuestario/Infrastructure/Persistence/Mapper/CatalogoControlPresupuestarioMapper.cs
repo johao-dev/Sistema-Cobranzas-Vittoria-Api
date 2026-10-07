@@ -19,6 +19,4 @@ public static class CatalogoControlPresupuestarioMapper
 
     public static Moneda ToDomain(MonedaEntity e) => new(e.IdMoneda, e.Codigo, e.Nombre, e.Simbolo, e.Activo);
 
-    public static SeccionGasto ToDomain(SeccionGastoEntity e)
-        => new(e.IdSeccionGasto, e.Codigo, e.Nombre, e.Descripcion, e.Orden, e.Activo, e.CodigosTipoCentroCosto);
 }

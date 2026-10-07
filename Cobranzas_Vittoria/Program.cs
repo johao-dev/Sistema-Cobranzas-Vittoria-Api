@@ -247,7 +247,7 @@ builder.Services.AddScoped<IImportProcessor, CategoriaGastoImportProcessor>();
 // autenticacion; se invocan desde sus controllers con permisos del modulo.
 builder.Services.AddControlPresupuestario();
 
-// Modulo Gastos directos (arquitectura hexagonal): registro por seccion de Gastos del proyecto.
+// Modulo Gastos directos (arquitectura hexagonal): registro presupuestario de Gastos del proyecto.
 builder.Services.AddGastosDirectos();
 
 // ResolvedorEntidadesService: servicio transversal usado por MaterialImportProcessor

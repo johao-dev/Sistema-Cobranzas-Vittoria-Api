@@ -23,10 +23,10 @@ public sealed class CatalogoPartidaController : ControllerBase
     [AuthorizePermission(Permisos.ControlPresupuestario.Partida.Ver)]
     public async Task<IActionResult> Listar([FromServices] ListarCatalogoPartidaHandler handler, [FromQuery] bool? activo,
         [FromQuery] int? idTipoPartida, [FromQuery] int? idPartidaPadre, [FromQuery] bool soloRaices = false,
-        [FromQuery] bool? esHoja = null, [FromQuery] string? busqueda = null, [FromQuery] int? idSeccionGasto = null)
+        [FromQuery] bool? esHoja = null, [FromQuery] string? busqueda = null)
     {
         var partidas = await handler.HandleAsync(new ListarCatalogoPartidaQuery(activo, idTipoPartida, idPartidaPadre,
-            soloRaices, esHoja, busqueda, idSeccionGasto));
+            soloRaices, esHoja, busqueda));
         return Ok(partidas.Select(CatalogoPartidaResponse.Desde));
     }
 
@@ -41,7 +41,7 @@ public sealed class CatalogoPartidaController : ControllerBase
         [FromBody] CrearCatalogoPartidaRequest request)
     {
         var creada = await handler.HandleAsync(new CrearCatalogoPartidaCommand(request.Codigo, request.Nombre,
-            request.IdTipoPartida, request.IdPartidaPadre, request.Descripcion, request.IdSeccionGasto));
+            request.IdTipoPartida, request.IdPartidaPadre, request.Descripcion));
         return CreatedAtRoute("ObtenerCatalogoPartida", new { id = creada.IdCatalogoPartida }, CatalogoPartidaResponse.Desde(creada));
     }
 
@@ -51,7 +51,7 @@ public sealed class CatalogoPartidaController : ControllerBase
         [FromBody] ActualizarCatalogoPartidaRequest request)
     {
         var actualizada = await handler.HandleAsync(new ActualizarCatalogoPartidaCommand(id, request.Nombre,
-            request.IdTipoPartida, request.Activo, request.IdPartidaPadre, request.Descripcion, request.IdSeccionGasto));
+            request.IdTipoPartida, request.Activo, request.IdPartidaPadre, request.Descripcion));
         return Ok(CatalogoPartidaResponse.Desde(actualizada));
     }
 
@@ -77,7 +77,7 @@ public sealed class CatalogoPartidaController : ControllerBase
         {
             SheetName = "Plantilla Partidas",
             Title = "Plantilla de importacion - Catalogo de partidas",
-            FiltersSubtitle = "Tipo y Seccion aceptan el codigo o el nombre. CodigoPadre puede ser otra fila del archivo.",
+            FiltersSubtitle = "Tipo acepta el codigo o el nombre. CodigoPadre puede ser otra fila del archivo.",
             GeneratedAtSubtitle = "Generado el: {0}",
             IncludeTotalsRow = false,
             HeaderRowIndex = 0

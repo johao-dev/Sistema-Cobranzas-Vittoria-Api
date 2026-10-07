@@ -11,5 +11,4 @@ public interface ICatalogoControlPresupuestarioRepository
     Task<IReadOnlyList<TipoPartida>> ListarTiposPartidaAsync(bool? activo);
     Task<IReadOnlyList<TipoMovimientoPresupuestal>> ListarTiposMovimientoAsync(bool? activo);
     Task<IReadOnlyList<Moneda>> ListarMonedasAsync(bool? activo);
-    Task<IReadOnlyList<SeccionGasto>> ListarSeccionesGastoAsync(bool? activo);
 }

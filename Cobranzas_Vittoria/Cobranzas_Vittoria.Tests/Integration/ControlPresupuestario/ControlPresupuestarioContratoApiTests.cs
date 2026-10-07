@@ -111,10 +111,10 @@ public sealed class ControlPresupuestarioContratoApiTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Catalogos_SoloExigenSesion()
+    public async Task CatalogosVigentes_SoloExigenSesion()
     {
         UsarToken(Array.Empty<string>());
-        foreach (var catalogo in new[] { "estados-presupuesto", "tipos-centro-costo", "tipos-partida", "tipos-movimiento", "monedas", "secciones-gasto" })
+        foreach (var catalogo in new[] { "estados-presupuesto", "tipos-centro-costo", "tipos-partida", "tipos-movimiento", "monedas" })
         {
             var r = await _client.GetAsync($"{Base}/catalogos/{catalogo}");
             Assert.That(r.StatusCode, Is.EqualTo(HttpStatusCode.OK), catalogo);

@@ -2,6 +2,7 @@ using Cobranzas_Vittoria.Entities;
 using Dapper;
 using DbUp;
 using DbUp.Engine;
+using DbUp.Helpers;
 using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Contable;
@@ -25,7 +26,8 @@ public class MigracionGastosHistoricosTests
         await master.ExecuteAsync($"CREATE DATABASE [{_database}]");
         _connectionString = new SqlConnectionStringBuilder(GlobalSetupFixture.DbContainer.GetConnectionString())
             { InitialCatalog = _database }.ConnectionString;
-        var result = Upgrade(name => name.Contains(".Migrations.Versioned.") && !name.Contains(".V2_6_3__"));
+        var result = Upgrade(name => name.Contains(".Migrations.Versioned.")
+            && !name.Contains(".V2_6_3__") && !name.Contains(".V2_7_0__"));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
     }
 
@@ -44,8 +46,15 @@ public class MigracionGastosHistoricosTests
         .WithScriptsEmbeddedInAssembly(typeof(OrdenCompra).Assembly, filtro)
         .LogToConsole().Build().PerformUpgrade();
 
+    private DatabaseUpgradeResult SincronizarRepeatables() => DeployChanges.To
+        .SqlDatabase(_connectionString)
+        .WithScriptsEmbeddedInAssembly(typeof(OrdenCompra).Assembly,
+            name => name.Contains(".Migrations.Repeatable."))
+        .JournalTo(new NullJournal())
+        .LogToConsole().Build().PerformUpgrade();
+
     [Test]
-    public async Task GastosSinPartida_PasanAUnPresupuestoHistoricoInactivoPorSeccion()
+    public async Task Upgrade_ConservaGastosYPartidasHistoricas_YTerminaConSchemaFinal()
     {
         await using var cn = new SqlConnection(_connectionString);
         await cn.OpenAsync();
@@ -79,7 +88,14 @@ public class MigracionGastosHistoricosTests
         var result = Upgrade(name => name.Contains(".V2_6_3__"));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
 
-        var gastos = (await cn.QueryAsync<(string Concepto, decimal Monto, string Estado, string Moneda, string Seccion, string Presupuesto, bool Activo, string Centro)>("""
+        Assert.That(SincronizarRepeatables().Successful, Is.True,
+            "Reproduce una base anterior con procedimientos dependientes del TVP antiguo.");
+        var retiro = Upgrade(name => name.Contains(".V2_7_0__"));
+        Assert.That(retiro.Successful, Is.True, retiro.Error?.ToString());
+        var repeatablesFinales = SincronizarRepeatables();
+        Assert.That(repeatablesFinales.Successful, Is.True, repeatablesFinales.Error?.ToString());
+
+        var gastos = (await cn.QueryAsync<(string Concepto, decimal Monto, string Estado, string Moneda, string Partida, string Presupuesto, bool Activo, string Centro)>("""
             SELECT gd.Concepto, gd.Monto, gd.Estado, m.Codigo, cp.Codigo, p.Codigo, p.Activo, cc.Codigo
             FROM contable.GastoDirecto gd
             JOIN maestra.Moneda m ON m.IdMoneda = gd.IdMoneda
@@ -93,9 +109,9 @@ public class MigracionGastosHistoricosTests
 
         Assert.That(gastos, Has.Count.EqualTo(3), "El gasto con monto 0 no se migra.");
         Assert.That(gastos[0], Is.EqualTo(("Compra de lote", 150000m, "REGISTRADO", "PEN", "HIST.TERRENO", gastos[0].Presupuesto, false, $"CC-PRY-{proyecto}")));
-        Assert.That((gastos[1].Monto, gastos[1].Estado, gastos[1].Moneda, gastos[1].Seccion), Is.EqualTo((2000m, "ANULADO", "USD", "HIST.MUNICIPAL")));
+        Assert.That((gastos[1].Monto, gastos[1].Estado, gastos[1].Moneda, gastos[1].Partida), Is.EqualTo((2000m, "ANULADO", "USD", "HIST.MUNICIPAL")));
         Assert.That(gastos[1].Presupuesto, Is.Not.EqualTo(gastos[0].Presupuesto), "Un presupuesto histórico por moneda.");
-        Assert.That((gastos[2].Concepto, gastos[2].Seccion, gastos[2].Centro), Is.EqualTo(("MOVILIDAD", "HIST.ADMINISTRATIVO", "CC-ADM-HIST")));
+        Assert.That((gastos[2].Concepto, gastos[2].Partida, gastos[2].Centro), Is.EqualTo(("MOVILIDAD", "HIST.ADMINISTRATIVO", "CC-ADM-HIST")));
         Assert.That(gastos.All(g => !g.Activo), Is.True, "Los presupuestos históricos quedan inactivos.");
         Assert.That(await cn.QuerySingleAsync<int>("SELECT COUNT(*) FROM ControlPresupuestario.MovimientoPresupuestal"), Is.Zero);
         Assert.That(await cn.QuerySingleAsync<int>("SELECT COUNT(*) FROM contable.GastoDirectoLegacyMap"), Is.EqualTo(3));
@@ -105,6 +121,22 @@ public class MigracionGastosHistoricosTests
             JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = pv.IdPresupuesto
             WHERE p.Codigo LIKE 'HIST-%' GROUP BY ep.Codigo
             """), Is.EqualTo("APROBADO"));
+        Assert.That(await cn.QuerySingleAsync<int>("""
+            SELECT COUNT(*) FROM sys.tables
+            WHERE object_id IN (OBJECT_ID('ControlPresupuestario.SeccionGasto'),
+                OBJECT_ID('ControlPresupuestario.SeccionGastoTipoCentroCosto'),
+                OBJECT_ID('ControlPresupuestario.SeccionGastoCategoriaGasto'))
+            """), Is.Zero);
+        Assert.That(await cn.QuerySingleAsync<int>("""
+            SELECT COUNT(*) FROM sys.columns
+            WHERE object_id = OBJECT_ID('ControlPresupuestario.CatalogoPartida') AND name = 'IdSeccionGasto'
+            """), Is.Zero);
+        Assert.That(await cn.QuerySingleAsync<int>("""
+            SELECT COUNT(*) FROM sys.table_types tt
+            JOIN sys.columns c ON c.object_id = tt.type_table_object_id
+            WHERE SCHEMA_NAME(tt.schema_id) = 'ControlPresupuestario'
+              AND tt.name = 'TVP_CatalogoPartida' AND c.name = 'IdSeccionGasto'
+            """), Is.Zero);
     }
 
     [Test]

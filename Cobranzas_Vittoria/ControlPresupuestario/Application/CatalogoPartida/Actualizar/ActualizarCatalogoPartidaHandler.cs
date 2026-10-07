@@ -22,7 +22,7 @@ public sealed class ActualizarCatalogoPartidaHandler
         var partida = await _repository.ObtenerAsync(command.IdCatalogoPartida)
             ?? throw new CatalogoPartidaNoEncontradoException(command.IdCatalogoPartida);
         partida.Actualizar(command.Nombre, command.IdTipoPartida, command.Activo, command.IdPartidaPadre,
-            command.Descripcion, command.IdSeccionGasto);
+            command.Descripcion);
         await _repository.ActualizarAsync(partida);
         _logger.LogInformation("Partida actualizada: IdCatalogoPartida={Id}", command.IdCatalogoPartida);
         var actualizada = await _repository.ObtenerAsync(command.IdCatalogoPartida)

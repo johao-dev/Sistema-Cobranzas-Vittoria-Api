@@ -5,7 +5,7 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Domain.Persistence;
 
 /// <summary>Filtros del catálogo de partidas. SoloRaices e IdPartidaPadre son excluyentes.</summary>
 public sealed record FiltroPartidas(bool? Activo = null, int? IdTipoPartida = null, int? IdPartidaPadre = null,
-    bool SoloRaices = false, bool? EsHoja = null, string? Busqueda = null, int? IdSeccionGasto = null);
+    bool SoloRaices = false, bool? EsHoja = null, string? Busqueda = null);
 
 /// <summary>Puerto de persistencia del catálogo de partidas.</summary>
 public interface ICatalogoPartidaRepository

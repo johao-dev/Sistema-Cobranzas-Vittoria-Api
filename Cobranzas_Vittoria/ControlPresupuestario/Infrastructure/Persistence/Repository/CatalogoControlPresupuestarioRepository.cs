@@ -36,10 +36,6 @@ public sealed class CatalogoControlPresupuestarioRepository : RepositoryBase, IC
         => (await ListarAsync<MonedaEntity>("usp_Moneda_Listar", activo))
             .Select(CatalogoControlPresupuestarioMapper.ToDomain).ToList();
 
-    public async Task<IReadOnlyList<SeccionGasto>> ListarSeccionesGastoAsync(bool? activo)
-        => (await ListarAsync<SeccionGastoEntity>("usp_SeccionGasto_Listar", activo))
-            .Select(CatalogoControlPresupuestarioMapper.ToDomain).ToList();
-
     private async Task<IEnumerable<T>> ListarAsync<T>(string procedimiento, bool? activo)
     {
         using var db = Open();

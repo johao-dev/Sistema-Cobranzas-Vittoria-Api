@@ -17,8 +17,8 @@ public sealed class CrearGastoDirectoHandler
     public async Task<int> HandleAsync(CrearGastoDirectoCommand c)
     {
         var id = await _repository.CrearAsync(RegistroGastoDirecto.Crear(c.IdPresupuestoDetalle, c.IdProveedor, c.IdMoneda, c.Fecha, c.Concepto,
-            c.Descripcion, c.Monto, c.Seccion, c.IdMonedaOriginal, c.MontoOriginal, c.TipoCambio, c.FechaTipoCambio));
-        _logger.LogInformation("Gasto directo registrado: IdGastoDirecto={Id}, Seccion={Seccion}", id, c.Seccion);
+            c.Descripcion, c.Monto, c.IdMonedaOriginal, c.MontoOriginal, c.TipoCambio, c.FechaTipoCambio));
+        _logger.LogInformation("Gasto directo registrado: IdGastoDirecto={Id}", id);
         return id;
     }
 }

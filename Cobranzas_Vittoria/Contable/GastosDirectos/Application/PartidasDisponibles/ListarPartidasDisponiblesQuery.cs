@@ -1,3 +1,3 @@
 namespace Cobranzas_Vittoria.Contable.GastosDirectos.Application.PartidasDisponibles;
 
-public sealed record ListarPartidasDisponiblesQuery(string? Seccion, int IdCentroCosto);
+public sealed record ListarPartidasDisponiblesQuery(int IdCentroCosto);

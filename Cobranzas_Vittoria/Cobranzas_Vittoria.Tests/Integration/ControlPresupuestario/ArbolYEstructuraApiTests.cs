@@ -25,15 +25,15 @@ public sealed class ArbolYEstructuraApiTests : IntegrationTestBase
 
     // Formato de las áreas: código en columnas de nivel, subtítulos sin monto y totales con decimales de fórmula.
     private const string PresupuestoPorNiveles = """
-        Nivel 1;Nivel 2;Nivel 3;Descripción;Und.;Metrado;Precio;Total;Tipo;Seccion
-        1;0;0;GASTOS DIRECTOS;;;;;MATERIALES;
-        1;1;0;ESTRUCTURAS;;;;;;
-        1;1;1;CONCRETO;m3;10;100;1000.004;;
-        1;1;2;ACERO;kg;5;100;500;;
-        1;2;0;ARQUITECTURA;;;;0;;
-        1;2;1;TARRAJEO;m2;1;250;250;;
-        2;0;0;GASTOS INDIRECTOS;;;;;INDIRECTOS;
-        2;1;0;LICENCIA;glb;1;300;300;;
+        Nivel 1;Nivel 2;Nivel 3;Descripción;Und.;Metrado;Precio;Total;Tipo
+        1;0;0;GASTOS DIRECTOS;;;;;MATERIALES
+        1;1;0;ESTRUCTURAS;;;;;
+        1;1;1;CONCRETO;m3;10;100;1000.004;
+        1;1;2;ACERO;kg;5;100;500;
+        1;2;0;ARQUITECTURA;;;;0;
+        1;2;1;TARRAJEO;m2;1;250;250;
+        2;0;0;GASTOS INDIRECTOS;;;;;INDIRECTOS
+        2;1;0;LICENCIA;glb;1;300;300;
         """;
 
     private int _idPen;
@@ -95,6 +95,46 @@ public sealed class ArbolYEstructuraApiTests : IntegrationTestBase
         var repetir = await Json(await SubirAsync($"{ruta}/partidas/importar-estructura", PresupuestoPorNiveles));
         Assert.That(repetir.GetProperty("partidasCreadas").GetInt32(), Is.Zero);
         Assert.That(repetir.GetProperty("actualizados").GetInt32(), Is.EqualTo(4));
+    }
+
+    [Test]
+    public async Task CatalogoPartida_ImportacionYPlantilla_UsanContratoJerarquicoPuro()
+    {
+        var codigo = "IMP-" + Guid.NewGuid().ToString("N")[..8];
+        var importacion = await SubirAsync($"{Base}/partidas/importar", $"""
+            Codigo;Nombre;Tipo;CodigoPadre;Descripcion
+            {codigo};Partida importada;MATERIALES;;Creada sin clasificación de pantalla
+            """);
+
+        Assert.That(importacion.StatusCode, Is.EqualTo(HttpStatusCode.OK), await importacion.Content.ReadAsStringAsync());
+        Assert.That(await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM ControlPresupuestario.CatalogoPartida WHERE Codigo=@codigo", new { codigo }), Is.EqualTo(1));
+
+        var plantilla = await _client.GetAsync($"{Base}/partidas/plantilla?formato=csv");
+        Assert.That(plantilla.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That((await plantilla.Content.ReadAsStringAsync()).TrimStart('﻿').Trim(),
+            Is.EqualTo("Codigo;Nombre;Tipo;CodigoPadre;Descripcion"));
+    }
+
+    [Test]
+    public async Task InstalacionLimpia_TerminaConElSchemaPresupuestarioFinal()
+    {
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("""
+            SELECT COUNT(*) FROM sys.tables
+            WHERE object_id IN (OBJECT_ID('ControlPresupuestario.SeccionGasto'),
+                OBJECT_ID('ControlPresupuestario.SeccionGastoTipoCentroCosto'),
+                OBJECT_ID('ControlPresupuestario.SeccionGastoCategoriaGasto'))
+            """), Is.Zero);
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("""
+            SELECT COUNT(*) FROM sys.columns
+            WHERE object_id = OBJECT_ID('ControlPresupuestario.CatalogoPartida') AND name = 'IdSeccionGasto'
+            """), Is.Zero);
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("""
+            SELECT COUNT(*) FROM sys.table_types tt
+            JOIN sys.columns c ON c.object_id = tt.type_table_object_id
+            WHERE SCHEMA_NAME(tt.schema_id) = 'ControlPresupuestario'
+              AND tt.name = 'TVP_CatalogoPartida' AND c.name = 'IdSeccionGasto'
+            """), Is.Zero);
     }
 
     [Test]
@@ -247,9 +287,9 @@ public sealed class ArbolYEstructuraApiTests : IntegrationTestBase
         Assert.That(csv.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var lineas = (await csv.Content.ReadAsStringAsync()).TrimStart('﻿').Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => l.TrimEnd('\r')).ToList();
-        Assert.That(lineas[0], Is.EqualTo("Codigo;Nombre;Tipo;Seccion;Monto;Subtotal;Observacion"));
-        Assert.That(lineas, Does.Contain("1.1;ESTRUCTURAS;MATERIALES;;;1500.00;"));
-        Assert.That(lineas, Does.Contain("1.1.1;CONCRETO;MATERIALES;;1000.00;;"));
+        Assert.That(lineas[0], Is.EqualTo("Codigo;Nombre;Tipo;Monto;Subtotal;Observacion"));
+        Assert.That(lineas, Does.Contain("1.1;ESTRUCTURAS;MATERIALES;;1500.00;"));
+        Assert.That(lineas, Does.Contain("1.1.1;CONCRETO;MATERIALES;1000.00;;"));
 
         var xlsx = await _client.GetAsync($"{ruta}/plantilla-estructura?formato=xlsx");
         Assert.That(xlsx.StatusCode, Is.EqualTo(HttpStatusCode.OK));

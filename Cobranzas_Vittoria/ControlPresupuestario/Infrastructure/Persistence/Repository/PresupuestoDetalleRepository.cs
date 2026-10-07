@@ -90,12 +90,11 @@ public sealed class PresupuestoDetalleRepository : RepositoryBase, IPresupuestoD
                 nuevas.Columns.Add("Nombre", typeof(string));
                 nuevas.Columns.Add("IdTipoPartida", typeof(int));
                 nuevas.Columns.Add("CodigoPadre", typeof(string));
-                nuevas.Columns.Add("IdSeccionGasto", typeof(int));
                 nuevas.Columns.Add("Descripcion", typeof(string));
                 nuevas.Columns.Add("_Fila", typeof(int));
                 foreach (var p in importacion.PartidasNuevas)
                     nuevas.Rows.Add(p.Codigo, p.Nombre, p.IdTipoPartida, (object?)p.CodigoPadre ?? DBNull.Value,
-                        (object?)p.IdSeccionGasto ?? DBNull.Value, DBNull.Value, p.Fila);
+                        DBNull.Value, p.Fila);
                 try
                 {
                     creadas = await db.QueryFirstAsync<int>(Schema + "usp_CatalogoPartida_CargaMasiva",

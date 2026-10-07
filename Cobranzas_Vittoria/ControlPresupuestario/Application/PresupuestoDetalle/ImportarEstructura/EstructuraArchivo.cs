@@ -10,7 +10,7 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Application.PresupuestoDetall
 
 /// <summary>Fila del presupuesto jerárquico ya leída. EsCategoria: otra fila del archivo la tiene como padre.</summary>
 public sealed record FilaEstructura(int Fila, string Codigo, string? CodigoPadre, string Nombre, string? MontoTexto,
-    decimal? Monto, string? Tipo, string? Seccion, string? Observacion, bool EsCategoria);
+    decimal? Monto, string? Tipo, string? Observacion, bool EsCategoria);
 
 /// <summary>
 /// Lee un presupuesto jerárquico (CSV/XLSX) y valida su estructura sin mirar la base.
@@ -18,7 +18,7 @@ public sealed record FilaEstructura(int Fila, string Codigo, string? CodigoPadre
 /// <item>Código: columna <c>Codigo</c> ("1.1.3") o columnas <c>Nivel 1</c>…<c>Nivel N</c>; un 0 o una celda vacía cierran el código.</item>
 /// <item><c>Nombre</c> (o <c>Descripcion</c>) obligatorio; <c>Monto</c> (o <c>Total</c>) obligatorio en las hojas (0 permitido,
 /// redondeado al céntimo) y vacío o 0 en las categorías, cuyo total siempre es la suma de sus hojas.</item>
-/// <item><c>Tipo</c>, <c>Seccion</c> y <c>Observacion</c> opcionales; el resto de columnas (Und., Metrado, Precio, Subtotal) se ignora.</item>
+/// <item><c>Tipo</c> y <c>Observacion</c> opcionales; el resto de columnas (Und., Metrado, Precio, Subtotal) se ignora.</item>
 /// </list>
 /// Los encabezados se comparan sin mayúsculas, tildes, espacios ni puntos.
 /// </summary>
@@ -61,11 +61,10 @@ public static class EstructuraArchivo
                 $"Faltan las columnas requeridas: {string.Join(", ", faltantes)}. " +
                 $"Encabezados recibidos: {string.Join(", ", filas[0].Columnas)}.");
         var tipo = Columna("tipo", "tipopartida");
-        var seccion = Columna("seccion", "secciongasto");
         var observacion = Columna("observacion", "observaciones");
 
         var errores = new List<DetalleErrorFila>();
-        var leidas = new List<(int Fila, string Codigo, string Nombre, string? Monto, string? Tipo, string? Seccion, string? Obs)>();
+        var leidas = new List<(int Fila, string Codigo, string Nombre, string? Monto, string? Tipo, string? Obs)>();
         foreach (var fila in filas)
         {
             var n = fila.NumeroFila;
@@ -87,8 +86,7 @@ public static class EstructuraArchivo
             var obs = observacion is null ? null : NullSiVacio(fila.Valor(observacion));
             if (obs is { Length: > 500 })
                 errores.Add(new(n, "Observacion", CodigosError.Fila.FormatoInvalido, "La observación admite como máximo 500 caracteres."));
-            leidas.Add((n, cod, nom, NullSiVacio(fila.Valor(monto!)), tipo is null ? null : NullSiVacio(fila.Valor(tipo)),
-                seccion is null ? null : NullSiVacio(fila.Valor(seccion)), obs));
+            leidas.Add((n, cod, nom, NullSiVacio(fila.Valor(monto!)), tipo is null ? null : NullSiVacio(fila.Valor(tipo)), obs));
         }
 
         var primera = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -117,10 +115,7 @@ public static class EstructuraArchivo
                     // Los totales de un Excel suelen ser fórmulas con muchos decimales: se redondean al céntimo.
                     valor = decimal.Round(m, 2, MidpointRounding.AwayFromZero);
             }
-            if (f.Seccion is not null && esCategoria)
-                errores.Add(new(f.Fila, "Seccion", CodigosError.Fila.ReglaNegocio,
-                    $"La partida {f.Codigo} es una categoría; solo una partida sin hijas puede tener sección."));
-            resultado.Add(new FilaEstructura(f.Fila, f.Codigo, Padre(f.Codigo), f.Nombre, f.Monto, valor, f.Tipo, f.Seccion,
+            resultado.Add(new FilaEstructura(f.Fila, f.Codigo, Padre(f.Codigo), f.Nombre, f.Monto, valor, f.Tipo,
                 f.Obs, esCategoria));
         }
         return (resultado, errores);

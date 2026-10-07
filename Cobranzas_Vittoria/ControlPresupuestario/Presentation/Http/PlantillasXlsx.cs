@@ -17,8 +17,7 @@ public sealed class CatalogoPartidaPlantillaFila
     [ExcelColumn(Header = "Nombre", Order = 2, Width = 40)] public string Nombre { get; set; } = string.Empty;
     [ExcelColumn(Header = "Tipo", Order = 3, Width = 18)] public string Tipo { get; set; } = string.Empty;
     [ExcelColumn(Header = "CodigoPadre", Order = 4, Width = 14)] public string CodigoPadre { get; set; } = string.Empty;
-    [ExcelColumn(Header = "Seccion", Order = 5, Width = 20)] public string Seccion { get; set; } = string.Empty;
-    [ExcelColumn(Header = "Descripcion", Order = 6, Width = 40)] public string Descripcion { get; set; } = string.Empty;
+    [ExcelColumn(Header = "Descripcion", Order = 5, Width = 40)] public string Descripcion { get; set; } = string.Empty;
 }
 
 public sealed class PresupuestoPlantillaFila
@@ -35,8 +34,7 @@ public sealed class EstructuraPresupuestoPlantillaFila
     [ExcelColumn(Header = "Codigo", Order = 1, Width = 14)] public string Codigo { get; set; } = string.Empty;
     [ExcelColumn(Header = "Nombre", Order = 2, Width = 50)] public string Nombre { get; set; } = string.Empty;
     [ExcelColumn(Header = "Tipo", Order = 3, Width = 16)] public string Tipo { get; set; } = string.Empty;
-    [ExcelColumn(Header = "Seccion", Order = 4, Width = 18)] public string Seccion { get; set; } = string.Empty;
-    [ExcelColumn(Header = "Monto", Order = 5, Width = 16)] public decimal? Monto { get; set; }
-    [ExcelColumn(Header = "Subtotal", Order = 6, Width = 16)] public decimal? Subtotal { get; set; }
-    [ExcelColumn(Header = "Observacion", Order = 7, Width = 40)] public string Observacion { get; set; } = string.Empty;
+    [ExcelColumn(Header = "Monto", Order = 4, Width = 16)] public decimal? Monto { get; set; }
+    [ExcelColumn(Header = "Subtotal", Order = 5, Width = 16)] public decimal? Subtotal { get; set; }
+    [ExcelColumn(Header = "Observacion", Order = 6, Width = 40)] public string Observacion { get; set; } = string.Empty;
 }

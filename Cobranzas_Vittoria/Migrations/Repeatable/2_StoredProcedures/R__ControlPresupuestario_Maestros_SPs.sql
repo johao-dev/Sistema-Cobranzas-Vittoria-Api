@@ -133,8 +133,7 @@ CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_CatalogoPartida_Crear
     @Nombre NVARCHAR(200),
     @IdTipoPartida INT,
     @IdPartidaPadre INT = NULL,
-    @Descripcion NVARCHAR(500) = NULL,
-    @IdSeccionGasto INT = NULL
+    @Descripcion NVARCHAR(500) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -143,8 +142,6 @@ BEGIN
         THROW 51240, 'TRANSACCION_NO_CONFIRMABLE: la unidad externa requiere rollback.', 1;
     DECLARE @TranCount INT = @@TRANCOUNT, @SavepointCreado BIT = 0;
     BEGIN TRY
-        IF @IdSeccionGasto IS NOT NULL AND @IdSeccionGasto <= 0
-            THROW 51200, 'CAMPO_REQUERIDO: IdSeccionGasto positivo o NULL.', 1;
         SET @Codigo = LTRIM(RTRIM(@Codigo));
         IF NULLIF(@Codigo, '') IS NULL THROW 51200, 'CAMPO_REQUERIDO: Codigo.', 1;
         SET @Nombre = LTRIM(RTRIM(@Nombre));
@@ -170,25 +167,15 @@ BEGIN
         IF @TipoActivo = 0 THROW 51202, 'RECURSO_INACTIVO: TipoPartida.', 1;
         IF EXISTS (SELECT 1 FROM ControlPresupuestario.CatalogoPartida WHERE Codigo = @Codigo)
             THROW 51205, 'CODIGO_DUPLICADO: CatalogoPartida.', 1;
-        IF @IdSeccionGasto IS NOT NULL
-        BEGIN
-            DECLARE @SeccionActiva BIT;
-            SELECT @SeccionActiva = Activo FROM ControlPresupuestario.SeccionGasto WITH (HOLDLOCK)
-            WHERE IdSeccionGasto = @IdSeccionGasto;
-            IF @SeccionActiva IS NULL THROW 51201, 'REFERENCIA_NO_EXISTE: la sección de gasto no existe.', 1;
-            IF @SeccionActiva = 0 THROW 51202, 'RECURSO_INACTIVO: la sección de gasto está inactiva.', 1;
-        END;
         DECLARE @IdCatalogoPartida INT;
         DECLARE @Nivel INT = 1;
         IF @IdPartidaPadre IS NOT NULL
         BEGIN
-            DECLARE @PadreActivo BIT, @NivelPadre INT, @PadreSeccion INT;
-            SELECT @PadreActivo = Activo, @NivelPadre = Nivel, @PadreSeccion = IdSeccionGasto
+            DECLARE @PadreActivo BIT, @NivelPadre INT;
+            SELECT @PadreActivo = Activo, @NivelPadre = Nivel
             FROM ControlPresupuestario.CatalogoPartida WHERE IdCatalogoPartida = @IdPartidaPadre;
             IF @PadreActivo IS NULL THROW 51201, 'REFERENCIA_NO_EXISTE: partida padre.', 1;
             IF @PadreActivo = 0 THROW 51212, 'PARTIDA_INACTIVA: padre no disponible.', 1;
-            IF @PadreSeccion IS NOT NULL
-                THROW 51250, 'SECCION_EN_AGRUPADORA: la partida padre tiene sección de gasto; quítale la sección antes de agregarle partidas hijas.', 1;
             IF @NivelPadre = 2147483647 THROW 51217, 'JERARQUIA_INVALIDA: nivel fuera de rango.', 1;
             SET @Nivel = @NivelPadre + 1;
             IF EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle WITH
@@ -215,15 +202,13 @@ BEGIN
         IF @NivelEsperado <> 0 THROW 51217, 'JERARQUIA_INVALIDA: la raíz debe tener nivel uno.', 1;
         DECLARE @FechaCreacion DATETIME2(0) = SYSDATETIME();
         INSERT INTO ControlPresupuestario.CatalogoPartida
-            (Codigo, Nombre, IdTipoPartida, IdPartidaPadre, Nivel, Descripcion, FechaCreacion, IdSeccionGasto)
-        VALUES (@Codigo, @Nombre, @IdTipoPartida, @IdPartidaPadre, @Nivel, @Descripcion, @FechaCreacion,
-            @IdSeccionGasto);
+            (Codigo, Nombre, IdTipoPartida, IdPartidaPadre, Nivel, Descripcion, FechaCreacion)
+        VALUES (@Codigo, @Nombre, @IdTipoPartida, @IdPartidaPadre, @Nivel, @Descripcion, @FechaCreacion);
         SET @IdCatalogoPartida = CONVERT(INT, SCOPE_IDENTITY());
         IF @TranCount = 0 COMMIT TRANSACTION;
         SELECT @IdCatalogoPartida AS IdCatalogoPartida, @Codigo AS Codigo, @Nombre AS Nombre,
             @IdTipoPartida AS IdTipoPartida, @IdPartidaPadre AS IdPartidaPadre, @Nivel AS Nivel,
-            @Descripcion AS Descripcion, CONVERT(BIT, 1) AS Activo, @FechaCreacion AS FechaCreacion,
-            @IdSeccionGasto AS IdSeccionGasto;
+            @Descripcion AS Descripcion, CONVERT(BIT, 1) AS Activo, @FechaCreacion AS FechaCreacion;
     END TRY
     BEGIN CATCH
         IF @TranCount = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
@@ -240,8 +225,7 @@ CREATE OR ALTER PROCEDURE ControlPresupuestario.usp_CatalogoPartida_Actualizar
     @IdTipoPartida INT,
     @Activo BIT,
     @IdPartidaPadre INT = NULL,
-    @Descripcion NVARCHAR(500) = NULL,
-    @IdSeccionGasto INT = NULL
+    @Descripcion NVARCHAR(500) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -252,8 +236,6 @@ BEGIN
     BEGIN TRY
         IF @IdCatalogoPartida IS NULL OR @IdCatalogoPartida <= 0
             THROW 51200, 'CAMPO_REQUERIDO: IdCatalogoPartida positivo.', 1;
-        IF @IdSeccionGasto IS NOT NULL AND @IdSeccionGasto <= 0
-            THROW 51200, 'CAMPO_REQUERIDO: IdSeccionGasto positivo o NULL.', 1;
         IF @IdTipoPartida IS NULL OR @IdTipoPartida <= 0
             THROW 51200, 'CAMPO_REQUERIDO: IdTipoPartida positivo.', 1;
         SET @Nombre = LTRIM(RTRIM(@Nombre));
@@ -332,36 +314,16 @@ BEGIN
             END;
             IF @NivelEsperado <> 0 THROW 51217, 'JERARQUIA_INVALIDA: la raíz debe tener nivel uno.', 1;
         END;
-        -- Solo una hoja puede pertenecer a una sección de gasto, y un padre con
-        -- sección no puede recibir hijas (dejaría de ser hoja).
-        IF @IdSeccionGasto IS NOT NULL
-        BEGIN
-            DECLARE @SeccionActiva BIT, @SeccionAnterior INT;
-            SELECT @SeccionAnterior = IdSeccionGasto FROM ControlPresupuestario.CatalogoPartida
-            WHERE IdCatalogoPartida = @IdCatalogoPartida;
-            SELECT @SeccionActiva = Activo FROM ControlPresupuestario.SeccionGasto WITH (HOLDLOCK)
-            WHERE IdSeccionGasto = @IdSeccionGasto;
-            IF @SeccionActiva IS NULL THROW 51201, 'REFERENCIA_NO_EXISTE: la sección de gasto no existe.', 1;
-            -- Conservar una sección que se desactivó después sigue permitido.
-            IF @SeccionActiva = 0 AND ISNULL(@SeccionAnterior, 0) <> @IdSeccionGasto
-                THROW 51202, 'RECURSO_INACTIVO: la sección de gasto está inactiva.', 1;
-            IF EXISTS (SELECT 1 FROM ControlPresupuestario.CatalogoPartida WHERE IdPartidaPadre = @IdCatalogoPartida)
-                THROW 51250, 'SECCION_EN_AGRUPADORA: solo una partida sin hijas puede pertenecer a una sección de gasto.', 1;
-        END;
-        IF @IdPartidaPadre IS NOT NULL AND EXISTS (
-            SELECT 1 FROM ControlPresupuestario.CatalogoPartida
-            WHERE IdCatalogoPartida = @IdPartidaPadre AND IdSeccionGasto IS NOT NULL)
-            THROW 51250, 'SECCION_EN_AGRUPADORA: la partida padre tiene sección de gasto; quítale la sección antes de agregarle partidas hijas.', 1;
         DECLARE @FechaActualizacion DATETIME2(0) = SYSDATETIME();
         UPDATE ControlPresupuestario.CatalogoPartida
         SET Nombre = @Nombre, Descripcion = @Descripcion, IdTipoPartida = @IdTipoPartida,
             IdPartidaPadre = @IdPartidaPadre, Nivel = @Nivel, Activo = @Activo,
-            IdSeccionGasto = @IdSeccionGasto, FechaActualizacion = @FechaActualizacion
+            FechaActualizacion = @FechaActualizacion
         WHERE IdCatalogoPartida = @IdCatalogoPartida;
         IF @TranCount = 0 COMMIT TRANSACTION;
         SELECT @IdCatalogoPartida AS IdCatalogoPartida, @Nombre AS Nombre, @Descripcion AS Descripcion,
             @IdTipoPartida AS IdTipoPartida, @IdPartidaPadre AS IdPartidaPadre, @Nivel AS Nivel,
-            @Activo AS Activo, @IdSeccionGasto AS IdSeccionGasto, @FechaActualizacion AS FechaActualizacion;
+            @Activo AS Activo, @FechaActualizacion AS FechaActualizacion;
     END TRY
     BEGIN CATCH
         IF @TranCount = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
@@ -412,7 +374,6 @@ BEGIN
             Nombre NVARCHAR(200) NOT NULL,
             IdTipoPartida INT NOT NULL,
             CodigoPadre VARCHAR(50) NULL,
-            IdSeccionGasto INT NULL,
             Descripcion NVARCHAR(500) NULL,
             Fila INT NOT NULL
         );
@@ -440,12 +401,6 @@ BEGIN
         WHERE t.IdTipoPartida IS NULL ORDER BY f._Fila;
         IF @Mensaje IS NOT NULL THROW 50004, @Mensaje, 1;
 
-        SELECT TOP (1) @Mensaje = CONCAT(N'FK_NO_EXISTE: fila ', f._Fila, N', la sección de gasto no existe o está inactiva.')
-        FROM @Filas f
-        LEFT JOIN ControlPresupuestario.SeccionGasto s ON s.IdSeccionGasto = f.IdSeccionGasto AND s.Activo = 1
-        WHERE f.IdSeccionGasto IS NOT NULL AND s.IdSeccionGasto IS NULL ORDER BY f._Fila;
-        IF @Mensaje IS NOT NULL THROW 50004, @Mensaje, 1;
-
         SELECT TOP (1) @Mensaje = CONCAT(N'FK_NO_EXISTE: fila ', f._Fila, N', la partida padre ',
             LTRIM(RTRIM(f.CodigoPadre)), N' no existe en el catálogo ni en el archivo.')
         FROM @Filas f
@@ -456,33 +411,20 @@ BEGIN
         ORDER BY f._Fila;
         IF @Mensaje IS NOT NULL THROW 50004, @Mensaje, 1;
 
-        -- Padre existente en BD: debe estar activo, sin sección y sin montos.
+        -- Padre existente en BD: debe estar activo y sin montos.
         SELECT TOP (1) @Mensaje = CONCAT(N'PADRE_NO_DISPONIBLE: fila ', f._Fila, N', la partida padre ', p.Codigo,
-            CASE
-                WHEN p.Activo = 0 THEN N' está inactiva.'
-                WHEN p.IdSeccionGasto IS NOT NULL THEN N' tiene sección de gasto y no puede tener hijas.'
-                ELSE N' ya tiene montos presupuestados y no puede convertirse en agrupadora.'
-            END)
+            CASE WHEN p.Activo = 0 THEN N' está inactiva.'
+                 ELSE N' ya tiene montos presupuestados y no puede convertirse en agrupadora.' END)
         FROM @Filas f
         JOIN ControlPresupuestario.CatalogoPartida p ON p.Codigo = LTRIM(RTRIM(f.CodigoPadre))
-        WHERE p.Activo = 0 OR p.IdSeccionGasto IS NOT NULL
-           OR EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle d WITH (HOLDLOCK)
+        WHERE p.Activo = 0 OR EXISTS (SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle d WITH (HOLDLOCK)
                       WHERE d.IdCatalogoPartida = p.IdCatalogoPartida)
         ORDER BY f._Fila;
         IF @Mensaje IS NOT NULL THROW 50005, @Mensaje, 1;
 
-        -- Una fila con sección no puede ser padre de otra fila del archivo.
-        SELECT TOP (1) @Mensaje = CONCAT(N'SECCION_EN_AGRUPADORA: fila ', f._Fila, N', la partida ',
-            LTRIM(RTRIM(f.Codigo)), N' tiene hijas en el archivo; solo una partida sin hijas puede tener sección de gasto.')
-        FROM @Filas f
-        WHERE f.IdSeccionGasto IS NOT NULL
-          AND EXISTS (SELECT 1 FROM @Filas h WHERE LTRIM(RTRIM(h.CodigoPadre)) = LTRIM(RTRIM(f.Codigo)))
-        ORDER BY f._Fila;
-        IF @Mensaje IS NOT NULL THROW 50006, @Mensaje, 1;
-
-        INSERT INTO @Pendientes (Codigo, Nombre, IdTipoPartida, CodigoPadre, IdSeccionGasto, Descripcion, Fila)
+        INSERT INTO @Pendientes (Codigo, Nombre, IdTipoPartida, CodigoPadre, Descripcion, Fila)
         SELECT LTRIM(RTRIM(Codigo)), LTRIM(RTRIM(Nombre)), IdTipoPartida,
-            NULLIF(LTRIM(RTRIM(CodigoPadre)), ''), IdSeccionGasto, NULLIF(LTRIM(RTRIM(Descripcion)), N''), _Fila
+            NULLIF(LTRIM(RTRIM(CodigoPadre)), ''), NULLIF(LTRIM(RTRIM(Descripcion)), N''), _Fila
         FROM @Filas;
 
         DECLARE @Total INT = 0, @Oleada INT;
@@ -490,9 +432,9 @@ BEGIN
         WHILE EXISTS (SELECT 1 FROM @Pendientes)
         BEGIN
             INSERT INTO ControlPresupuestario.CatalogoPartida
-                (Codigo, Nombre, IdTipoPartida, IdPartidaPadre, Nivel, Descripcion, FechaCreacion, IdSeccionGasto)
+                (Codigo, Nombre, IdTipoPartida, IdPartidaPadre, Nivel, Descripcion, FechaCreacion)
             SELECT pe.Codigo, pe.Nombre, pe.IdTipoPartida, padre.IdCatalogoPartida,
-                ISNULL(padre.Nivel, 0) + 1, pe.Descripcion, @Fecha, pe.IdSeccionGasto
+                ISNULL(padre.Nivel, 0) + 1, pe.Descripcion, @Fecha
             FROM @Pendientes pe
             LEFT JOIN ControlPresupuestario.CatalogoPartida padre ON padre.Codigo = pe.CodigoPadre
             WHERE pe.CodigoPadre IS NULL OR padre.IdCatalogoPartida IS NOT NULL;

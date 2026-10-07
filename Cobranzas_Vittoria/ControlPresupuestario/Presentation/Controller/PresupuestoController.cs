@@ -217,7 +217,7 @@ public sealed class PresupuestoController : ControllerBase
         if (tipo == "csv")
             return File(PlantillaArchivo.Csv(ColumnasImportacion.EstructuraPresupuesto, filas.Select(f => new[]
             {
-                f.Codigo, f.Nombre, f.Tipo ?? string.Empty, f.Seccion ?? string.Empty, Monto(f.Monto), Monto(f.Subtotal),
+                f.Codigo, f.Nombre, f.Tipo ?? string.Empty, Monto(f.Monto), Monto(f.Subtotal),
                 f.Observacion ?? string.Empty
             })), PlantillaArchivo.TipoCsv, nombre);
         var xlsx = excel.ExportToXlsx(filas.Select(f => new EstructuraPresupuestoPlantillaFila
@@ -225,7 +225,6 @@ public sealed class PresupuestoController : ControllerBase
             Codigo = f.Codigo,
             Nombre = f.Nombre,
             Tipo = f.Tipo ?? string.Empty,
-            Seccion = f.Seccion ?? string.Empty,
             Monto = f.Monto,
             Subtotal = f.Subtotal,
             Observacion = f.Observacion ?? string.Empty

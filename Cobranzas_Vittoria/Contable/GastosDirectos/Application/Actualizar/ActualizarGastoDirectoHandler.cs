@@ -13,6 +13,6 @@ public sealed class ActualizarGastoDirectoHandler
     {
         GastoDirectoValidator.ValidarId(c.IdGastoDirecto);
         return _repository.ActualizarAsync(c.IdGastoDirecto, RegistroGastoDirecto.Crear(c.IdPresupuestoDetalle, c.IdProveedor, c.IdMoneda, c.Fecha, c.Concepto,
-            c.Descripcion, c.Monto, c.Seccion, c.IdMonedaOriginal, c.MontoOriginal, c.TipoCambio, c.FechaTipoCambio));
+            c.Descripcion, c.Monto, c.IdMonedaOriginal, c.MontoOriginal, c.TipoCambio, c.FechaTipoCambio));
     }
 }

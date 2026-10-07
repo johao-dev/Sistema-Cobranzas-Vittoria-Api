@@ -13,7 +13,7 @@ public sealed class ListarCatalogoPartidaHandler
     {
         CatalogoPartidaValidator.ValidarFiltro(q.SoloRaices, q.IdPartidaPadre);
         var partidas = await _repository.ListarAsync(new FiltroPartidas(q.Activo, q.IdTipoPartida, q.IdPartidaPadre,
-            q.SoloRaices, q.EsHoja, Validacion.Texto(q.Busqueda), q.IdSeccionGasto));
+            q.SoloRaices, q.EsHoja, Validacion.Texto(q.Busqueda)));
         return partidas.Select(CatalogoPartidaResult.Desde).ToList();
     }
 }

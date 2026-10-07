@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarEstadosPresupuesto;
 using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarMonedas;
-using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarSeccionesGasto;
 using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarTiposCentroCosto;
 using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarTiposMovimiento;
 using Cobranzas_Vittoria.ControlPresupuestario.Application.Catalogo.ListarTiposPartida;
@@ -42,8 +41,4 @@ public sealed class CatalogoControlPresupuestarioController : ControllerBase
     public async Task<IActionResult> Monedas([FromServices] ListarMonedasHandler handler, [FromQuery] bool? activo = true)
         => Ok(await handler.HandleAsync(new ListarMonedasQuery(activo)));
 
-    [HttpGet("secciones-gasto")]
-    public async Task<IActionResult> SeccionesGasto([FromServices] ListarSeccionesGastoHandler handler,
-        [FromQuery] bool? activo = true)
-        => Ok(await handler.HandleAsync(new ListarSeccionesGastoQuery(activo)));
 }
