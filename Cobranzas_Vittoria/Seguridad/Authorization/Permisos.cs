@@ -14,7 +14,6 @@ public static class Permisos
         public const string Aprobar = "requerimientos.aprobar";
         public const string Rechazar = "requerimientos.rechazar";
         public const string EnviarCompras = "requerimientos.enviar_compras";
-        public const string VerDepuracionAlmacen = "requerimientos.ver_depuracion_almacen";
     }
 
     public static class GastoDirecto

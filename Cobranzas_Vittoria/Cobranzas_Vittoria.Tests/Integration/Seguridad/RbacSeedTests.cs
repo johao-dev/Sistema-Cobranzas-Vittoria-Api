@@ -44,12 +44,10 @@ public sealed class RbacSeedTests : IntegrationTestBase
                 Permisos.Requerimientos.Ver,
                 Permisos.Requerimientos.EditarCantidadesAlmacen,
                 Permisos.Requerimientos.ProcesarStock,
-                Permisos.Requerimientos.VerDepuracionAlmacen
             }));
             Assert.That(permisosCoordinador, Is.EquivalentTo(new[]
             {
                 Permisos.Requerimientos.Ver,
-                Permisos.Requerimientos.VerDepuracionAlmacen,
                 Permisos.Requerimientos.Aprobar,
                 Permisos.Requerimientos.Rechazar,
                 Permisos.Requerimientos.EnviarCompras
@@ -57,7 +55,6 @@ public sealed class RbacSeedTests : IntegrationTestBase
             Assert.That(permisosComprador, Is.EquivalentTo(new[]
             {
                 Permisos.Requerimientos.Ver,
-                Permisos.Requerimientos.VerDepuracionAlmacen
             }));
             Assert.That(permisosAdministrador, Is.EquivalentTo(JwtTestTokenFactory.TodosLosPermisosRequerimientos));
         });
