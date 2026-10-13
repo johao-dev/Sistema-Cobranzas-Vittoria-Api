@@ -8,7 +8,12 @@ public static class Permisos
         public const string Ver = "requerimientos.ver";
         public const string Crear = "requerimientos.crear";
         public const string EditarBorrador = "requerimientos.editar_borrador";
-        public const string EditarCantidadesAlmacen = "requerimientos.editar_cantidades_almacen";
+        public const string EditarCantidadesAlmacen = "requerimientos.editar_cantidades_almacen"; // marcado para borrar luego
+        
+        /*
+            crear migración de este permiso a db y asignarlo a los roles de 'Almacenero' y 'Administrador'
+        */
+        public const string GestionarItemsAlmacen = "requerimientos.gestionar_items_almacen";
         public const string Enviar = "requerimientos.enviar";
         public const string ProcesarStock = "requerimientos.procesar_stock";
         public const string Aprobar = "requerimientos.aprobar";

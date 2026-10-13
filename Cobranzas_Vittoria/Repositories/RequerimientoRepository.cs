@@ -242,6 +242,7 @@ END";
             );
         }
 
+        // marcado para borrar luego
         public async Task ActualizarCantidadesAlmacenAsync(
             int idRequerimiento,
             IReadOnlyCollection<ActualizarCantidadAlmacenItemRequest> items)
@@ -321,6 +322,21 @@ WHERE IdRequerimiento = @IdRequerimiento
                 transaction.Rollback();
                 throw;
             }
+        }
+
+        public async Task AgregarItemAsync(int idRequerimiento, AgregarItemRequerimientoRequest request)
+        {
+            throw new NotImplementedException("Este método aún no ha sido implementado.");
+        }
+
+        public async Task ActualizarItemAsync(int idRequerimiento, int idItem, ActualizarItemRequerimientoRequest request)
+        {
+            throw new NotImplementedException("Este método aún no ha sido implementado.");
+        }
+
+        public async Task EliminarItemAsync(int idRequerimiento, int idItem)
+        {
+            throw new NotImplementedException("Este método aún no ha sido implementado.");
         }
 
         private async Task<string> EnsureNumeroRequerimientoAsync(IDbConnection db, string numeroSolicitado)
