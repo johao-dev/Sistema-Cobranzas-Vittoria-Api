@@ -85,16 +85,35 @@ namespace Cobranzas_Vittoria.Services
 
         public async Task AgregarItemAsync(int idRequerimiento, AgregarItemRequerimientoRequest request)
         {
+            // Reglas de negocio pendientes:
+            // - Verificar que el requerimiento exista y esté en estado EnviadoAlmacen.
+            // - Validar que IdMaterial sea válido y que Cantidad sea mayor que cero.
+            // - Validar IdPresupuestoDetalle cuando se proporcione.
+            // - Impedir que el material ya exista entre los ítems del requerimiento.
+            // - Delegar la inserción al repositorio solo después de superar las validaciones.
             throw new NotImplementedException("Este método aún no ha sido implementado.");
         }
 
         public async Task ActualizarItemAsync(int idRequerimiento, int idItem, ActualizarItemRequerimientoRequest request)
         {
+            // Reglas de negocio pendientes:
+            // - Verificar que el requerimiento exista y esté en estado EnviadoAlmacen.
+            // - Verificar que el ítem exista y pertenezca al requerimiento indicado.
+            // - Rechazar una solicitud PATCH que no incluya ningún campo a modificar.
+            // - Validar que Cantidad sea mayor que cero cuando se proporcione.
+            // - Definir si IdMaterial se puede modificar; si se permite, impedir materiales duplicados.
+            // - Definir si null significa no modificar o limpiar IdPresupuestoDetalle y Observacion.
+            // - Delegar la actualización parcial al repositorio solo después de superar las validaciones.
             throw new NotImplementedException("Este método aún no ha sido implementado.");
         }
 
         public async Task EliminarItemAsync(int idRequerimiento, int idItem)
         {
+            // Reglas de negocio pendientes:
+            // - Verificar que el requerimiento exista y esté en estado EnviadoAlmacen.
+            // - Verificar que el ítem exista y pertenezca al requerimiento indicado.
+            // - Impedir la eliminación si dejaría el requerimiento sin ítems.
+            // - Delegar la eliminación al repositorio solo después de superar las validaciones.
             throw new NotImplementedException("Este método aún no ha sido implementado.");
         }
         
