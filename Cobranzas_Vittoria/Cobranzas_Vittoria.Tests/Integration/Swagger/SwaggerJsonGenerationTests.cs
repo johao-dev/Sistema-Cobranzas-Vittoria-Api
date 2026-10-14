@@ -108,6 +108,10 @@ public class SwaggerJsonGenerationTests
         var doc = scope.ServiceProvider.GetRequiredService<Swashbuckle.AspNetCore.Swagger.ISwaggerProvider>().GetSwagger("v1");
         var operacion = doc.Paths["/api/contable/gastos-directos/importar"].Operations[Microsoft.OpenApi.Models.OperationType.Post];
         Assert.That(operacion.RequestBody.Content.ContainsKey("multipart/form-data"), Is.True);
+        var formulario = operacion.RequestBody.Content["multipart/form-data"].Schema;
+        Assert.That(formulario.Properties["archivo"].Type, Is.EqualTo("string"));
+        Assert.That(formulario.Properties["archivo"].Format, Is.EqualTo("binary"));
+        Assert.That(operacion.Responses.ContainsKey("415"), Is.True);
         var schema = operacion.Responses["422"].Content["application/json"].Schema;
         Assert.That(schema.Properties.Keys, Does.Contain("totalFilas"));
         Assert.That(schema.Properties.Keys, Does.Contain("filasInvalidas"));

@@ -338,6 +338,42 @@ public sealed class GastosDirectosImportacionTests : IntegrationTestBase
         Assert.That(await r.Content.ReadAsByteArrayAsync(), Is.EqualTo(new ObtenerPlantillaGastosDirectosHandler().Handle()));
     }
 
+    [TestCase("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [TestCase("application/octet-stream")]
+    public async Task ArchivoComoBodyBinario_Devuelve415SinPersistir(string contentType)
+    {
+        using var libro = Libro();
+        Fila(libro, 6);
+        using var stream = new MemoryStream();
+        libro.Write(stream, true);
+        using var body = new ByteArrayContent(stream.ToArray());
+        body.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+
+        var r = await _client.PostAsync(Ruta, body);
+
+        Assert.That(r.StatusCode, Is.EqualTo(HttpStatusCode.UnsupportedMediaType), await r.Content.ReadAsStringAsync());
+        await NadaPersistido();
+    }
+
+    [TestCase("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+    [TestCase("application/octet-stream")]
+    public async Task ArchivoEnFormularioMultipart_ImportaConMimeDelArchivo(string contentType)
+    {
+        using var libro = Libro();
+        Fila(libro, 6);
+        using var stream = new MemoryStream();
+        libro.Write(stream, true);
+        using var body = new MultipartFormDataContent();
+        var archivo = new ByteArrayContent(stream.ToArray());
+        archivo.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        body.Add(archivo, "archivo", "gastos.xlsx");
+
+        var r = await _client.PostAsync(Ruta, body);
+
+        Assert.That(r.StatusCode, Is.EqualTo(HttpStatusCode.OK), await r.Content.ReadAsStringAsync());
+        Assert.That((await Json(r)).GetProperty("filasInsertadas").GetInt32(), Is.EqualTo(1));
+    }
+
     [Test]
     public async Task MigracionImportacion_ReejecucionConservaGastosFacturasYAuditoria()
     {
