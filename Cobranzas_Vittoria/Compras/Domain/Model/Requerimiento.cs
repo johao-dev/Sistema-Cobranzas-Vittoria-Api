@@ -1,0 +1,1 @@
+namespace Cobranzas_Vittoria.Compras.Domain.Model;
