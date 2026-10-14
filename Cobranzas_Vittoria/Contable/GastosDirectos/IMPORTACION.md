@@ -52,8 +52,11 @@ existentes devuelven además `numeroFactura` y `tieneArchivo`. Una referencia no
 PDF descargable; su descarga devuelve 404 con un mensaje específico. Los PDF existentes
 conservan su ruta y pueden descargarse mediante el flujo habitual.
 
-La migración `V2_7_3` permite esas referencias en la tabla existente, conservando la
+La migración `V2_7_4` permite esas referencias en la tabla existente, conservando la
 restricción de ruta para documentos físicos, y agrega `UsuarioCreacion` al gasto.
+Conserva la renumeración a `2.7.4` y admite instalaciones que ya tengan estos cambios
+de esquema: no intenta duplicar `UsuarioCreacion` y reconstruye la restricción de ruta
+sin modificar gastos, facturas ni auditoría. Una prueba verifica esa reejecución.
 Esto es necesario porque el esquema anterior exigía un archivo físico y carecía de
 usuario de auditoría. No se crean tablas ni relaciones alternativas. La identidad
 procede de `IUsuarioActualService`; un campo `usuario` enviado por formulario se ignora.
@@ -87,7 +90,7 @@ Nuevos:
 - `Application/Importar/ObtenerPlantillaGastosDirectosHandler.cs`
 - `Domain/Model/GastoDirectoImportado.cs`
 - `Infrastructure/Plantillas/Plantilla_Carga_Masiva_Gastos_Directos.xlsx`
-- `../../Migrations/Versioned/V2_7_3__Contable_GastoDirecto_Importacion.sql`
+- `../../Migrations/Versioned/V2_7_4__Contable_GastoDirecto_Importacion.sql`
 - `../../Cobranzas_Vittoria.Tests/Integration/Contable/GastosDirectosImportacionTests.cs`
 - `../../Cobranzas_Vittoria.Tests/Unit/Importacion/GastosDirectosExcelTests.cs`
 - Este documento.
@@ -112,6 +115,7 @@ Modificados en el proyecto:
 - `Swagger/ErrorResponsesOperationFilter.cs`
 - `Cobranzas_Vittoria.csproj`
 - `Cobranzas_Vittoria.Tests/Integration/Swagger/SwaggerJsonGenerationTests.cs`
+- `Cobranzas_Vittoria.Tests/Integration/Compras/NormalizacionMigracionesTests.cs`
 
 ## Verificación
 
@@ -121,20 +125,23 @@ catálogos activos, límites de filas, fórmulas, culturas, fechas, USD, factura
 auditoría y rollback al fallar la asociación de la segunda factura. También prueban
 Swagger y la desactivación de una relación entre validación y persistencia.
 
+El escenario histórico de `NormalizacionMigracionesTests` excluye las tablas de gastos
+directos de V2.3.1. Su preparación también excluye el script de importación dependiente
+de esas tablas, identificado por nombre funcional y no por número de versión. Las diez
+fallas de la suite completa ocurrían en ese setup al intentar alterar una tabla ausente;
+las validaciones de los diez escenarios se conservan.
+
 Comandos desde la raíz del repositorio:
 
 ```bash
 dotnet test Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj --no-restore --filter 'FullyQualifiedName~GastosDirectosImportacionTests|FullyQualifiedName~GastosDirectosExcelTests|FullyQualifiedName~Swagger'
 dotnet test Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj --no-restore --filter 'FullyQualifiedName~Importacion|FullyQualifiedName~GastosDirectosControllerTests|FullyQualifiedName~ControlPresupuestario|FullyQualifiedName~Swagger|FullyQualifiedName~ApiExceptionMiddlewareTests|FullyQualifiedName~MigracionGastosHistoricosTests'
+dotnet test Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj --no-restore --logger 'trx;LogFileName=suite-completa-corregida.trx'
 ```
 
-La ejecución de regresión pasó 440 pruebas, sin fallos ni omitidas. Incluye las
-importaciones anteriores y los flujos de presupuesto, alta manual, documentos y
-migraciones históricas. La compilación inicial del backend terminó sin errores;
-el proyecto conserva advertencias preexistentes.
-
-La verificación final focalizada pasó 81 pruebas, sin fallos ni omitidas, sobre
-importación de gastos directos, lectura de la plantilla y Swagger. Ambos conjuntos
-se solapan; las cifras no representan una suma de pruebas distintas. Los resultados
-TRX están en `Cobranzas_Vittoria.Tests/TestResults/gastos-directos.trx` y
-`Cobranzas_Vittoria.Tests/TestResults/importaciones-regresion.trx`.
+La verificación final ejecutó la suite completa: **972 pruebas aprobadas, cero fallos
+y cero omitidas**. Incluye las diez pruebas de normalización histórica corregidas y
+una nueva prueba de reejecución de la migración que conserva gastos, referencias de
+facturas y auditoría. La compilación termina sin errores; el proyecto conserva
+advertencias preexistentes. El resultado TRX está en
+`Cobranzas_Vittoria.Tests/TestResults/suite-completa-corregida.trx`.
