@@ -29,10 +29,13 @@ public sealed class GastoDirectoController : ControllerBase
 {
     /// <summary>Importa hasta 200 gastos de la hoja Carga masiva. Todo el lote se valida antes de insertar.</summary>
     /// <remarks>Encabezados en fila 5; datos desde fila 6. Factura(s) admite números separados por ';'.
-    /// La identidad de auditoría se obtiene de la sesión autenticada. Las facturas son referencias opcionales sin PDF.</remarks>
+    /// La identidad de auditoría se obtiene de la sesión autenticada. Las facturas son referencias opcionales sin PDF.
+    /// Envía el archivo como campo 'archivo' de un formulario multipart/form-data.
+    /// El cliente debe generar el Content-Type con su boundary. Enviar el XLSX como cuerpo binario devuelve 415.</remarks>
     /// <response code="200">Lote importado con resumen de filas.</response>
     /// <response code="400">Archivo o estructura de plantilla inválidos.</response>
     /// <response code="413">Archivo mayor de 10 MB.</response>
+    /// <response code="415">La petición debe usar multipart/form-data con el campo de archivo 'archivo'.</response>
     /// <response code="422">Errores por fila y resumen; ningún gasto ni referencia se persiste.</response>
     [HttpPost("importar")]
     [AuthorizePermission(GD.Operar)]
@@ -41,6 +44,7 @@ public sealed class GastoDirectoController : ControllerBase
     [ProducesResponseType(typeof(ResultadoImportacionGastosDirectos), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status413RequestEntityTooLarge)]
+    [ProducesResponseType(StatusCodes.Status415UnsupportedMediaType)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Importar([FromServices] ImportarGastosDirectosHandler handler,
         IFormFile archivo, CancellationToken ct)

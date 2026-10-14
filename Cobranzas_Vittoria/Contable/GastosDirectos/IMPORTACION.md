@@ -6,6 +6,29 @@
 incluida como recurso del assembly para que también esté disponible al publicar la API.
 Ambas operaciones están documentadas en Swagger.
 
+## Enviar el archivo desde un cliente HTTP
+
+El cuerpo de la petición es un formulario `multipart/form-data`; el campo `archivo`
+debe ser de tipo archivo, con el XLSX adjunto. El cliente debe generar automáticamente
+el encabezado `Content-Type: multipart/form-data; boundary=...`.
+
+El MIME `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` describe
+el archivo dentro del formulario. Usarlo como Content-Type de la petición completa y
+adjuntar el XLSX como cuerpo binario produce HTTP 415 antes de leer el Excel.
+No establezcas manualmente ese encabezado al enviar el formulario multipart.
+
+Ejemplo con curl (ajusta URL, token y ruta del archivo completado):
+
+```bash
+curl 'http://localhost:5000/api/contable/gastos-directos/importar' \
+  -H 'Authorization: Bearer TU_TOKEN' \
+  -F 'archivo=@/ruta/plantilla-completada.xlsx'
+```
+
+`-F` crea el formulario y su boundary. La descarga y la carga usan el mismo formato
+XLSX, pero sus encabezados HTTP describen cuerpos distintos: archivo al descargar,
+formulario multipart al importar.
+
 ## Contrato y flujo
 
 Se procesa solamente `Carga masiva`, con los 16 encabezados exactos en fila 5 y
@@ -139,9 +162,16 @@ dotnet test Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests
 dotnet test Cobranzas_Vittoria/Cobranzas_Vittoria.Tests/Cobranzas_Vittoria.Tests.csproj --no-restore --logger 'trx;LogFileName=suite-completa-corregida.trx'
 ```
 
-La verificación final ejecutó la suite completa: **972 pruebas aprobadas, cero fallos
+La verificación de las migraciones ejecutó la suite completa: **972 pruebas aprobadas, cero fallos
 y cero omitidas**. Incluye las diez pruebas de normalización histórica corregidas y
 una nueva prueba de reejecución de la migración que conserva gastos, referencias de
 facturas y auditoría. La compilación termina sin errores; el proyecto conserva
 advertencias preexistentes. El resultado TRX está en
 `Cobranzas_Vittoria.Tests/TestResults/suite-completa-corregida.trx`.
+
+La verificación posterior del contrato HTTP pasó **86 pruebas de importación y
+Swagger**, sin fallos ni omitidas. Incluye cuatro casos nuevos: enviar el archivo como
+cuerpo binario devuelve 415 y enviarlo en el campo `archivo` de un formulario multipart
+permite importar, tanto con el MIME XLSX como con el MIME genérico del archivo.
+Swagger verifica además el campo binario `archivo` y la respuesta documentada 415.
+Resultado: `Cobranzas_Vittoria.Tests/TestResults/importacion-content-type-verificada.trx`.
