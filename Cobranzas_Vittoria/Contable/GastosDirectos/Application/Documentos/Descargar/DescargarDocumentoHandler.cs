@@ -21,6 +21,8 @@ public sealed class DescargarDocumentoHandler
         var documento = (await _repository.ObtenerAsync(query.IdGastoDirecto)).Documentos
             .FirstOrDefault(d => d.IdGastoDirectoDocumento == query.IdGastoDirectoDocumento)
             ?? throw GastoDirectoNoEncontradoException.Documento(query.IdGastoDirectoDocumento);
+        if (documento.RutaArchivo is null)
+            throw new GastoDirectoNoEncontradoException("Esta factura contiene solo una referencia, sin PDF adjunto.");
         var ruta = _almacen.ResolverRuta(documento.RutaArchivo)
             ?? throw new GastoDirectoNoEncontradoException("No se encontró el archivo físico del documento.");
         return new DescargarDocumentoResult(ruta, documento.NombreArchivo);

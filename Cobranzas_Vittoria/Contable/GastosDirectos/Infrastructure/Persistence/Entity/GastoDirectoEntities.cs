@@ -19,6 +19,7 @@ public sealed class GastoDirectoEntity
     public string Estado { get; set; } = string.Empty;
     public DateTime FechaCreacion { get; set; }
     public DateTime? FechaActualizacion { get; set; }
+    public string? UsuarioCreacion { get; set; }
     public int IdPresupuesto { get; set; }
     public string CodigoPresupuesto { get; set; } = string.Empty;
     public int IdCentroCosto { get; set; }
@@ -42,7 +43,7 @@ public sealed class GastoDirectoDocumentoEntity
     public int IdGastoDirecto { get; set; }
     public string TipoDocumento { get; set; } = string.Empty;
     public string NombreArchivo { get; set; } = string.Empty;
-    public string RutaArchivo { get; set; } = string.Empty;
+    public string? RutaArchivo { get; set; }
     public string? Extension { get; set; }
     public DateTime FechaCreacion { get; set; }
 }

@@ -58,6 +58,11 @@ public static class SwaggerConfiguration
 
                     **Atomicidad**: la carga es transaccional; si una sola fila falla,
                     toda la operacion hace rollback.
+
+                    Los gastos directos se importan en **`POST /api/contable/gastos-directos/importar`**
+                    con la plantilla XLSX descargable en **`GET /api/contable/gastos-directos/plantilla`**.
+                    Requiere `gasto_directo.operar`; acepta hasta 200 registros en la hoja `Carga masiva`,
+                    encabezados en fila 5. Los números de factura opcionales se separan con `;`.
                     """,
                 Contact = new OpenApiContact
                 {

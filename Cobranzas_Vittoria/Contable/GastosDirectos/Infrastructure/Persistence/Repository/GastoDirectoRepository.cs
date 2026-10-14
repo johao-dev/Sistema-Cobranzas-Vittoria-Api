@@ -8,6 +8,8 @@ using Cobranzas_Vittoria.Contable.GastosDirectos.Infrastructure.Persistence.Enti
 using Cobranzas_Vittoria.Contable.GastosDirectos.Infrastructure.Persistence.Mapper;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Cobranzas_Vittoria.Application.Importacion.Excepciones;
+using Cobranzas_Vittoria.Seguridad.Application.Common;
 
 namespace Cobranzas_Vittoria.Contable.GastosDirectos.Infrastructure.Persistence.Repository;
 
@@ -17,7 +19,10 @@ namespace Cobranzas_Vittoria.Contable.GastosDirectos.Infrastructure.Persistence.
 /// </summary>
 public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoRepository
 {
-    public GastoDirectoRepository(IDbConnectionFactory factory) : base(factory) { }
+    private readonly IUsuarioActualService _usuario;
+
+    public GastoDirectoRepository(IDbConnectionFactory factory, IUsuarioActualService usuario) : base(factory)
+        => _usuario = usuario;
 
     public Task<IReadOnlyList<GastoDirecto>> ListarAsync(FiltroGastosDirectos f) => Ejecutar<IReadOnlyList<GastoDirecto>>(async () =>
     {
@@ -83,9 +88,83 @@ public sealed class GastoDirectoRepository : RepositoryBase, IGastoDirectoReposi
     public Task<int> CrearAsync(RegistroGastoDirecto r) => Ejecutar(async () =>
     {
         using var db = Open();
-        return await db.ExecuteScalarAsync<int>("contable.usp_GastoDirecto_Crear", Parametros(r),
+        var parametros = Parametros(r);
+        parametros.Add("UsuarioCreacion", _usuario.ObtenerUsuarioActual());
+        return await db.ExecuteScalarAsync<int>("contable.usp_GastoDirecto_Crear", parametros,
             commandType: CommandType.StoredProcedure);
     });
+
+    /// <summary>
+    /// Revalida las relaciones bajo SERIALIZABLE antes de insertar. Todos los gastos y sus referencias
+    /// utilizan los mismos SPs del alta manual, una conexión y una transacción; ningún SP hace commit.
+    /// </summary>
+    public async Task CrearLoteAsync(IReadOnlyList<GastoDirectoImportado> lote, string usuario, CancellationToken ct = default)
+    {
+        using var db = Open();
+        using var tx = db.BeginTransaction(IsolationLevel.Serializable);
+        CommandDefinition Comando(string sp, object? parametros = null) => new(sp, parametros, tx,
+            commandType: CommandType.StoredProcedure, cancellationToken: ct);
+        var errores = new List<DetalleErrorFila>();
+        var centros = (await db.QueryAsync<CentroCostoGastoDirectoEntity>(Comando("contable.usp_GastoDirecto_CentrosCosto")))
+            .Select(c => c.IdCentroCosto).ToHashSet();
+        var categorias = (await db.QueryAsync<CategoriaGastoDirectoEntity>(Comando("contable.usp_GastoDirecto_Categorias")))
+            .Select(c => c.IdCategoriaGasto).ToHashSet();
+        var proveedores = (await db.QueryAsync<ProveedorGastoDirectoEntity>(Comando("contable.usp_GastoDirecto_Proveedores")))
+            .Select(p => p.IdProveedor).ToHashSet();
+        var monedas = (await db.QueryAsync<int>(Comando("ControlPresupuestario.usp_Moneda_Listar", new { Activo = true }))).ToHashSet();
+        var partidas = new Dictionary<int, IReadOnlyList<PartidaDisponibleGastoEntity>>();
+        foreach (var centro in lote.Select(i => i.IdCentroCosto).Distinct())
+            partidas[centro] = (await db.QueryAsync<PartidaDisponibleGastoEntity>(
+                Comando("contable.usp_GastoDirecto_PartidasDisponibles", new { IdCentroCosto = centro }))).ToArray();
+        foreach (var item in lote)
+        {
+            var r = item.Registro;
+            void Error(string campo, string mensaje) => errores.Add(new(item.Fila, campo, "REGLA_NEGOCIO",
+                $"Fila {item.Fila}: {mensaje}"));
+            if (!centros.Contains(item.IdCentroCosto)) Error("Centro de costo", "el centro dejó de estar habilitado.");
+            if (!categorias.Contains(r.IdCategoriaGasto)) Error("Categoría código", "la categoría dejó de estar activa.");
+            if (r.IdProveedor is null || !proveedores.Contains(r.IdProveedor.Value)) Error("Proveedor", "el proveedor dejó de estar activo.");
+            if (!partidas[item.IdCentroCosto].Any(p => p.IdPresupuestoDetalle == r.IdPresupuestoDetalle && p.IdMoneda == r.IdMoneda))
+                Error("Partida", "la partida ya no está disponible en la versión aprobada del centro de costo.");
+            if (!monedas.Contains(r.IdMoneda)) Error("Partida", "la moneda del presupuesto dejó de estar activa.");
+            if (r.MonedaReferencia is { } referencia && !monedas.Contains(referencia.IdMonedaOriginal))
+                Error("Moneda factura", "la moneda de la factura dejó de estar activa.");
+        }
+        if (errores.Count > 0)
+            throw new DatosInvalidosException("Las relaciones del lote cambiaron. No se importó ningún gasto.", errores, lote.Count);
+
+        var actual = lote.FirstOrDefault();
+        var campoActual = "Gasto";
+        try
+        {
+            foreach (var item in lote)
+            {
+                actual = item;
+                campoActual = "Gasto";
+                var parametros = Parametros(item.Registro);
+                parametros.Add("UsuarioCreacion", usuario);
+                var id = await db.ExecuteScalarAsync<int>(Comando("contable.usp_GastoDirecto_Crear", parametros));
+                campoActual = "Factura(s)";
+                foreach (var factura in item.Facturas)
+                    await db.ExecuteAsync(Comando("contable.usp_GastoDirectoDocumento_Registrar", new
+                    {
+                        IdGastoDirecto = id, TipoDocumento = Domain.ValueObject.TipoDocumentoGasto.Factura,
+                        NombreArchivo = factura, RutaArchivo = (string?)null, Extension = (string?)null
+                    }));
+            }
+            ct.ThrowIfCancellationRequested();
+            tx.Commit();
+        }
+        catch (SqlException ex) when (ex.Number is >= 51500 and <= 51599)
+        {
+            // Dispose revierte también las referencias de filas anteriores, incluso con XACT_ABORT.
+            var separador = ex.Message.IndexOf(':');
+            var codigo = separador > 0 ? ex.Message[..separador].Trim() : "REGLA_NEGOCIO";
+            var mensaje = separador > 0 ? ex.Message[(separador + 1)..].Trim() : "El procedimiento rechazó el registro.";
+            throw new DatosInvalidosException("El lote fue revertido. No se importó ningún gasto.",
+                new[] { new DetalleErrorFila(actual!.Fila, campoActual, codigo, $"Fila {actual.Fila}: {mensaje}") }, lote.Count);
+        }
+    }
 
     public Task<int> ActualizarAsync(int idGastoDirecto, RegistroGastoDirecto r) => Ejecutar(async () =>
     {
