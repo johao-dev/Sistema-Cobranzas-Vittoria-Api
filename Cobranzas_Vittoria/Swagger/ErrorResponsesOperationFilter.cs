@@ -134,6 +134,22 @@ public sealed class ErrorResponsesOperationFilter : IOperationFilter
             }
         };
 
+        if (context.ApiDescription.RelativePath == "api/contable/gastos-directos/importar"
+            && context.ApiDescription.HttpMethod == "POST")
+        {
+            var contenido = operation.Responses["422"].Content["application/json"];
+            foreach (var campo in new[] { "totalFilas", "filasValidas", "filasInvalidas", "filasInsertadas" })
+                contenido.Schema.Properties[campo] = new OpenApiSchema { Type = "integer", Format = "int32" };
+            foreach (var campo in new[] { "modulo", "formato", "resultado" })
+                contenido.Schema.Properties[campo] = new OpenApiSchema { Type = "string" };
+            contenido.Example = new OpenApiString("""
+                {"ok":false,"error":"DATOS_INVALIDOS","message":"El lote contiene errores. No se importó ningún gasto.",
+                 "modulo":"gastos-directos","formato":"xlsx","resultado":"RECHAZADO","filasInsertadas":0,
+                 "totalFilas":2,"filasValidas":1,"filasInvalidas":1,
+                 "errores":[{"fila":8,"campo":"Proveedor","codigoError":"REGLA_NEGOCIO","mensaje":"Fila 8: el proveedor no existe."}]}
+                """);
+        }
+
         // 500 - Unhandled error (cualquier excepcion no controlada)
         operation.Responses["500"] = new OpenApiResponse
         {

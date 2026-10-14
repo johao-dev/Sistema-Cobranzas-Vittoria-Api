@@ -19,6 +19,7 @@ public sealed record GastoDirecto
     public string Estado { get; init; } = string.Empty;
     public DateTime FechaCreacion { get; init; }
     public DateTime? FechaActualizacion { get; init; }
+    public string? UsuarioCreacion { get; init; }
     public int IdPresupuesto { get; init; }
     public string CodigoPresupuesto { get; init; } = string.Empty;
     public int IdCentroCosto { get; init; }
@@ -37,7 +38,11 @@ public sealed record GastoDirecto
 }
 
 public sealed record GastoDirectoDocumento(int IdGastoDirectoDocumento, int IdGastoDirecto, string TipoDocumento,
-    string NombreArchivo, string RutaArchivo, string? Extension, DateTime FechaCreacion);
+    string NombreArchivo, string? RutaArchivo, string? Extension, DateTime FechaCreacion)
+{
+    public string? NumeroFactura => RutaArchivo is null ? NombreArchivo : null;
+    public bool TieneArchivo => RutaArchivo is not null;
+}
 
 /// <summary>Documento ya guardado en el almacén, pendiente de registrar en el gasto.</summary>
 public sealed record DocumentoNuevo(string TipoDocumento, string NombreArchivo, string RutaArchivo, string? Extension);

@@ -12,7 +12,7 @@ BEGIN
         cg.Codigo AS CodigoCategoriaGasto, cg.Nombre AS NombreCategoriaGasto, gd.IdProveedor,
         pr.RazonSocial AS Proveedor, gd.IdMoneda, m.Codigo AS Moneda,
         gd.Fecha, gd.Concepto, gd.Descripcion, gd.Monto, gd.Estado,
-        gd.FechaCreacion, gd.FechaActualizacion,
+        gd.FechaCreacion, gd.FechaActualizacion, gd.UsuarioCreacion,
         p.IdPresupuesto, p.Codigo AS CodigoPresupuesto,
         cc.IdCentroCosto, cc.Codigo AS CodigoCentroCosto, cc.Nombre AS CentroCosto,
         cc.IdProyecto, cp.IdCatalogoPartida, cp.Codigo AS CodigoPartida,
@@ -59,7 +59,7 @@ BEGIN
         cg.Codigo AS CodigoCategoriaGasto, cg.Nombre AS NombreCategoriaGasto, gd.IdProveedor,
         pr.RazonSocial AS Proveedor, gd.IdMoneda, m.Codigo AS Moneda,
         gd.Fecha, gd.Concepto, gd.Descripcion, gd.Monto, gd.Estado,
-        gd.FechaCreacion, gd.FechaActualizacion,
+        gd.FechaCreacion, gd.FechaActualizacion, gd.UsuarioCreacion,
         p.IdPresupuesto, p.Codigo AS CodigoPresupuesto,
         cc.IdCentroCosto, cc.Codigo AS CodigoCentroCosto, cc.Nombre AS CentroCosto,
         cc.IdProyecto, cp.IdCatalogoPartida, cp.Codigo AS CodigoPartida,
@@ -100,7 +100,8 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirecto_Crear
     @IdMonedaOriginal INT = NULL,
     @MontoOriginal DECIMAL(18,2) = NULL,
     @TipoCambio DECIMAL(18,6) = NULL,
-    @FechaTipoCambio DATE = NULL
+    @FechaTipoCambio DATE = NULL,
+    @UsuarioCreacion NVARCHAR(256) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -147,10 +148,10 @@ BEGIN
 
     INSERT INTO contable.GastoDirecto
         (IdPresupuestoDetalle, IdCategoriaGasto, IdProveedor, IdMoneda, Fecha, Concepto,
-         Descripcion, Monto, Estado, IdMonedaOriginal, MontoOriginal, TipoCambio, FechaTipoCambio)
+         Descripcion, Monto, Estado, IdMonedaOriginal, MontoOriginal, TipoCambio, FechaTipoCambio, UsuarioCreacion)
     VALUES
         (@IdPresupuestoDetalle, @IdCategoriaGasto, @IdProveedor, @IdMoneda, @Fecha, @Concepto,
-         @Descripcion, @Monto, 'REGISTRADO', @IdMonedaOriginal, @MontoOriginal, @TipoCambio, @FechaTipoCambio);
+         @Descripcion, @Monto, 'REGISTRADO', @IdMonedaOriginal, @MontoOriginal, @TipoCambio, @FechaTipoCambio, @UsuarioCreacion);
     SELECT CONVERT(INT, SCOPE_IDENTITY()) AS IdGastoDirecto;
 END;
 GO
@@ -488,7 +489,7 @@ CREATE OR ALTER PROCEDURE contable.usp_GastoDirectoDocumento_Registrar
     @IdGastoDirecto INT,
     @TipoDocumento VARCHAR(20),
     @NombreArchivo NVARCHAR(255),
-    @RutaArchivo NVARCHAR(500),
+    @RutaArchivo NVARCHAR(500) = NULL,
     @Extension NVARCHAR(20) = NULL
 AS
 BEGIN
@@ -496,6 +497,11 @@ BEGIN
     SET XACT_ABORT ON;
     IF @TipoDocumento NOT IN ('Factura', 'Pago')
         THROW 51511, 'TIPO_DOCUMENTO_INVALIDO: use Factura o Pago.', 1;
+    IF NULLIF(LTRIM(RTRIM(@NombreArchivo)), '') IS NULL
+        THROW 51500, 'CAMPO_REQUERIDO: número de factura o nombre de archivo.', 1;
+    IF (@RutaArchivo IS NULL AND (@TipoDocumento <> 'Factura' OR @Extension IS NOT NULL))
+       OR (@RutaArchivo IS NOT NULL AND NULLIF(LTRIM(RTRIM(@RutaArchivo)), '') IS NULL)
+        THROW 51511, 'DOCUMENTO_INVALIDO: solo una referencia de factura puede carecer de archivo.', 1;
     IF NOT EXISTS (SELECT 1 FROM contable.GastoDirecto WHERE IdGastoDirecto = @IdGastoDirecto)
         THROW 51505, 'GASTO_NO_EXISTE: no se encontró el gasto directo.', 1;
     INSERT INTO contable.GastoDirectoDocumento

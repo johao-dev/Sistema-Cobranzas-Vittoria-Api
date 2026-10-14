@@ -120,7 +120,8 @@ namespace Cobranzas_Vittoria.Middleware
                     codigosUnicos: ex.Errores
                         .GroupBy(e => e.CodigoError)
                         .Select(g => $"{g.Key}={g.Count()}")
-                        .OrderBy(s => s));
+                        .OrderBy(s => s), totalFilas: ex.TotalFilas,
+                    filasInvalidas: ex.Errores.Select(e => e.Fila).Distinct().Count());
             }
             catch (DatosInvalidosValidacionException ex)
             {
@@ -384,12 +385,19 @@ namespace Cobranzas_Vittoria.Middleware
         /// Lista de <c>"CODIGO=cantidad"</c> para el log (no se expone al cliente
         /// para evitar PII, solo metadata de patrones).
         /// </param>
+        /// <param name="context">Solicitud HTTP actual.</param>
+        /// <param name="tipoOrigen">Nombre de la excepción para diagnóstico.</param>
+        /// <param name="message">Motivo del rechazo.</param>
+        /// <param name="totalFilas">Total opcional de registros detectados.</param>
+        /// <param name="filasInvalidas">Cantidad de filas distintas con errores.</param>
         private async Task EscribirRespuestaValidacionAsync(
             HttpContext context,
             string tipoOrigen,
             string message,
             IEnumerable<object> erroresSerializables,
-            IEnumerable<string> codigosUnicos)
+            IEnumerable<string> codigosUnicos,
+            int? totalFilas = null,
+            int filasInvalidas = 0)
         {
             var lista = erroresSerializables as IList<object> ?? erroresSerializables.ToList();
             var codigos = codigosUnicos as IList<string> ?? codigosUnicos.ToList();
@@ -401,6 +409,17 @@ namespace Cobranzas_Vittoria.Middleware
 
             context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
             context.Response.ContentType = "application/json";
+            if (totalFilas is not null)
+            {
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    ok = false, error = "DATOS_INVALIDOS", message, errores = lista,
+                    modulo = "gastos-directos", formato = "xlsx", filasInsertadas = 0,
+                    totalFilas, filasValidas = Math.Max(0, totalFilas.Value - filasInvalidas), filasInvalidas,
+                    resultado = "RECHAZADO"
+                });
+                return;
+            }
             await context.Response.WriteAsJsonAsync(new
             {
                 ok = false,

@@ -12,6 +12,7 @@ public interface IGastoDirectoRepository
     Task<IReadOnlyList<PartidaDisponibleGasto>> ListarPartidasDisponiblesAsync(int idCentroCosto);
     Task<(GastoDirecto? Gasto, IReadOnlyList<GastoDirectoDocumento> Documentos)> ObtenerAsync(int idGastoDirecto);
     Task<int> CrearAsync(RegistroGastoDirecto registro);
+    Task CrearLoteAsync(IReadOnlyList<GastoDirectoImportado> lote, string usuario, CancellationToken ct = default);
     Task<int> ActualizarAsync(int idGastoDirecto, RegistroGastoDirecto registro);
     Task ConfirmarAsync(int idGastoDirecto);
     Task AnularAsync(int idGastoDirecto);

@@ -100,5 +100,17 @@ public class SwaggerJsonGenerationTests
         Assert.DoesNotThrow(() => swaggerProvider.GetSwagger("v1"),
             "GetSwagger no debe lanzar. Si lanza, la inner exception tendra el detalle.");
     }
+
+    [Test]
+    public void GastosDirectos_DocumentaArchivoYResumenDeRechazo()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var doc = scope.ServiceProvider.GetRequiredService<Swashbuckle.AspNetCore.Swagger.ISwaggerProvider>().GetSwagger("v1");
+        var operacion = doc.Paths["/api/contable/gastos-directos/importar"].Operations[Microsoft.OpenApi.Models.OperationType.Post];
+        Assert.That(operacion.RequestBody.Content.ContainsKey("multipart/form-data"), Is.True);
+        var schema = operacion.Responses["422"].Content["application/json"].Schema;
+        Assert.That(schema.Properties.Keys, Does.Contain("totalFilas"));
+        Assert.That(schema.Properties.Keys, Does.Contain("filasInvalidas"));
+    }
 }
 

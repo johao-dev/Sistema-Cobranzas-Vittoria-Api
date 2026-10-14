@@ -20,6 +20,75 @@ namespace Cobranzas_Vittoria.Application.Importacion.Parsers;
 /// </summary>
 public class ExcelFileParser : IFileParser
 {
+    /// <summary>
+    /// Lee una plantilla XLSX con hoja, fila de encabezados y orden contractual explícitos.
+    /// Conserva el número físico de fila y el valor numérico OOXML, sin pasar importes por double.
+    /// Las columnas auxiliares no determinan si existe un registro.
+    /// </summary>
+    public List<SpreadsheetRow> ParsePlantilla(IFormFile file, string hoja, int filaEncabezados,
+        IReadOnlyList<string> encabezados, IReadOnlySet<int> auxiliares)
+    {
+        using var stream = file.OpenReadStream();
+        using var workbook = CrearWorkbook(file.FileName, stream);
+        var sheet = workbook.GetSheet(hoja)
+            ?? throw new EstructuraInvalidaException("ENCABEZADOS_INCORRECTOS", $"Falta la hoja '{hoja}'.");
+        var header = sheet.GetRow(filaEncabezados - 1);
+        if (header is null || encabezados.Where((nombre, i) =>
+                header.GetCell(i)?.CellType != CellType.String || header.GetCell(i).StringCellValue != nombre).Any()
+            || header.Cells.Any(c => c.ColumnIndex >= encabezados.Count && !string.IsNullOrWhiteSpace(CellToString(c))))
+            throw new EstructuraInvalidaException("ENCABEZADOS_INCORRECTOS",
+                $"La fila {filaEncabezados} de '{hoja}' debe contener exactamente, en orden: {string.Join(", ", encabezados)}.");
+
+        var filas = new List<SpreadsheetRow>();
+        for (var i = filaEncabezados; i <= sheet.LastRowNum; i++)
+        {
+            var row = sheet.GetRow(i);
+            if (row is null) continue;
+            var celdas = encabezados.Select((nombre, col) => (nombre, col))
+                .Where(c => !auxiliares.Contains(c.col))
+                .ToDictionary(c => c.nombre, c => ValorPlantilla(row.GetCell(c.col)), StringComparer.OrdinalIgnoreCase);
+            if (row.Cells.Any(c => c.ColumnIndex >= encabezados.Count && !string.IsNullOrWhiteSpace(ValorPlantilla(c))))
+                throw new EstructuraInvalidaException("ENCABEZADOS_INCORRECTOS", $"Fila {i + 1}: contiene columnas adicionales.");
+            if (celdas.Values.All(string.IsNullOrEmpty)) continue;
+            filas.Add(new SpreadsheetRow(i + 1, celdas));
+        }
+        return filas;
+    }
+
+    private static string ValorPlantilla(ICell? cell)
+    {
+        if (cell is null) return string.Empty;
+        var tipo = cell.CellType == CellType.Formula ? cell.CachedFormulaResultType : cell.CellType;
+        try
+        {
+            return tipo switch
+            {
+                CellType.String => (cell.StringCellValue ?? string.Empty).Trim(),
+                CellType.Blank => string.Empty,
+                CellType.Numeric when DateUtil.IsCellDateFormatted(cell) =>
+                    cell.DateCellValue?.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) ?? "#FECHA_INVALIDA",
+                CellType.Numeric => NumeroPlantilla((XSSFCell)cell),
+                CellType.Boolean => cell.BooleanCellValue ? "true" : "false",
+                _ => "#CELDA_INVALIDA"
+            };
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException)
+        {
+            return "#CELDA_INVALIDA";
+        }
+    }
+
+    private static string NumeroPlantilla(XSSFCell cell)
+    {
+        // Excel conserva 15 dígitos significativos. El OOXML de la plantilla contiene, por ejemplo,
+        // 3.7599999999999998 para 3.76. Normalizar esa representación usa solo aritmética decimal.
+        // Las celdas de texto se mantienen exactas y se validan sin este redondeo.
+        var raw = cell.GetRawValue();
+        if (!decimal.TryParse(raw, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var numero))
+            return "#NUMERO_INVALIDO";
+        return numero.ToString("G15", System.Globalization.CultureInfo.InvariantCulture);
+    }
     public const string CodigoFormatoInvalido = "FORMATO_INVALIDO";
 
     // Magic numbers

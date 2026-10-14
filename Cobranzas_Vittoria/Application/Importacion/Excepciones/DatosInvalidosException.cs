@@ -13,10 +13,13 @@ namespace Cobranzas_Vittoria.Application.Importacion.Excepciones;
 public class DatosInvalidosException : Exception
 {
     public IReadOnlyList<DetalleErrorFila> Errores { get; }
+    /// <summary>Resumen opcional de importaciones que cuentan filas físicas del lote.</summary>
+    public int? TotalFilas { get; }
 
-    public DatosInvalidosException(string mensaje, IReadOnlyList<DetalleErrorFila> errores)
+    public DatosInvalidosException(string mensaje, IReadOnlyList<DetalleErrorFila> errores, int? totalFilas = null)
         : base(mensaje)
     {
         Errores = errores;
+        TotalFilas = totalFilas;
     }
 }

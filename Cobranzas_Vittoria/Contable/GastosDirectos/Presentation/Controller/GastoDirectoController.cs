@@ -14,6 +14,7 @@ using Cobranzas_Vittoria.Contable.GastosDirectos.Application.Listar;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Application.Obtener;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Application.PartidasDisponibles;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Application.Proveedores;
+using Cobranzas_Vittoria.Contable.GastosDirectos.Application.Importar;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Presentation.Dto;
 using GD = Cobranzas_Vittoria.Seguridad.Authorization.Permisos.GastoDirecto;
 
@@ -26,6 +27,33 @@ namespace Cobranzas_Vittoria.Contable.GastosDirectos.Presentation.Controller;
 [Route("api/contable/gastos-directos")]
 public sealed class GastoDirectoController : ControllerBase
 {
+    /// <summary>Importa hasta 200 gastos de la hoja Carga masiva. Todo el lote se valida antes de insertar.</summary>
+    /// <remarks>Encabezados en fila 5; datos desde fila 6. Factura(s) admite números separados por ';'.
+    /// La identidad de auditoría se obtiene de la sesión autenticada. Las facturas son referencias opcionales sin PDF.</remarks>
+    /// <response code="200">Lote importado con resumen de filas.</response>
+    /// <response code="400">Archivo o estructura de plantilla inválidos.</response>
+    /// <response code="413">Archivo mayor de 10 MB.</response>
+    /// <response code="422">Errores por fila y resumen; ningún gasto ni referencia se persiste.</response>
+    [HttpPost("importar")]
+    [AuthorizePermission(GD.Operar)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(11_000_000)]
+    [ProducesResponseType(typeof(ResultadoImportacionGastosDirectos), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status413RequestEntityTooLarge)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Importar([FromServices] ImportarGastosDirectosHandler handler,
+        IFormFile archivo, CancellationToken ct)
+        => Ok(await handler.HandleAsync(archivo, ct));
+
+    /// <summary>Descarga la plantilla XLSX original con sus instrucciones y validaciones auxiliares.</summary>
+    [HttpGet("plantilla")]
+    [AuthorizePermission(GD.Operar)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult Plantilla([FromServices] ObtenerPlantillaGastosDirectosHandler handler)
+        => File(handler.Handle(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Plantilla_Carga_Masiva_Gastos_Directos.xlsx");
+
     [HttpGet]
     [AuthorizePermission(GD.Ver)]
     public async Task<IActionResult> Listar([FromServices] ListarGastosDirectosHandler handler, [FromQuery] string? estado,
