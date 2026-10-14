@@ -26,7 +26,10 @@ public class NormalizacionMigracionesTests
             && !name.Contains(".V2_1_") && !name.Contains(".V2_2_")
             && !name.Contains(".V2_3_")
             // Este fixture construye una línea histórica parcial sin GastoDirecto.
-            && !name.Contains(".V2_7_1__"));
+            && !name.Contains(".V2_7_1__")
+            // La importación depende de las tablas creadas por V2.3.1, excluida arriba.
+            // Se identifica por nombre funcional para admitir la renumeración del script.
+            && !name.EndsWith("__Contable_GastoDirecto_Importacion.sql", StringComparison.Ordinal));
         Assert.That(result.Successful, Is.True, result.Error?.ToString());
     }
 

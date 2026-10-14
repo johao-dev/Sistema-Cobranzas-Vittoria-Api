@@ -339,6 +339,32 @@ public sealed class GastosDirectosImportacionTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task MigracionImportacion_ReejecucionConservaGastosFacturasYAuditoria()
+    {
+        using var libro = Libro();
+        Fila(libro, 6);
+        Celda(libro, 6, "Factura(s)", "F001-245; INV-10025");
+        var r = await Importar(libro);
+        Assert.That(r.StatusCode, Is.EqualTo(HttpStatusCode.OK), await r.Content.ReadAsStringAsync());
+        var antes = await _client.GetStringAsync("/api/contable/gastos-directos");
+        var id = JsonDocument.Parse(antes).RootElement.EnumerateArray().Single().GetProperty("idGastoDirecto").GetInt32();
+        var documentos = await _client.GetStringAsync($"/api/contable/gastos-directos/{id}/documentos");
+        var assembly = typeof(RegistroGastoDirecto).Assembly;
+        var recurso = assembly.GetManifestResourceNames().Single(n =>
+            n.EndsWith("__Contable_GastoDirecto_Importacion.sql", StringComparison.Ordinal));
+        using var reader = new StreamReader(assembly.GetManifestResourceStream(recurso)!);
+        var script = await reader.ReadToEndAsync();
+
+        // El esquema existente reproduce una instalación que ya aplicó el cambio
+        // con el nombre anterior; el nuevo número no debe duplicar columnas ni perder datos.
+        await DbHelpers.QueryScalarAsync<int>(script + "\nSELECT 1;");
+        await DbHelpers.QueryScalarAsync<int>(script + "\nSELECT 1;");
+
+        Assert.That(await _client.GetStringAsync("/api/contable/gastos-directos"), Is.EqualTo(antes));
+        Assert.That(await _client.GetStringAsync($"/api/contable/gastos-directos/{id}/documentos"), Is.EqualTo(documentos));
+    }
+
+    [Test]
     public async Task RevalidacionTransaccional_RechazaRelacionDesactivadaTrasLeerArchivo()
     {
         var categoria = await DbHelpers.QueryScalarAsync<int>("SELECT IdCategoriaGasto FROM maestra.CategoriaGasto WHERE Codigo='OTROS';");
