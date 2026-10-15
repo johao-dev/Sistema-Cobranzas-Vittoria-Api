@@ -9,4 +9,6 @@ public static class EstadoRequerimiento
     public const string AprobadoCoordinador = "AprobadoCoordinador";
     public const string EnviadoOC = "EnviadoOC";
     public const string GeneradoOC = "GeneradoOC";
+    // Se reconoce al reconstruir históricos. No se inventa una transición de anulación sin un flujo definido.
+    public const string Anulado = "Anulado";
 }
