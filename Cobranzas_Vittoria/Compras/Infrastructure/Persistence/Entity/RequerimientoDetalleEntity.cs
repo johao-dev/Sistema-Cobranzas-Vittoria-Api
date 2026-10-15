@@ -6,6 +6,7 @@ public class RequerimientoDetalleEntity
     public int IdRequerimiento { get; set; }
     public int IdMaterial { get; set; }
     public decimal Cantidad { get; set; }
-    public string? Observacion { get; set; } = string.Empty;
+    // Dapper puede omitir columnas NULL; el valor por defecto también debe ser null.
+    public string? Observacion { get; set; }
     public int? IdPresupuestoDetalle { get; set; }
 }

@@ -975,6 +975,16 @@ IF EXISTS
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 BEGIN TRY
+-- La comprobación previa puede quedar obsoleta mientras se envía o valida el documento.
+-- Compartir el mutex del padre impide que una edición legacy de borrador reemplace sus líneas después.
+DECLARE @EstadoActualRequerimiento NVARCHAR(30);
+SELECT @EstadoActualRequerimiento = Estado
+FROM compras.Requerimiento WITH (UPDLOCK, HOLDLOCK)
+WHERE IdRequerimiento = @IdRequerimiento;
+IF @EstadoActualRequerimiento IS NULL
+    THROW 51072, 'El requerimiento no existe.', 1;
+IF @EstadoActualRequerimiento <> N'Registrado'
+    THROW 51462, 'ESTADO_REQUERIMIENTO_INVALIDO: solo puede editarse el borrador registrado.', 1;
 UPDATE
     compras.Requerimiento
 SET

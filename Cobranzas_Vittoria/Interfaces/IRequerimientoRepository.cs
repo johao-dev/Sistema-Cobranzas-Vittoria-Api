@@ -9,12 +9,6 @@ namespace Cobranzas_Vittoria.Interfaces
         Task ActualizarCantidadesAlmacenAsync(int idRequerimiento, IReadOnlyCollection<Cobranzas_Vittoria.Dtos.Compras.Requerimientos.ActualizarCantidadAlmacenItemRequest> items); // marcado para borrar luego
 
 
-        // nuevos contratos
-        Task AgregarItemAsync(int idRequerimiento, Dtos.Compras.Requerimientos.AgregarItemRequerimientoRequest request);
-        Task ActualizarItemAsync(int idRequerimiento, int idItem, Dtos.Compras.Requerimientos.ActualizarItemRequerimientoRequest request);
-        Task EliminarItemAsync(int idRequerimiento, int idItem);
-
-
         Task<bool> PuedeEditarAsync(int idRequerimiento);
         Task<bool> EsSolicitanteAsync(int idRequerimiento, int idUsuario);
         Task EnviarAsync(int idRequerimiento, int idUsuario, string? observacion);

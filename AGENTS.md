@@ -43,6 +43,13 @@
 - **Idioma del código:** Código y comentarios en español. Mantener el código "spanglish" donde corresponda.
 - Usar nombres descriptivos y mantener consistencia con el código existente.
 
+### Tipos explícitos y legibilidad
+
+- La regla primordial es que el código sea legible para humanos. Priorizar la claridad por encima de reducir líneas o caracteres.
+- Preferir tipos explícitos en las declaraciones de variables, incluidos los resultados de llamadas asíncronas y consultas LINQ. Reservar `var` para casos en los que declarar el tipo no sea posible o perjudique la legibilidad, como los tipos anónimos.
+- Aplicar un espaciado vertical que separe los pasos lógicos de un método: validaciones, obtención de datos, reglas de negocio, persistencia y registro de resultados.
+- Evitar bloques de instrucciones demasiado compactos. Usar líneas en blanco entre responsabilidades distintas, manteniendo juntas las instrucciones estrechamente relacionadas.
+
 ### Código limpio y SOLID
 
 - Seguir principios de código limpio y SOLID cuando sea posible y aporten claridad.

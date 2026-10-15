@@ -1,4 +1,5 @@
 using System.Reflection;
+using Cobranzas_Vittoria.Compras;
 using Cobranzas_Vittoria.Application.Common;
 using Cobranzas_Vittoria.Application.Common.Exports;
 using Cobranzas_Vittoria.Application.Importacion.Parsers;
@@ -249,6 +250,7 @@ builder.Services.AddControlPresupuestario();
 
 // Modulo Gastos directos (arquitectura hexagonal): registro presupuestario de Gastos del proyecto.
 builder.Services.AddGastosDirectos();
+builder.Services.AddCompras();
 
 // ResolvedorEntidadesService: servicio transversal usado por MaterialImportProcessor
 // para resolver IDs de catalogos (Especialidad, UnidadMedida) dentro de la

@@ -61,6 +61,7 @@ public static class JwtTestTokenFactory
         Permisos.Requerimientos.Crear,
         Permisos.Requerimientos.EditarBorrador,
         Permisos.Requerimientos.EditarCantidadesAlmacen,
+        Permisos.Requerimientos.GestionarItemsAlmacen,
         Permisos.Requerimientos.Enviar,
         Permisos.Requerimientos.ProcesarStock,
         Permisos.Requerimientos.Aprobar,

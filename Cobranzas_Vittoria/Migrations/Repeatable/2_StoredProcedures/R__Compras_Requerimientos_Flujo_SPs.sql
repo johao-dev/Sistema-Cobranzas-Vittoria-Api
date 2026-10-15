@@ -67,7 +67,10 @@ BEGIN
 
     UPDATE compras.Requerimiento
     SET Estado = N'EnviadoAlmacen', Observacion = COALESCE(@Observacion, Observacion)
-    WHERE IdRequerimiento = @IdRequerimiento;
+    -- El predicado también se verifica al escribir: un envío atrasado no debe reabrir un documento validado.
+    WHERE IdRequerimiento = @IdRequerimiento AND IdUsuarioSolicitante = @IdUsuario AND Estado = N'Registrado';
+    IF @@ROWCOUNT = 0
+        THROW 51052, 'Solo el solicitante puede enviar un requerimiento registrado.', 1;
 END;
 GO
 
@@ -82,28 +85,35 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    IF @Resultado NOT IN (N'Conforme', N'Observado')
+    IF @Resultado IS NULL OR @Resultado NOT IN (N'Conforme', N'Observado')
         THROW 51053, 'El resultado de almacén es inválido.', 1;
 
     IF NOT EXISTS (SELECT 1 FROM seguridad.Usuario WHERE IdUsuario = @IdUsuario)
         THROW 51054, 'El usuario que procesa el requerimiento no existe.', 1;
 
-    IF NOT EXISTS (
-        SELECT 1 FROM compras.Requerimiento
-        WHERE IdRequerimiento = @IdRequerimiento AND Estado = N'EnviadoAlmacen')
-        THROW 51055, 'El requerimiento debe estar enviado a almacén para procesar stock.', 1;
-
-    BEGIN TRANSACTION;
-
-    INSERT INTO compras.RequerimientoValidacion (IdRequerimiento, IdUsuario, Resultado, Observacion)
-    VALUES (@IdRequerimiento, @IdUsuario, @Resultado, @Observacion);
-
-    UPDATE compras.Requerimiento
-    SET Estado = CASE WHEN @Resultado = N'Conforme' THEN N'ValidadoAlmacen' ELSE N'Registrado' END,
-        Observacion = COALESCE(@Observacion, Observacion)
-    WHERE IdRequerimiento = @IdRequerimiento;
-
-    COMMIT TRANSACTION;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+    IF XACT_STATE() = -1 THROW 51469, 'TRANSACCION_NO_CONFIRMABLE: se requiere rollback externo.', 1;
+    BEGIN TRY
+        IF @TranCount = 0 BEGIN TRANSACTION;
+        ELSE SAVE TRANSACTION ReqProcesarStock;
+        DECLARE @EstadoActual NVARCHAR(30);
+        SELECT @EstadoActual = Estado FROM compras.Requerimiento WITH (UPDLOCK, HOLDLOCK)
+        WHERE IdRequerimiento = @IdRequerimiento;
+        IF @EstadoActual IS NULL OR @EstadoActual <> N'EnviadoAlmacen'
+            THROW 51055, 'El requerimiento debe estar enviado a almacén para procesar stock.', 1;
+        INSERT INTO compras.RequerimientoValidacion (IdRequerimiento, IdUsuario, Resultado, Observacion)
+        VALUES (@IdRequerimiento, @IdUsuario, @Resultado, @Observacion);
+        UPDATE compras.Requerimiento
+        SET Estado = CASE WHEN @Resultado = N'Conforme' THEN N'ValidadoAlmacen' ELSE N'Registrado' END,
+            Observacion = COALESCE(@Observacion, Observacion)
+        WHERE IdRequerimiento = @IdRequerimiento;
+        IF @TranCount = 0 COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @TranCount = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        ELSE IF @TranCount > 0 AND XACT_STATE() = 1 ROLLBACK TRANSACTION ReqProcesarStock;
+        THROW;
+    END CATCH;
 END;
 GO
 

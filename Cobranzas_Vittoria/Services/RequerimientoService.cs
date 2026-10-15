@@ -83,21 +83,6 @@ namespace Cobranzas_Vittoria.Services
             await _repo.ActualizarCantidadesAlmacenAsync(idRequerimiento, request.Items);
         }
 
-        public async Task AgregarItemAsync(int idRequerimiento, AgregarItemRequerimientoRequest request)
-        {
-            throw new NotImplementedException("Este método aún no ha sido implementado.");
-        }
-
-        public async Task ActualizarItemAsync(int idRequerimiento, int idItem, ActualizarItemRequerimientoRequest request)
-        {
-            throw new NotImplementedException("Este método aún no ha sido implementado.");
-        }
-
-        public async Task EliminarItemAsync(int idRequerimiento, int idItem)
-        {
-            throw new NotImplementedException("Este método aún no ha sido implementado.");
-        }
-        
         public Task<bool> PuedeEditarAsync(int idRequerimiento) => _repo.PuedeEditarAsync(idRequerimiento);
         public Task EnviarAsync(int idRequerimiento, int idUsuarioActual, string? observacion) => _repo.EnviarAsync(idRequerimiento, idUsuarioActual, observacion);
         public Task ProcesarStockAsync(int idRequerimiento, int idUsuarioActual, string resultado, string? observacion) => _repo.ProcesarStockAsync(idRequerimiento, idUsuarioActual, resultado, observacion);

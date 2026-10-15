@@ -43,6 +43,7 @@ public sealed class RbacSeedTests : IntegrationTestBase
             {
                 Permisos.Requerimientos.Ver,
                 Permisos.Requerimientos.EditarCantidadesAlmacen,
+                Permisos.Requerimientos.GestionarItemsAlmacen,
                 Permisos.Requerimientos.ProcesarStock,
             }));
             Assert.That(permisosCoordinador, Is.EquivalentTo(new[]

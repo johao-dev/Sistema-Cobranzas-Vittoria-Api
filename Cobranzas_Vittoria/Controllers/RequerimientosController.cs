@@ -63,34 +63,6 @@ public class RequerimientosController : ControllerBase
         return Ok(new { ok = true });
     }
 
-    // --------------------------------------------------------------------- Nuevos endpoints para permitir a almacen gestionar items de requerimientos en estado Enviado.
-    
-    [HttpPost("{id:int}/items")] // Agregar un item a un requerimiento en estado Enviado.
-    [AuthorizePermission(Permisos.Requerimientos.GestionarItemsAlmacen)]
-    public async Task<IActionResult> AgregarItem(int id, [FromBody] AgregarItemRequerimientoRequest request)
-    {
-        await _service.AgregarItemAsync(id, request);
-        return Ok(new { ok = true });
-    }
-
-    [HttpPatch("{idRequerimiento:int}/items/{idDetalle:int}")] // Actualizar un item de un requerimiento en estado Enviado.
-    [AuthorizePermission(Permisos.Requerimientos.GestionarItemsAlmacen)]
-    public async Task<IActionResult> ActualizarItem(int idRequerimiento, int idDetalle, [FromBody] ActualizarItemRequerimientoRequest request)
-    {
-        await _service.ActualizarItemAsync(idRequerimiento, idDetalle, request);
-        return Ok(new { ok = true });
-    }
-
-    [HttpDelete("{idRequerimiento:int}/items/{idDetalle:int}")] // Eliminar un item de un requerimiento en estado Enviado.
-    [AuthorizePermission(Permisos.Requerimientos.GestionarItemsAlmacen)]
-    public async Task<IActionResult> EliminarItem(int idRequerimiento, int idDetalle)
-    {
-        await _service.EliminarItemAsync(idRequerimiento, idDetalle);
-        return Ok(new { ok = true }); // definir un mejor contrato de HTTP response.
-    }
-
-    // ---------------------------------------------------------------------
-
     [HttpPost("{id:int}/enviar")]
     [AuthorizePermission(Permisos.Requerimientos.Enviar)]
     public async Task<IActionResult> Enviar(int id, [FromBody] EnviarRequerimientoRequest request)

@@ -6,7 +6,8 @@ public class RequerimientoEntity
     public string NumeroRequerimiento { get; set; } = string.Empty;
     public DateOnly FechaRequerimiento { get; set; }
     public int IdProyecto { get; set; }
-    public string? Descripcion { get; set; } = string.Empty;
+    // Conservar NULL al materializar; no sustituirlo por texto vacío antes de ejecutar el mapper.
+    public string? Descripcion { get; set; }
     public DateOnly? FechaEntrega { get; set; }
     public int IdUsuarioSolicitante { get; set; }
     public string Estado { get; set; } = string.Empty;
