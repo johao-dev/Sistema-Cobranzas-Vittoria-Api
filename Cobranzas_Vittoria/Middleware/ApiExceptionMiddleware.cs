@@ -1,5 +1,5 @@
 using Cobranzas_Vittoria.Application.Common.Excepciones;
-using Cobranzas_Vittoria.Application.Compras.Excepciones;
+using Cobranzas_Vittoria.Compras.Domain.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
 using Cobranzas_Vittoria.Application.Inventario.Excepciones;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Domain.Excepciones;
@@ -20,7 +20,6 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - DatosInvalidosException         -> 422 Unprocessable Entity (+ lista de errores por fila)
     ///   - DatosInvalidosValidacionException -> 422 Unprocessable Entity (+ lista de errores generica;
     ///                                       usado por modulos que no son Importacion, ej: Inventario)
-    ///   - ConflictoNegocioComprasException -> 409 Conflict
     ///   - ModuloNoSoportadoException      -> 400 BadRequest (codigo "MODULO_NO_SOPORTADO")
     ///   - FormatoPlantillaInvalidoException -> 400 BadRequest (codigo "FORMATO_PLANTILLA_INVALIDO")
     ///   - PlantillaNoDisponibleException  -> 404 NotFound   (codigo "PLANTILLA_NO_DISPONIBLE")
@@ -30,6 +29,7 @@ namespace Cobranzas_Vittoria.Middleware
     ///   - RecursoPresupuestarioNoEncontradoException -> 404 (Control Presupuestario)
     ///   - ValidacionPresupuestariaException -> 400 (Control Presupuestario)
     ///   - ControlPresupuestarioException   -> 409 regla presupuestaria (el repositorio traduce los SP 512xx)
+    ///   - ComprasException               -> 400 validación, 404 recurso ausente, 409 conflicto
     ///   - SqlException 51400-51499        -> 409 conflicto de Compras
     ///   - Otras SqlException              -> 500 SQL_ERROR
     ///   - Exception (cualquier otra)      -> 500 UNHANDLED_ERROR  (deuda tecnica documentada)
@@ -145,18 +145,6 @@ namespace Cobranzas_Vittoria.Middleware
                         .Select(g => $"{g.Key}={g.Count()}")
                         .OrderBy(s => s));
             }
-            catch (ConflictoNegocioComprasException ex)
-            {
-                _logger.LogWarning(
-                    "Rechazo 409 ({Tipo}) en {Method} {Path}: {Codigo} - {Mensaje}",
-                    nameof(ConflictoNegocioComprasException), context.Request.Method, context.Request.Path,
-                    ex.CodigoError, ex.Message);
-                await EscribirErrorAsync(
-                    context,
-                    StatusCodes.Status409Conflict,
-                    ex.CodigoError,
-                    ex.Message);
-            }
             catch (ModuloNoSoportadoException ex)
             {
                 _logger.LogWarning(
@@ -246,6 +234,18 @@ namespace Cobranzas_Vittoria.Middleware
                     StatusCodes.Status400BadRequest,
                     "SOLICITUD_INVALIDA",
                     ex.Message);
+            }
+            catch (ComprasException ex)
+            {
+                var status = ex switch
+                {
+                    RecursoComprasNoEncontradoException => StatusCodes.Status404NotFound,
+                    ValidacionComprasException => StatusCodes.Status400BadRequest,
+                    _ => StatusCodes.Status409Conflict
+                };
+                _logger.LogWarning("Rechazo {Status} de Compras en {Method} {Path}: {Codigo}",
+                    status, context.Request.Method, context.Request.Path, ex.CodigoError);
+                await EscribirErrorAsync(context, status, ex.CodigoError, ex.Message);
             }
             catch (GastoDirectoException ex)
             {

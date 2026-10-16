@@ -37,7 +37,7 @@ public class AuthControllerTests : IntegrationTestBase
             Assert.That(jwt.Claims
                     .Where(c => c.Type == PermissionAuthorizationHandler.ClaimType)
                     .Select(c => c.Value),
-                Contains.Item(Permisos.Requerimientos.EditarCantidadesAlmacen));
+                Contains.Item(Permisos.Requerimientos.GestionarItemsAlmacen));
         });
 
         var hashPersistido = await DbHelpers.QueryScalarAsync<string>(
@@ -76,7 +76,7 @@ public class AuthControllerTests : IntegrationTestBase
             Assert.That(jwtRenovado.Claims
                     .Where(c => c.Type == PermissionAuthorizationHandler.ClaimType)
                     .Select(c => c.Value),
-                Contains.Item(Permisos.Requerimientos.EditarCantidadesAlmacen));
+                Contains.Item(Permisos.Requerimientos.GestionarItemsAlmacen));
         });
 
         var tokenAnterior = await _client.PostAsJsonAsync(

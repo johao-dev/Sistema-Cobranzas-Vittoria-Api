@@ -8,13 +8,12 @@ public static class Permisos
         public const string Ver = "requerimientos.ver";
         public const string Crear = "requerimientos.crear";
         public const string EditarBorrador = "requerimientos.editar_borrador";
-        public const string EditarCantidadesAlmacen = "requerimientos.editar_cantidades_almacen";
+        public const string GestionarItemsAlmacen = "requerimientos.gestionar_items_almacen";
         public const string Enviar = "requerimientos.enviar";
         public const string ProcesarStock = "requerimientos.procesar_stock";
         public const string Aprobar = "requerimientos.aprobar";
         public const string Rechazar = "requerimientos.rechazar";
         public const string EnviarCompras = "requerimientos.enviar_compras";
-        public const string VerDepuracionAlmacen = "requerimientos.ver_depuracion_almacen";
     }
 
     public static class GastoDirecto

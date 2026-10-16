@@ -11,6 +11,7 @@ public class ArquitecturaHexagonalTests
 {
     private static readonly (string Carpeta, string Namespace)[] Modulos =
     {
+        ("Compras", "Cobranzas_Vittoria.Compras"),
         ("ControlPresupuestario", "Cobranzas_Vittoria.ControlPresupuestario"),
         (Path.Combine("Contable", "GastosDirectos"), "Cobranzas_Vittoria.Contable.GastosDirectos")
     };
