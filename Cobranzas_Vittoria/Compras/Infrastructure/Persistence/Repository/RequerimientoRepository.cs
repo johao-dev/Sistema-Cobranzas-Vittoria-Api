@@ -16,24 +16,37 @@ public sealed class RequerimientoRepository(IDbConnectionFactory factory) : IReq
 
     public Task<Requerimiento?> ObtenerConItemsAsync(int idRequerimiento, CancellationToken cancellationToken = default)
         => TraductorErroresSql.EjecutarAsync(async () =>
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var db = factory.CreateConnection();
-        using var filas = await db.QueryMultipleAsync(new CommandDefinition("compras.usp_Requerimiento_ObtenerConItems",
-            new { IdRequerimiento = idRequerimiento }, commandType: CommandType.StoredProcedure,
-            cancellationToken: cancellationToken));
-        var cabecera = await filas.ReadSingleOrDefaultAsync<RequerimientoEntity>();
-        var items = await filas.ReadAsync<RequerimientoDetalleEntity>();
-        return cabecera is null ? null : RequerimientoMapper.ToDomain(cabecera, items);
-    });
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using IDbConnection db = factory.CreateConnection();
+
+            using SqlMapper.GridReader filas = await db.QueryMultipleAsync(new CommandDefinition("compras.usp_Requerimiento_ObtenerConItems",
+                new { IdRequerimiento = idRequerimiento }, commandType: CommandType.StoredProcedure,
+                cancellationToken: cancellationToken));
+
+            RequerimientoEntity? cabecera = await filas.ReadSingleOrDefaultAsync<RequerimientoEntity>();
+            IEnumerable<RequerimientoDetalleEntity> items = await filas.ReadAsync<RequerimientoDetalleEntity>();
+
+            return cabecera is null ? null : RequerimientoMapper.ToDomain(cabecera, items);
+        });
 
     public Task<ItemRequerimiento> AgregarItemAsync(int idRequerimiento, ItemRequerimiento item,
         CancellationToken cancellationToken = default)
     {
         ValidarPertenencia(idRequerimiento, item);
-        var fila = RequerimientoMapper.ToEntity(item);
+
+        RequerimientoDetalleEntity fila = RequerimientoMapper.ToEntity(item);
+
         return EscribirItemAsync("compras.usp_RequerimientoItem_AgregarAlmacen",
-            new { fila.IdRequerimiento, fila.IdMaterial, fila.Cantidad, fila.IdPresupuestoDetalle, fila.Observacion },
+            new
+            {
+                fila.IdRequerimiento,
+                fila.IdMaterial,
+                fila.Cantidad,
+                fila.IdPresupuestoDetalle,
+                fila.Observacion
+            },
             cancellationToken);
     }
 
@@ -41,39 +54,55 @@ public sealed class RequerimientoRepository(IDbConnectionFactory factory) : IReq
         CamposItemRequerimiento campos, CancellationToken cancellationToken = default)
     {
         ValidarPertenencia(idRequerimiento, item);
+
         if (campos == CamposItemRequerimiento.Ninguno || (campos & ~CamposItemRequerimiento.Todos) != 0)
             throw new ValidacionComprasException("REQUERIMIENTO_PATCH_INVALIDO", "Indica campos editables.");
-        var fila = RequerimientoMapper.ToEntity(item);
+
+        RequerimientoDetalleEntity fila = RequerimientoMapper.ToEntity(item);
+
         return EscribirItemAsync("compras.usp_RequerimientoItem_ActualizarAlmacen",
-            new { fila.IdRequerimiento, fila.IdRequerimientoDetalle, fila.Cantidad, fila.IdPresupuestoDetalle,
-                fila.Observacion, CambiarCantidad = campos.HasFlag(CamposItemRequerimiento.Cantidad),
+            new
+            {
+                fila.IdRequerimiento,
+                fila.IdRequerimientoDetalle,
+                fila.Cantidad,
+                fila.IdPresupuestoDetalle,
+                fila.Observacion,
+                CambiarCantidad = campos.HasFlag(CamposItemRequerimiento.Cantidad),
                 CambiarPartida = campos.HasFlag(CamposItemRequerimiento.Partida),
-                CambiarObservacion = campos.HasFlag(CamposItemRequerimiento.Observacion) }, cancellationToken);
+                CambiarObservacion = campos.HasFlag(CamposItemRequerimiento.Observacion)
+            }, cancellationToken);
     }
 
     public Task EliminarItemAsync(int idRequerimiento, int idDetalle, CancellationToken cancellationToken = default)
         => TraductorErroresSql.EjecutarAsync(async () =>
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        using var db = factory.CreateConnection();
-        return await db.ExecuteAsync(new CommandDefinition("compras.usp_RequerimientoItem_EliminarAlmacen",
-            new { IdRequerimiento = idRequerimiento, IdRequerimientoDetalle = idDetalle },
-            commandType: CommandType.StoredProcedure, cancellationToken: cancellationToken));
-    });
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using IDbConnection db = factory.CreateConnection();
+
+            return await db.ExecuteAsync(new CommandDefinition("compras.usp_RequerimientoItem_EliminarAlmacen",
+                new { IdRequerimiento = idRequerimiento, IdRequerimientoDetalle = idDetalle },
+                commandType: CommandType.StoredProcedure, cancellationToken: cancellationToken));
+        });
 
     private Task<ItemRequerimiento> EscribirItemAsync(string procedimiento, object parametros, CancellationToken ct)
         => TraductorErroresSql.EjecutarAsync(async () =>
-    {
-        ct.ThrowIfCancellationRequested();
-        using var db = factory.CreateConnection();
-        var fila = await db.QuerySingleAsync<RequerimientoDetalleEntity>(new CommandDefinition(procedimiento,
-            parametros, commandType: CommandType.StoredProcedure, cancellationToken: ct));
-        return RequerimientoMapper.ToDomain(fila);
-    });
+        {
+            ct.ThrowIfCancellationRequested();
+
+            using IDbConnection db = factory.CreateConnection();
+
+            RequerimientoDetalleEntity fila = await db.QuerySingleAsync<RequerimientoDetalleEntity>(new CommandDefinition(procedimiento,
+                parametros, commandType: CommandType.StoredProcedure, cancellationToken: ct));
+
+            return RequerimientoMapper.ToDomain(fila);
+        });
 
     private static void ValidarPertenencia(int idRequerimiento, ItemRequerimiento item)
     {
         ArgumentNullException.ThrowIfNull(item);
+
         if (idRequerimiento != item.IdRequerimiento)
             throw new ItemRequerimientoNoEncontradoException(idRequerimiento, item.IdRequerimientoDetalle);
     }

@@ -12,9 +12,11 @@ public static class ComprasModule
     public static IServiceCollection AddCompras(this IServiceCollection services)
     {
         services.AddScoped<IRequerimientoRepository, RequerimientoRepository>();
+
         services.AddScoped<AgregarItemHandler>();
         services.AddScoped<ActualizarItemHandler>();
         services.AddScoped<EliminarItemHandler>();
+
         return services;
     }
 }

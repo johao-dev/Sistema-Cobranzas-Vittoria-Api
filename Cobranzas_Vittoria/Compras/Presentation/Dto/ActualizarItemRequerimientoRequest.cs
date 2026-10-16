@@ -19,20 +19,35 @@ public sealed class ActualizarItemRequerimientoRequest
     public decimal? Cantidad
     {
         get => _cantidad;
-        set { _cantidad = value; Campos |= CamposItemRequerimiento.Cantidad; }
+
+        set
+        {
+            _cantidad = value;
+            Campos |= CamposItemRequerimiento.Cantidad;
+        }
     }
 
     [Range(1, int.MaxValue)]
     public int? IdPresupuestoDetalle
     {
         get => _idPresupuestoDetalle;
-        set { _idPresupuestoDetalle = value; Campos |= CamposItemRequerimiento.Partida; }
+
+        set
+        {
+            _idPresupuestoDetalle = value;
+            Campos |= CamposItemRequerimiento.Partida;
+        }
     }
 
     [StringLength(250)]
     public string? Observacion
     {
         get => _observacion;
-        set { _observacion = value; Campos |= CamposItemRequerimiento.Observacion; }
+
+        set
+        {
+            _observacion = value;
+            Campos |= CamposItemRequerimiento.Observacion;
+        }
     }
 }

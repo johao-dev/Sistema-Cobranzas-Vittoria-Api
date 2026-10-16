@@ -46,7 +46,8 @@ public sealed class ItemRequerimiento
         // Se validan todos los campos antes de asignar: un rechazo no deja el objeto a medio actualizar.
         ReglasCompras.Cantidad(cantidad);
         ReglasCompras.IdOpcional(idPresupuestoDetalle, nameof(IdPresupuestoDetalle));
-        var texto = ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250);
+        string? texto = ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250);
+
         IdPresupuestoDetalle = idPresupuestoDetalle;
         Cantidad = cantidad;
         Observacion = texto;

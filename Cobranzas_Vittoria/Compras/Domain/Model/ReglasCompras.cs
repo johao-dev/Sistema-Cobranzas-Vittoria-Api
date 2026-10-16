@@ -13,16 +13,22 @@ internal static class ReglasCompras
 
     public static string TextoRequerido(string? valor, string campo, int maximo)
     {
-        var texto = TextoOpcional(valor, campo, maximo);
+        string? texto = TextoOpcional(valor, campo, maximo);
+
         return texto ?? throw ValidacionComprasException.CampoRequerido(campo);
     }
 
     public static string? TextoOpcional(string? valor, string campo, int maximo)
     {
         // Se normalizan entradas nuevas; la reconstrucción no modifica textos históricos.
-        var texto = valor?.Trim();
-        if (string.IsNullOrEmpty(texto)) return null;
-        if (texto.Length > maximo) throw ValidacionComprasException.Longitud(campo, maximo);
+        string? texto = valor?.Trim();
+
+        if (string.IsNullOrEmpty(texto))
+            return null;
+
+        if (texto.Length > maximo)
+            throw ValidacionComprasException.Longitud(campo, maximo);
+
         return texto;
     }
 
@@ -36,6 +42,7 @@ internal static class ReglasCompras
         if (cantidad > 9999999999999999.99m || cantidad != decimal.Round(cantidad, 2))
             throw new ValidacionComprasException("COMPRAS_PRECISION_INVALIDA",
                 "La cantidad debe ser representable como DECIMAL(18,2), sin redondear.");
+
         return cantidad;
     }
 }

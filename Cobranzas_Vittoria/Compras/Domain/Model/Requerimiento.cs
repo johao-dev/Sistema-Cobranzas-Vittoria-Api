@@ -41,7 +41,7 @@ public sealed class Requerimiento
         string? observacion = null,
         DateTime? fechaCreacion = null)
     {
-        var requerimiento = new Requerimiento
+        Requerimiento requerimiento = new Requerimiento
         {
             // La numeración se obtiene fuera del dominio: asegurar unicidad exige acceder a la BD.
             NumeroRequerimiento = ReglasCompras.TextoRequerido(numeroRequerimiento, nameof(NumeroRequerimiento), 30),
@@ -55,19 +55,24 @@ public sealed class Requerimiento
             // Se permite suministrar el instante desde el caso de uso para usar un reloj controlado.
             FechaCreacion = fechaCreacion ?? DateTime.UtcNow
         };
+
         ValidarFechas(fechaRequerimiento, fechaEntrega);
         ArgumentNullException.ThrowIfNull(items);
 
-        foreach (var item in items)
+        foreach (ItemRequerimiento item in items)
         {
             ArgumentNullException.ThrowIfNull(item);
+
             // Un alta no debe apropiarse de líneas persistidas de otro documento.
             if (item.IdRequerimiento != 0 || item.IdRequerimientoDetalle != 0)
                 throw new ConflictoComprasException("REQUERIMIENTO_ITEM_YA_ASOCIADO",
                     "Un requerimiento nuevo solo admite ítems nuevos sin identidad persistida.");
+
             requerimiento._items.Add(CopiarItem(item));
         }
+
         requerimiento.ValidarItemsParaEnvio();
+
         return requerimiento;
     }
 
@@ -86,7 +91,8 @@ public sealed class Requerimiento
         IEnumerable<ItemRequerimiento> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        var requerimiento = new Requerimiento
+
+        Requerimiento requerimiento = new Requerimiento
         {
             IdRequerimiento = ReglasCompras.Id(idRequerimiento, nameof(IdRequerimiento)),
             NumeroRequerimiento = numeroRequerimiento,
@@ -102,21 +108,27 @@ public sealed class Requerimiento
 
         // La lectura no es un alta: se conserva incluso un documento histórico vacío o con valores
         // que hoy no aceptaríamos. Las reglas de escritura se aplican al ejecutar cada operación.
-        var ids = new HashSet<int>();
-        foreach (var item in items)
+        HashSet<int> ids = new HashSet<int>();
+
+        foreach (ItemRequerimiento item in items)
         {
             ArgumentNullException.ThrowIfNull(item);
+
             // Sí se protege la estructura del agregado: mezclar padres o repetir una identidad indica
             // una consulta/mapeo incorrecto, no un dato que deba corregirse silenciosamente.
             if (item.IdRequerimiento != idRequerimiento)
                 throw new ConflictoComprasException("REQUERIMIENTO_ITEM_NO_PERTENECE",
                     "Todos los ítems reconstruidos deben pertenecer al requerimiento indicado.");
+
             ReglasCompras.Id(item.IdRequerimientoDetalle, nameof(ItemRequerimiento.IdRequerimientoDetalle));
+
             if (!ids.Add(item.IdRequerimientoDetalle))
                 throw new ConflictoComprasException("REQUERIMIENTO_DETALLE_DUPLICADO",
                     "La reconstrucción contiene más de una fila para el mismo detalle.");
+
             requerimiento._items.Add(CopiarItem(item));
         }
+
         return requerimiento;
     }
 
@@ -130,9 +142,11 @@ public sealed class Requerimiento
     {
         ValidarEstado(EstadoRequerimiento.Registrado);
         ValidarSolicitante(idUsuarioActual);
-        var numero = ReglasCompras.TextoRequerido(numeroRequerimiento, nameof(NumeroRequerimiento), 30);
-        var textoDescripcion = ReglasCompras.TextoOpcional(descripcion, nameof(Descripcion), 250);
-        var textoObservacion = ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250);
+
+        string numero = ReglasCompras.TextoRequerido(numeroRequerimiento, nameof(NumeroRequerimiento), 30);
+        string? textoDescripcion = ReglasCompras.TextoOpcional(descripcion, nameof(Descripcion), 250);
+        string? textoObservacion = ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250);
+
         ValidarFechas(fechaRequerimiento, fechaEntrega);
 
         // Proyecto y solicitante identifican el contexto del documento. Cambiar el proyecto necesita
@@ -151,13 +165,16 @@ public sealed class Requerimiento
         string? observacion)
     {
         ValidarEstado(EstadoRequerimiento.EnviadoAlmacen);
+
         // Un material representa una sola necesidad dentro del documento; modificar su cantidad
         // evita líneas duplicadas que luego harían ambigua la generación de la orden de compra.
         if (_items.Any(i => i.IdMaterial == idMaterial))
             throw new ConflictoComprasException("MATERIAL_DUPLICADO",
                 "No se puede agregar un material que ya exista en el requerimiento.");
-        var item = ItemRequerimiento.Crear(IdRequerimiento, idMaterial, idPresupuestoDetalle, cantidad, observacion);
+
+        ItemRequerimiento item = ItemRequerimiento.Crear(IdRequerimiento, idMaterial, idPresupuestoDetalle, cantidad, observacion);
         _items.Add(item);
+
         return item;
     }
 
@@ -168,6 +185,7 @@ public sealed class Requerimiento
         string? observacion)
     {
         ValidarEstado(EstadoRequerimiento.EnviadoAlmacen);
+
         // El material no cambia: sustituirlo implica agregar la nueva necesidad y quitar la anterior.
         return ObtenerItem(idDetalle).Actualizar(cantidad, idPresupuestoDetalle, observacion);
     }
@@ -175,11 +193,14 @@ public sealed class Requerimiento
     public void EliminarItem(int idDetalle)
     {
         ValidarEstado(EstadoRequerimiento.EnviadoAlmacen);
-        var item = ObtenerItem(idDetalle);
+
+        ItemRequerimiento item = ObtenerItem(idDetalle);
+
         // Un requerimiento vacío ya no expresa una solicitud. Retirar el documento es otro flujo.
         if (_items.Count == 1)
             throw new ConflictoComprasException("REQUERIMIENTO_SIN_ITEMS",
                 "No se puede eliminar el último ítem del requerimiento.");
+
         _items.Remove(item);
     }
 
@@ -187,23 +208,29 @@ public sealed class Requerimiento
     {
         ValidarEstado(EstadoRequerimiento.Registrado);
         ValidarSolicitante(idUsuarioActual);
+
         // La solicitud debe ser utilizable al salir de borrador, incluso si provino de datos legacy.
         ValidarItemsParaEnvio();
+
         CambiarEstado(EstadoRequerimiento.EnviadoAlmacen, observacion);
     }
 
     public void ProcesarStock(string resultado, string? observacion = null)
     {
         ValidarEstado(EstadoRequerimiento.EnviadoAlmacen);
+
         // Se conservan las dos salidas del SP actual: conforme continúa, observado vuelve al solicitante.
-        var destino = resultado switch
+        string destino = resultado switch
         {
             "Conforme" => EstadoRequerimiento.ValidadoAlmacen,
             "Observado" => EstadoRequerimiento.Registrado,
             _ => throw new ValidacionComprasException("REQUERIMIENTO_RESULTADO_INVALIDO",
                 "El resultado de almacén debe ser Conforme u Observado.")
         };
-        if (resultado == "Conforme") ValidarItemsParaEnvio();
+
+        if (resultado == "Conforme")
+            ValidarItemsParaEnvio();
+
         // El caso de uso debe persistir también RequerimientoValidacion en la misma transacción.
         CambiarEstado(destino, observacion);
     }
@@ -212,6 +239,7 @@ public sealed class Requerimiento
     {
         // La aprobación corresponde a una solicitud ya revisada por almacén, como exige el flujo actual.
         ValidarEstado(EstadoRequerimiento.ValidadoAlmacen);
+
         CambiarEstado(EstadoRequerimiento.AprobadoCoordinador, observacion);
     }
 
@@ -219,12 +247,14 @@ public sealed class Requerimiento
     {
         // Coordinación puede rechazar antes o después de aprobar, pero nunca después de enviar a OC.
         ValidarEstado(EstadoRequerimiento.ValidadoAlmacen, EstadoRequerimiento.AprobadoCoordinador);
+
         CambiarEstado(EstadoRequerimiento.Rechazado, observacion);
     }
 
     public void EnviarCompras(string? observacion = null)
     {
         ValidarEstado(EstadoRequerimiento.AprobadoCoordinador);
+
         CambiarEstado(EstadoRequerimiento.EnviadoOC, observacion);
     }
 
@@ -233,12 +263,14 @@ public sealed class Requerimiento
         // Este cambio se persiste junto a la creación de la OC; el modelo no puede garantizar por sí
         // solo que no exista ya una orden. Esa unicidad se protege dentro de la transacción de BD.
         ValidarEstado(EstadoRequerimiento.EnviadoOC);
+
         Estado = EstadoRequerimiento.GeneradoOC;
     }
 
     private ItemRequerimiento ObtenerItem(int idDetalle)
     {
         ReglasCompras.Id(idDetalle, nameof(ItemRequerimiento.IdRequerimientoDetalle));
+
         return _items.FirstOrDefault(i => i.IdRequerimientoDetalle == idDetalle)
             ?? throw new ItemRequerimientoNoEncontradoException(IdRequerimiento, idDetalle);
     }
@@ -254,6 +286,7 @@ public sealed class Requerimiento
     private void ValidarSolicitante(int idUsuarioActual)
     {
         ReglasCompras.Id(idUsuarioActual, nameof(idUsuarioActual));
+
         // La identidad del solicitante sí pertenece al documento y protege edición/envío del borrador.
         if (idUsuarioActual != IdUsuarioSolicitante)
             throw new ConflictoComprasException("REQUERIMIENTO_SOLICITANTE_REQUERIDO",
@@ -265,10 +298,12 @@ public sealed class Requerimiento
         if (_items.Count == 0)
             throw new ValidacionComprasException("REQUERIMIENTO_SIN_ITEMS",
                 "El requerimiento debe contener al menos un ítem.");
+
         if (_items.GroupBy(i => i.IdMaterial).Any(grupo => grupo.Count() > 1))
             throw new ConflictoComprasException("MATERIAL_DUPLICADO",
                 "Cada material puede aparecer una sola vez dentro del requerimiento.");
-        foreach (var item in _items)
+
+        foreach (ItemRequerimiento item in _items)
         {
             ReglasCompras.Id(item.IdMaterial, nameof(ItemRequerimiento.IdMaterial));
             ReglasCompras.IdOpcional(item.IdPresupuestoDetalle, nameof(ItemRequerimiento.IdPresupuestoDetalle));
@@ -283,6 +318,7 @@ public sealed class Requerimiento
         // el sistema necesita permitir el registro de documentos atrasados o programados.
         if (fechaRequerimiento == default)
             throw ValidacionComprasException.CampoRequerido(nameof(FechaRequerimiento));
+
         if (fechaEntrega < fechaRequerimiento)
             throw new ValidacionComprasException("REQUERIMIENTO_FECHAS_INVALIDAS",
                 "La fecha de entrega no puede ser anterior a la fecha del requerimiento.");
@@ -291,8 +327,9 @@ public sealed class Requerimiento
     private void CambiarEstado(string destino, string? observacion)
     {
         // En las transiciones, null conserva la observación previa, igual que COALESCE en los SP.
-        var texto = observacion is null ? Observacion
+        string? texto = observacion is null ? Observacion
             : ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250);
+
         Estado = destino;
         Observacion = texto;
     }

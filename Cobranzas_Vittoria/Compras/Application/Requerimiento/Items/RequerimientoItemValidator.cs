@@ -9,6 +9,7 @@ internal static class RequerimientoItemValidator
     {
         if (idRequerimiento <= 0)
             throw ValidacionComprasException.IdentificadorInvalido(nameof(idRequerimiento));
+
         if (idDetalle is <= 0)
             throw ValidacionComprasException.IdentificadorInvalido(nameof(idDetalle));
     }
@@ -18,6 +19,7 @@ internal static class RequerimientoItemValidator
         if (campos == CamposItemRequerimiento.Ninguno || (campos & ~CamposItemRequerimiento.Todos) != 0)
             throw new ValidacionComprasException("REQUERIMIENTO_PATCH_INVALIDO",
                 "Indica al menos un campo editable: cantidad, partida u observación.");
+
         if (campos.HasFlag(CamposItemRequerimiento.Cantidad) && cantidad is null)
             throw new ValidacionComprasException("REQUERIMIENTO_CANTIDAD_INVALIDA",
                 "La cantidad no puede ser nula.");

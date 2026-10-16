@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Compras.Application.Requerimiento.Items;
 using Cobranzas_Vittoria.Compras.Application.Requerimiento.Items.Actualizar;
 using Cobranzas_Vittoria.Compras.Application.Requerimiento.Items.Agregar;
 using Cobranzas_Vittoria.Compras.Application.Requerimiento.Items.Eliminar;
@@ -16,8 +17,9 @@ public sealed class RequerimientoItemController : ControllerBase
     public async Task<IActionResult> Agregar(int idRequerimiento, [FromBody] AgregarItemRequerimientoRequest request,
         [FromServices] AgregarItemHandler handler, CancellationToken ct)
     {
-        var result = await handler.HandleAsync(new AgregarItemCommand(idRequerimiento, request.IdMaterial,
+        RequerimientoItemResult result = await handler.HandleAsync(new AgregarItemCommand(idRequerimiento, request.IdMaterial,
             request.Cantidad!.Value, request.IdPresupuestoDetalle, request.Observacion), ct);
+
         return StatusCode(StatusCodes.Status201Created, RequerimientoItemResponse.Desde(result));
     }
 
@@ -26,8 +28,9 @@ public sealed class RequerimientoItemController : ControllerBase
         [FromBody] ActualizarItemRequerimientoRequest request, [FromServices] ActualizarItemHandler handler,
         CancellationToken ct)
     {
-        var result = await handler.HandleAsync(new ActualizarItemCommand(idRequerimiento, idDetalle,
+        RequerimientoItemResult result = await handler.HandleAsync(new ActualizarItemCommand(idRequerimiento, idDetalle,
             request.Cantidad, request.IdPresupuestoDetalle, request.Observacion, request.Campos), ct);
+
         return Ok(RequerimientoItemResponse.Desde(result));
     }
 
@@ -36,6 +39,7 @@ public sealed class RequerimientoItemController : ControllerBase
         [FromServices] EliminarItemHandler handler, CancellationToken ct)
     {
         await handler.HandleAsync(new EliminarItemCommand(idRequerimiento, idDetalle), ct);
+
         return NoContent();
     }
 }

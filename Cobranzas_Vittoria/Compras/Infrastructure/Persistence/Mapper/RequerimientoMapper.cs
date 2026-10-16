@@ -9,6 +9,7 @@ public static class RequerimientoMapper
     public static RequerimientoEntity ToEntity(Requerimiento domain)
     {
         ArgumentNullException.ThrowIfNull(domain);
+
         return new RequerimientoEntity
         {
             IdRequerimiento = domain.IdRequerimiento,
@@ -28,6 +29,7 @@ public static class RequerimientoMapper
     {
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(items);
+
         // Se exigen los detalles explícitamente: una cabecera sin consultar líneas no es un agregado
         // completo y podría permitir duplicados o impedir eliminaciones por contar ítems incorrectamente.
         return Requerimiento.Reconstruir(entity.IdRequerimiento, entity.NumeroRequerimiento,
@@ -39,6 +41,7 @@ public static class RequerimientoMapper
     public static RequerimientoDetalleEntity ToEntity(ItemRequerimiento domain)
     {
         ArgumentNullException.ThrowIfNull(domain);
+
         return new RequerimientoDetalleEntity
         {
             IdRequerimientoDetalle = domain.IdRequerimientoDetalle,
@@ -53,6 +56,7 @@ public static class RequerimientoMapper
     public static ItemRequerimiento ToDomain(RequerimientoDetalleEntity entity)
     {
         ArgumentNullException.ThrowIfNull(entity);
+
         return ItemRequerimiento.Reconstruir(entity.IdRequerimientoDetalle, entity.IdRequerimiento,
             entity.IdMaterial, entity.IdPresupuestoDetalle, entity.Cantidad, entity.Observacion);
     }
@@ -62,6 +66,7 @@ public static class RequerimientoMapper
         ToEntityConItems(Requerimiento domain)
     {
         ArgumentNullException.ThrowIfNull(domain);
+
         return (ToEntity(domain), domain.Items.Select(ToEntity).ToList());
     }
 }
