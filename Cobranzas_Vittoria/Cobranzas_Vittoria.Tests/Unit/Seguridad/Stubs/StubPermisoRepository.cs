@@ -38,4 +38,14 @@ public sealed class StubPermisoRepository : IPermisoRepository
 
     public void Add(int idPermiso, string codigo, string nombre, string descripcion = "", bool activo = true)
         => Permisos.Add(Permiso.Reconstruir(idPermiso, codigo, nombre, descripcion, activo));
+
+    public Task EnableAsync(int idPermiso)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task DisableAsync(int idPermiso)
+    {
+        throw new NotImplementedException();
+    }
 }

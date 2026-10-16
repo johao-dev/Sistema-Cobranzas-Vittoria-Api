@@ -8,7 +8,7 @@ using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
 [ApiController]
-[Authorize]
+[Authorize] // TODO: Implementar autorización solo para administradores
 [Route("api/seguridad/permisos")]
 public class PermisoController : ControllerBase
 {
@@ -85,5 +85,21 @@ public class PermisoController : ControllerBase
 
         await handler.HandleAsync(command);
         return NoContent();
+    }
+
+    [HttpPatch("{idPermiso}/enable")]
+    public async Task<IActionResult> Enable(
+        [FromServices] UpdatePermisoHandler handler,
+        int idPermiso)
+    {
+        throw new NotImplementedException();
+    }
+
+    [HttpPatch("{idPermiso}/disable")]
+    public async Task<IActionResult> Disable(
+        [FromServices] UpdatePermisoHandler handler,
+        int idPermiso)
+    {
+        throw new NotImplementedException();
     }
 }

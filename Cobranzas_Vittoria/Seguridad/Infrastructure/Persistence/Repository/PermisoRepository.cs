@@ -53,4 +53,25 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
 
         return PermisoMapper.ToDomain(entity);
     }
+
+    // TODO: Implement EnableAsync and DisableAsync methods
+
+    /*
+        SQL parametrizado de referencia:
+
+        UPDATE seguridad.Permiso
+        SET Activo = @Activo,
+            FechaModificacion = @FechaModificacion,
+            UsuarioModificacion = @UsuarioModificacion
+        WHERE IdPermiso = @IdPermiso;
+    */
+    public Task EnableAsync(int idPermiso)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task DisableAsync(int idPermiso)
+    {
+        throw new NotImplementedException();
+    }
 }

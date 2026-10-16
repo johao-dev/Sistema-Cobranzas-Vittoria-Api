@@ -19,90 +19,17 @@ using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Services;
-using Cobranzas_Vittoria.Seguridad.Application.Common;
-using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
-using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.Listar;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.Obtener.ConPermisos;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.AsignarPermisos;
-using Cobranzas_Vittoria.Seguridad.Application.Rol.QuitarPermiso;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.Actualizar;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.AsignarRoles;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.Crear;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.Listar;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.Obtener;
-using Cobranzas_Vittoria.Seguridad.Application.Usuario.QuitarRol;
-using Cobranzas_Vittoria.Seguridad.Application.Auth.Login;
-using Cobranzas_Vittoria.Seguridad.Application.Auth.Refresh;
-using Cobranzas_Vittoria.Seguridad.Application.Auth.Logout;
-using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
-using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
-using Cobranzas_Vittoria.Seguridad.Infrastructure.Services;
-using Cobranzas_Vittoria.Seguridad.Authorization;
+using Cobranzas_Vittoria.Seguridad;
 using Cobranzas_Vittoria.Swagger;
 using DbUp;
 using DbUp.Helpers;
 using Dapper;
 using Microsoft.Data.SqlClient;
-using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddHttpContextAccessor();
-
-JwtOptions jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-if (string.IsNullOrWhiteSpace(jwtOptions.Key) ||
-    string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
-    string.IsNullOrWhiteSpace(jwtOptions.Audience) ||
-    jwtOptions.ExpireMinutes <= 0 ||
-    jwtOptions.RefreshExpireDays <= 0)
-{
-    throw new InvalidOperationException("JWT configuration is incomplete or invalid.");
-}
-builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptions<JwtOptions>>(
-    Microsoft.Extensions.Options.Options.Create(jwtOptions));
-
-// Configuración de autenticación JWT
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidAudience = jwtOptions.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key))
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var token = context.Request.Cookies["access_token"];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    context.Token = token;
-                }
-                return Task.CompletedTask;
-            }
-        };
-    });
-
-// Configuración de autorización basada en roles
-builder.Services.AddAuthorization();
-builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
-builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+builder.Services.AddSeguridad(builder.Configuration);
 
 // ============================================================================
 // Dapper: registro de TypeHandlers globales
@@ -138,48 +65,6 @@ builder.Services.AddMemoryCache(); // soporte para caché
 builder.Services.AddTransient<ApiExceptionMiddleware>();
 
 // Repositories
-builder.Services.AddScoped<IRolRepository, RolRepository>();
-builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
-
-// ============================================================================
-// Feature: Modulo Seguridad - Permisos
-// ============================================================================
-builder.Services.AddScoped<IPermisoRepository, PermisoRepository>();
-builder.Services.AddScoped<IUsuarioActualService, UsuarioActualService>();
-builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
-builder.Services.AddSingleton<IJwtService, JwtService>();
-builder.Services.AddSingleton<IRefreshTokenService, RefreshTokenService>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-builder.Services.AddScoped<LoginHandler>();
-builder.Services.AddScoped<RefreshHandler>();
-builder.Services.AddScoped<LogoutHandler>();
-builder.Services.AddScoped<ListarPermisoHandler>();
-builder.Services.AddScoped<ObtenerPorIdHandler>();
-builder.Services.AddScoped<UpdatePermisoHandler>();
-
-// ============================================================================
-// Feature: Modulo Seguridad - Roles
-// ============================================================================
-builder.Services.AddScoped<IRolRepository, RolRepository>();
-builder.Services.AddScoped<CreateRolHandler>();
-builder.Services.AddScoped<ListarRolHandler>();
-builder.Services.AddScoped<ObtenerRolHandler>();
-builder.Services.AddScoped<ObtenerRolConPermisosHandler>();
-builder.Services.AddScoped<ActualizarRolHandler>();
-builder.Services.AddScoped<AsignarPermisosHandler>();
-builder.Services.AddScoped<QuitarPermisoHandler>();
-
-// ============================================================================
-// Feature: Modulo Seguridad - Usuarios
-// ============================================================================
-builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
-builder.Services.AddScoped<CreateUsuarioHandler>();
-builder.Services.AddScoped<ListarUsuarioHandler>();
-builder.Services.AddScoped<ObtenerUsuarioHandler>();
-builder.Services.AddScoped<ActualizarUsuarioHandler>();
-builder.Services.AddScoped<AsignarRolesHandler>();
-builder.Services.AddScoped<QuitarRolHandler>();
-
 builder.Services.AddScoped<IEspecialidadRepository, EspecialidadRepository>();
 builder.Services.AddScoped<IProyectoRepository, ProyectoRepository>();
 builder.Services.AddScoped<IProveedorRepository, ProveedorRepository>();
