@@ -181,7 +181,7 @@ public class RequerimientoItemControllerTests : IntegrationTestBase
         using var client = GlobalSetupFixture.Factory.CreateClient();
         if (conToken)
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
-                JwtTestTokenFactory.CrearToken(permisos: [Permisos.Requerimientos.EditarCantidadesAlmacen]));
+                JwtTestTokenFactory.CrearToken(permisos: [Permisos.Requerimientos.Ver]));
         var response = await EnviarAsync(client, method, 999, 999);
         Assert.That(response.StatusCode, Is.EqualTo(esperado));
     }
