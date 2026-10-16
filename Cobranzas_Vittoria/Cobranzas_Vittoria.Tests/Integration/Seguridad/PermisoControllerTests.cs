@@ -12,9 +12,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Seguridad;
 /// Endpoints cubiertos:
 ///   GET    /api/seguridad/permisos/{id}
 ///   GET    /api/seguridad/permisos?activo=
-///   POST   /api/seguridad/permisos
 ///   PUT    /api/seguridad/permisos/{id}
-///   DELETE /api/seguridad/permisos/{id}
 ///
 /// Estas pruebas son ligeras: verifican codigos HTTP, forma del body y
 /// persistencia basica. No cubren autorizacion/RBAC (pendiente de fase
@@ -30,8 +28,8 @@ public class PermisoControllerTests : IntegrationTestBase
     /// </summary>
     private static string NuevoCodigo(string prefijo)
     {
-        var guid = Guid.NewGuid().ToString("N");
-        var codigo = $"{prefijo}-{guid}";
+        string guid = Guid.NewGuid().ToString("N");
+        string codigo = $"{prefijo}-{guid}";
         const int limite = 128;
 
         if (codigo.Length <= limite)
@@ -41,68 +39,10 @@ public class PermisoControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Create_ConDatosValidos_Retorna201YPersisteEnBD()
-    {
-        // Arrange
-        var request = new CreatePermisoRequest(
-            NuevoCodigo("create"),
-            "Permiso controller",
-            "Desc");
-
-        // Act
-        var response = await _client.PostAsJsonAsync(BaseUrl, request);
-
-        // Assert - HTTP
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created),
-            $"Body: {await response.Content.ReadAsStringAsync()}");
-
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        int id = body.GetProperty("idPermiso").GetInt32();
-        Assert.That(id, Is.GreaterThan(0));
-        Assert.That(JsonHelpers.GetString(body, "codigo"), Is.EqualTo(request.Codigo));
-        Assert.That(JsonHelpers.GetString(body, "nombre"), Is.EqualTo(request.Nombre));
-
-        // Assert - BD
-        var nombreEnBd = await DbHelpers.QueryScalarAsync<string>(
-            "SELECT Nombre FROM seguridad.Permiso WHERE IdPermiso = @id",
-            new { id });
-        Assert.That(nombreEnBd, Is.EqualTo(request.Nombre));
-    }
-
-    [Test]
-    public async Task Create_ConCodigoDuplicado_Retorna422()
-    {
-        // Arrange
-        var codigo = NuevoCodigo("dup");
-        var primero = await _client.PostAsJsonAsync(BaseUrl, new CreatePermisoRequest(codigo, "Primero", ""));
-        Assert.That(primero.StatusCode, Is.EqualTo(HttpStatusCode.Created));
-
-        // Act
-        var response = await _client.PostAsJsonAsync(BaseUrl, new CreatePermisoRequest(codigo, "Segundo", ""));
-
-        // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity),
-            $"Body: {await response.Content.ReadAsStringAsync()}");
-    }
-
-    [Test]
-    public async Task Create_ConBodyVacio_Retorna400()
-    {
-        using var content = new StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json");
-
-        var response = await _client.PostAsync(BaseUrl, content);
-
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-    }
-
-    [Test]
     public async Task GetById_Existente_Retorna200ConPermiso()
     {
         // Arrange
-        var createResp = await _client.PostAsJsonAsync(BaseUrl,
-            new CreatePermisoRequest(NuevoCodigo("get"), "Get", ""));
-        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>();
-        int id = createBody.GetProperty("idPermiso").GetInt32();
+        int id = await PermisoTestData.InsertarAsync(NuevoCodigo("get"), "Get");
 
         // Act
         var response = await _client.GetAsync($"{BaseUrl}/{id}");
@@ -126,8 +66,8 @@ public class PermisoControllerTests : IntegrationTestBase
     public async Task List_RetornaPermisosCreados()
     {
         // Arrange
-        var codigo = NuevoCodigo("list");
-        await _client.PostAsJsonAsync(BaseUrl, new CreatePermisoRequest(codigo, "List", ""));
+        string codigo = NuevoCodigo("list");
+        await PermisoTestData.InsertarAsync(codigo, "List");
 
         // Act
         var response = await _client.GetAsync(BaseUrl);
@@ -144,18 +84,10 @@ public class PermisoControllerTests : IntegrationTestBase
     public async Task List_ConFiltroActivoFalse_RetornaSoloInactivos()
     {
         // Arrange - crear activo e inactivo
-        var codigoActivo = NuevoCodigo("active");
-        var codigoInactivo = NuevoCodigo("inactive");
-        var createActivo = await _client.PostAsJsonAsync(BaseUrl,
-            new CreatePermisoRequest(codigoActivo, "Activo", ""));
-        var createInactivo = await _client.PostAsJsonAsync(BaseUrl,
-            new CreatePermisoRequest(codigoInactivo, "Inactivo", ""));
-        var inactivoId = (await createInactivo.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("idPermiso").GetInt32();
-
-        // Desactivar via BD para no depender del endpoint de update
-        await DbHelpers.QueryScalarAsync<int>(
-            "UPDATE seguridad.Permiso SET Activo = 0 WHERE IdPermiso = @id; SELECT @@ROWCOUNT;",
-            new { id = inactivoId });
+        string codigoActivo = NuevoCodigo("active");
+        string codigoInactivo = NuevoCodigo("inactive");
+        await PermisoTestData.InsertarAsync(codigoActivo, "Activo");
+        await PermisoTestData.InsertarAsync(codigoInactivo, "Inactivo", activo: false);
 
         // Act
         var response = await _client.GetAsync($"{BaseUrl}?activo=false");
@@ -173,10 +105,7 @@ public class PermisoControllerTests : IntegrationTestBase
     public async Task Update_Existente_Retorna204YActualizaEnBD()
     {
         // Arrange
-        var createResp = await _client.PostAsJsonAsync(BaseUrl,
-            new CreatePermisoRequest(NuevoCodigo("upd"), "Original", "Desc"));
-        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>();
-        int id = createBody.GetProperty("idPermiso").GetInt32();
+        int id = await PermisoTestData.InsertarAsync(NuevoCodigo("upd"), "Original", "Desc");
 
         // Act
         var response = await _client.PutAsJsonAsync($"{BaseUrl}/{id}",
@@ -201,31 +130,31 @@ public class PermisoControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Delete_Existente_Retorna204YEliminaEnBD()
+    public async Task Post_NoDisponible_Retorna405SinCrearPermiso()
     {
-        // Arrange
-        var createResp = await _client.PostAsJsonAsync(BaseUrl,
-            new CreatePermisoRequest(NuevoCodigo("del"), "Delete", ""));
-        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>();
-        int id = createBody.GetProperty("idPermiso").GetInt32();
+        string codigo = NuevoCodigo("post-retirado");
 
-        // Act
-        var response = await _client.DeleteAsync($"{BaseUrl}/{id}");
+        HttpResponseMessage response = await _client.PostAsJsonAsync(BaseUrl,
+            new { Codigo = codigo, Nombre = "Alta retirada", Descripcion = "" });
 
-        // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
-        var countEnBd = await DbHelpers.QueryScalarAsync<int>(
-            "SELECT COUNT(*) FROM seguridad.Permiso WHERE IdPermiso = @id",
-            new { id });
-        Assert.That(countEnBd, Is.EqualTo(0));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.MethodNotAllowed));
+
+        int cantidad = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM seguridad.Permiso WHERE Codigo = @codigo", new { codigo });
+        Assert.That(cantidad, Is.Zero);
     }
 
     [Test]
-    public async Task Delete_Inexistente_Retorna422()
+    public async Task Delete_NoDisponible_Retorna405YConservaPermiso()
     {
-        var response = await _client.DeleteAsync($"{BaseUrl}/9999999");
+        int id = await PermisoTestData.InsertarAsync(NuevoCodigo("delete-retirado"), "Baja retirada");
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity),
-            $"Body: {await response.Content.ReadAsStringAsync()}");
+        HttpResponseMessage response = await _client.DeleteAsync($"{BaseUrl}/{id}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.MethodNotAllowed));
+
+        int cantidad = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT COUNT(*) FROM seguridad.Permiso WHERE IdPermiso = @id", new { id });
+        Assert.That(cantidad, Is.EqualTo(1));
     }
 }

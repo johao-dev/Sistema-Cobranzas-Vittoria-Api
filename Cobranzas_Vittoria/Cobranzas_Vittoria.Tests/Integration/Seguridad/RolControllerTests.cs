@@ -126,16 +126,16 @@ public class RolControllerTests : IntegrationTestBase
     public async Task AsignarPermisos_ConDatosValidos_Retorna204YPersisteSinDuplicados()
     {
         RolResponse rol = await CrearRolAsync("ASIG-PERM");
-        PermisoResponse permiso = await CrearPermisoAsync("asig-perm");
+        int idPermiso = await InsertarPermisoAsync("asig-perm");
 
         var response = await _client.PostAsJsonAsync(
             $"{BaseUrl}/{rol.IdRol}/permisos",
-            new AsignarPermisosRequest(new[] { permiso.IdPermiso, permiso.IdPermiso }));
+            new AsignarPermisosRequest(new[] { idPermiso, idPermiso }));
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
         var asociaciones = await DbHelpers.QueryScalarAsync<int>(
             "SELECT COUNT(*) FROM seguridad.PermisoRol WHERE IdRol = @idRol AND IdPermiso = @idPermiso",
-            new { idRol = rol.IdRol, idPermiso = permiso.IdPermiso });
+            new { idRol = rol.IdRol, idPermiso });
         Assert.That(asociaciones, Is.EqualTo(1));
     }
 
@@ -143,10 +143,10 @@ public class RolControllerTests : IntegrationTestBase
     public async Task GetByIdConPermisos_RetornaRolYDatosDePermisosAsignados()
     {
         RolResponse rol = await CrearRolAsync("GET-PERM");
-        PermisoResponse permiso = await CrearPermisoAsync("get-perm");
+        int idPermiso = await InsertarPermisoAsync("get-perm");
         await _client.PostAsJsonAsync(
             $"{BaseUrl}/{rol.IdRol}/permisos",
-            new AsignarPermisosRequest(new[] { permiso.IdPermiso }));
+            new AsignarPermisosRequest(new[] { idPermiso }));
 
         var response = await _client.GetAsync($"{BaseUrl}/{rol.IdRol}/permisos");
 
@@ -155,8 +155,8 @@ public class RolControllerTests : IntegrationTestBase
         Assert.That(resultado, Is.Not.Null);
         Assert.That(resultado!.IdRol, Is.EqualTo(rol.IdRol));
         PermisoAsignadoResponse permisoAsignado = resultado.Permisos.Single();
-        Assert.That(permisoAsignado.IdPermiso, Is.EqualTo(permiso.IdPermiso));
-        Assert.That(permisoAsignado.Nombre, Is.EqualTo(permiso.Nombre));
+        Assert.That(permisoAsignado.IdPermiso, Is.EqualTo(idPermiso));
+        Assert.That(permisoAsignado.Nombre, Is.EqualTo("Permiso de prueba"));
     }
 
     [Test]
@@ -189,18 +189,18 @@ public class RolControllerTests : IntegrationTestBase
     public async Task QuitarPermiso_ConAsociacionExistente_Retorna204YLaElimina()
     {
         RolResponse rol = await CrearRolAsync("QUIT-PERM");
-        PermisoResponse permiso = await CrearPermisoAsync("quit-perm");
+        int idPermiso = await InsertarPermisoAsync("quit-perm");
         await _client.PostAsJsonAsync(
             $"{BaseUrl}/{rol.IdRol}/permisos",
-            new AsignarPermisosRequest(new[] { permiso.IdPermiso }));
+            new AsignarPermisosRequest(new[] { idPermiso }));
 
         var response = await _client.DeleteAsync(
-            $"{BaseUrl}/{rol.IdRol}/permisos/{permiso.IdPermiso}");
+            $"{BaseUrl}/{rol.IdRol}/permisos/{idPermiso}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
         var asociaciones = await DbHelpers.QueryScalarAsync<int>(
             "SELECT COUNT(*) FROM seguridad.PermisoRol WHERE IdRol = @idRol AND IdPermiso = @idPermiso",
-            new { idRol = rol.IdRol, idPermiso = permiso.IdPermiso });
+            new { idRol = rol.IdRol, idPermiso });
         Assert.That(asociaciones, Is.Zero);
     }
 
@@ -212,14 +212,8 @@ public class RolControllerTests : IntegrationTestBase
         return (await response.Content.ReadFromJsonAsync<RolResponse>())!;
     }
 
-    private async Task<PermisoResponse> CrearPermisoAsync(string prefijo)
-    {
-        var request = new CreatePermisoRequest(
+    private static Task<int> InsertarPermisoAsync(string prefijo)
+        => PermisoTestData.InsertarAsync(
             $"{prefijo}-{Guid.NewGuid():N}",
-            "Permiso de prueba",
-            "");
-        var response = await _client.PostAsJsonAsync("/api/seguridad/permisos", request);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<PermisoResponse>())!;
-    }
+            "Permiso de prueba");
 }

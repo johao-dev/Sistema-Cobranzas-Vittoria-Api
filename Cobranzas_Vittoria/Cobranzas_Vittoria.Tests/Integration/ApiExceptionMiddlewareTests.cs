@@ -48,18 +48,18 @@ public class ApiExceptionMiddlewareTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Post_BodyVacio_DevuelveBadRequest()
+    public async Task Put_BodyVacio_DevuelveBadRequest()
     {
         using var content = new StringContent(string.Empty, Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/api/seguridad/permisos", content);
+        HttpResponseMessage response = await _client.PutAsync("/api/seguridad/permisos/1", content);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]
-    public async Task Post_JsonMalformado_DevuelveBadRequest()
+    public async Task Put_JsonMalformado_DevuelveBadRequest()
     {
         using var content = new StringContent("{", Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/api/seguridad/permisos", content);
+        HttpResponseMessage response = await _client.PutAsync("/api/seguridad/permisos/1", content);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 

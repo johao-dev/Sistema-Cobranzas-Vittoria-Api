@@ -2,6 +2,7 @@ using System.Data;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Seguridad.Domain.Model;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Repository;
+using Cobranzas_Vittoria.Tests.Integration.Common;
 using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Seguridad;
@@ -154,17 +155,14 @@ public class RolRepositoryTests : IntegrationTestBase
     public async Task GetByIdWithPermisosAsync_ConPermisoAsignado_RetornaLaAsociacion()
     {
         var roles = CrearRepository();
-        var permisos = new PermisoRepository(new TestConnectionFactory());
         var rol = await roles.AddAsync(CrearRol("repo.permisos", "Permisos"));
-        var permiso = Permiso.Crear("repo.permisos.ver", "Ver permisos", "");
-        permiso.EstablecerAuditoriaCreacion("test");
-        permiso = await permisos.AddAsync(permiso);
+        int idPermiso = await PermisoTestData.InsertarAsync("repo.permisos.ver", "Ver permisos");
 
-        await roles.AsignarPermisosAsync(rol.IdRol, new[] { permiso.IdPermiso }, "test");
+        await roles.AsignarPermisosAsync(rol.IdRol, new[] { idPermiso }, "test");
         var obtenido = await roles.GetByIdWithPermisosAsync(rol.IdRol);
 
         Assert.That(obtenido, Is.Not.Null);
-        Assert.That(obtenido!.Permisos.Select(p => p.IdPermiso), Contains.Item(permiso.IdPermiso));
+        Assert.That(obtenido!.Permisos.Select(p => p.IdPermiso), Contains.Item(idPermiso));
     }
 
     // =====================================================================

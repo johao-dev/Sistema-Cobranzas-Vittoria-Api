@@ -24,17 +24,6 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
         return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity);
     }
 
-    public async Task<Permiso?> GetByCodigoAsync(string codigo)
-    {
-        using IDbConnection db = Open();
-        PermisoEntity? permisoEntity = await db.QueryFirstOrDefaultAsync<PermisoEntity>(
-            "seguridad.usp_Permiso_GetByCodigo",
-            new { Codigo = codigo },
-            commandType: CommandType.StoredProcedure);
-
-        return permisoEntity is null ? null : PermisoMapper.ToDomain(permisoEntity);
-    }
-
     public async Task<IEnumerable<Permiso>> GetAllAsync(bool activo = true)
     {
         using IDbConnection db = Open();
@@ -44,23 +33,6 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
             commandType: CommandType.StoredProcedure);
 
         return permisosEntities.Select(PermisoMapper.ToDomain);
-    }
-
-    public async Task<Permiso> AddAsync(Permiso permiso)
-    {
-        using IDbConnection db = Open();
-        PermisoEntity entity = await db.QueryFirstAsync<PermisoEntity>(
-            "seguridad.usp_Permiso_Insert",
-            new
-            {
-                permiso.Codigo,
-                permiso.Nombre,
-                permiso.Descripcion,
-                permiso.UsuarioCreacion
-            },
-            commandType: CommandType.StoredProcedure);
-
-        return PermisoMapper.ToDomain(entity);
     }
 
     public async Task<Permiso> UpdateAsync(Permiso permiso)
@@ -80,14 +52,5 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
             commandType: CommandType.StoredProcedure);
 
         return PermisoMapper.ToDomain(entity);
-    }
-
-    public async Task DeleteAsync(int idPermiso)
-    {
-        using IDbConnection db = Open();
-        await db.ExecuteAsync(
-            "seguridad.usp_Permiso_Delete",
-            new { IdPermiso = idPermiso },
-            commandType: CommandType.StoredProcedure);
     }
 }

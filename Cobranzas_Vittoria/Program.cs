@@ -21,8 +21,6 @@ using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Services;
 using Cobranzas_Vittoria.Seguridad.Application.Common;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
-using Cobranzas_Vittoria.Seguridad.Application.Permiso.Crear;
-using Cobranzas_Vittoria.Seguridad.Application.Permiso.Eliminar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Rol.Crear;
@@ -155,11 +153,9 @@ builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<LoginHandler>();
 builder.Services.AddScoped<RefreshHandler>();
 builder.Services.AddScoped<LogoutHandler>();
-builder.Services.AddScoped<CreatePermisoHandler>();
 builder.Services.AddScoped<ListarPermisoHandler>();
 builder.Services.AddScoped<ObtenerPorIdHandler>();
 builder.Services.AddScoped<UpdatePermisoHandler>();
-builder.Services.AddScoped<DeletePermisoHandler>();
 
 // ============================================================================
 // Feature: Modulo Seguridad - Roles
