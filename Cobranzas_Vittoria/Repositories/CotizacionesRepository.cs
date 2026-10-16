@@ -1,4 +1,4 @@
-﻿using Chavez_Logistica.Interfaces;
+﻿using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Cotizaciones;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
