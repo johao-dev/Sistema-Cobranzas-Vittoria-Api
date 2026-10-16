@@ -55,8 +55,8 @@ public class RolTests
     {
         var permisos = new[]
         {
-            PermisoBuilder.Nuevo().ConCodigo("permiso.uno").BuildNewDomain(),
-            PermisoBuilder.Nuevo().ConCodigo("permiso.dos").BuildNewDomain()
+            PermisoBuilder.Nuevo().ConCodigo("permiso.uno").BuildDomain(),
+            PermisoBuilder.Nuevo().ConCodigo("permiso.dos").BuildDomain()
         };
 
         var rol = Rol.Crear("Rol con permisos", "Desc", permisos);
@@ -151,7 +151,7 @@ public class RolTests
     public void AgregarPermiso_NuevoPermiso_RetornaTrueYAumentaColeccion()
     {
         var rol = RolBuilder.Nuevo().BuildNewDomain();
-        var permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo").BuildNewDomain();
+        Permiso permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo").BuildDomain();
 
         var agregado = rol.AgregarPermiso(permiso);
 
@@ -162,7 +162,7 @@ public class RolTests
     [Test]
     public void AgregarPermiso_Duplicado_RetornaFalseYNoDuplica()
     {
-        var permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.dup").BuildNewDomain();
+        Permiso permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.dup").BuildDomain();
         var rol = RolBuilder.Nuevo()
             .ConPermiso(permiso)
             .BuildDomain();
@@ -184,7 +184,7 @@ public class RolTests
     [Test]
     public void QuitarPermiso_Existente_RetornaTrueYReduceColeccion()
     {
-        var permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.quitar").BuildNewDomain();
+        Permiso permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.quitar").BuildDomain();
         var rol = RolBuilder.Nuevo()
             .ConPermiso(permiso)
             .BuildDomain();
@@ -199,7 +199,7 @@ public class RolTests
     public void QuitarPermiso_Inexistente_RetornaFalse()
     {
         var rol = RolBuilder.Nuevo().BuildNewDomain();
-        var permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.inexistente").BuildNewDomain();
+        Permiso permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.inexistente").BuildDomain();
 
         var quitado = rol.QuitarPermiso(permiso);
 
@@ -209,15 +209,15 @@ public class RolTests
     [Test]
     public void EstablecerPermisos_ReemplazaColeccionExistente()
     {
-        var permisoOriginal = PermisoBuilder.Nuevo().ConCodigo("permiso.original").BuildNewDomain();
+        Permiso permisoOriginal = PermisoBuilder.Nuevo().ConCodigo("permiso.original").BuildDomain();
         var rol = RolBuilder.Nuevo()
             .ConPermiso(permisoOriginal)
             .BuildDomain();
 
         var permisosNuevos = new[]
         {
-            PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo1").BuildNewDomain(),
-            PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo2").BuildNewDomain()
+            PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo1").BuildDomain(),
+            PermisoBuilder.Nuevo().ConCodigo("permiso.nuevo2").BuildDomain()
         };
 
         rol.EstablecerPermisos(permisosNuevos);
@@ -229,7 +229,7 @@ public class RolTests
     [Test]
     public void LimpiarPermisos_VaciaLaColeccion()
     {
-        var permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.limpiar").BuildNewDomain();
+        Permiso permiso = PermisoBuilder.Nuevo().ConCodigo("permiso.limpiar").BuildDomain();
         var rol = RolBuilder.Nuevo()
             .ConPermiso(permiso)
             .BuildDomain();

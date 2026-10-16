@@ -21,24 +21,6 @@ public class Permiso : IEquatable<Permiso>
     private Permiso() { }
 
     /// <summary>
-    /// Crea un permiso valido y lanza una excepcion de dominio si se violan
-    /// las reglas de negocio basicas.
-    /// </summary>
-    public static Permiso Crear(string codigo, string nombre, string descripcion)
-    {
-        ValidarCodigo(codigo);
-        ValidarNombre(nombre);
-
-        return new Permiso
-        {
-            Codigo = codigo.Trim(),
-            Nombre = nombre.Trim(),
-            Descripcion = descripcion?.Trim() ?? string.Empty,
-            Activo = true
-        };
-    }
-
-    /// <summary>
     /// Actualiza solo los campos editables del permiso: Nombre y Descripcion.
     /// El Codigo no se puede cambiar una vez creado.
     /// </summary>
@@ -49,16 +31,6 @@ public class Permiso : IEquatable<Permiso>
         Nombre = nombre.Trim();
         Descripcion = descripcion?.Trim() ?? string.Empty;
         FechaModificacion = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Establece el usuario y fecha de creacion. Se invoca desde el caso de uso
-    /// justo antes de persistir.
-    /// </summary>
-    public void EstablecerAuditoriaCreacion(string usuarioCreacion)
-    {
-        FechaCreacion = DateTime.UtcNow;
-        UsuarioCreacion = usuarioCreacion;
     }
 
     /// <summary>
@@ -85,6 +57,7 @@ public class Permiso : IEquatable<Permiso>
 
     /// <summary>
     /// Reconstruye la entidad desde persistencia sin revalidar.
+    /// El catalogo de permisos y su auditoria de creacion se mantienen mediante migraciones.
     ///
     /// <para>
     /// <b>Nota:</b> Usar solo en mappers/repositorios.
@@ -113,25 +86,6 @@ public class Permiso : IEquatable<Permiso>
             FechaModificacion = fechaModificacion,
             UsuarioModificacion = usuarioModificacion
         };
-    }
-
-    private static void ValidarCodigo(string codigo)
-    {
-        if (string.IsNullOrWhiteSpace(codigo))
-        {
-            throw new ValidacionNegocioSeguridadException(
-                nameof(Codigo),
-                "PERMISO_CODIGO_REQUERIDO",
-                "El codigo del permiso es requerido.");
-        }
-
-        if (codigo.Contains(' '))
-        {
-            throw new ValidacionNegocioSeguridadException(
-                nameof(Codigo),
-                "PERMISO_CODIGO_ESPACIOS",
-                "El codigo del permiso no puede contener espacios.");
-        }
     }
 
     private static void ValidarNombre(string nombre)

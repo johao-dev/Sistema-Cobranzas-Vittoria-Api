@@ -80,7 +80,4 @@ public sealed class PermisoBuilder
             _usuarioCreacion,
             _fechaModificacion,
             _usuarioModificacion);
-
-    public Permiso BuildNewDomain()
-        => Permiso.Crear(_codigo, _nombre, _descripcion);
 }
