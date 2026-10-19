@@ -17,8 +17,17 @@ public sealed class StubPermisoRepository : IPermisoRepository
     /// <summary>Permite simular fallos o comportamiento custom en <see cref="UpdateAsync"/>.</summary>
     public Func<Permiso, Task<Permiso>>? OnUpdateAsync { get; set; }
 
+    public Func<Permiso, Task>? OnEnableAsync { get; set; }
+    public Func<Permiso, Task>? OnDisableAsync { get; set; }
+    public List<Permiso> PermisosHabilitados { get; } = new();
+    public List<Permiso> PermisosDeshabilitados { get; } = new();
+    public List<int> IdsConsultados { get; } = new();
+
     public Task<Permiso?> GetByIdAsync(int idPermiso)
-        => Task.FromResult(Permisos.FirstOrDefault(p => p.IdPermiso == idPermiso));
+    {
+        IdsConsultados.Add(idPermiso);
+        return Task.FromResult(Permisos.FirstOrDefault(p => p.IdPermiso == idPermiso));
+    }
 
     public Task<IEnumerable<Permiso>> GetAllAsync(bool activo = true)
         => Task.FromResult(Permisos.Where(p => p.Activo == activo).AsEnumerable());
@@ -39,13 +48,15 @@ public sealed class StubPermisoRepository : IPermisoRepository
     public void Add(int idPermiso, string codigo, string nombre, string descripcion = "", bool activo = true)
         => Permisos.Add(Permiso.Reconstruir(idPermiso, codigo, nombre, descripcion, activo));
 
-    public Task EnableAsync(int idPermiso)
+    public Task EnableAsync(Permiso permiso)
     {
-        throw new NotImplementedException();
+        PermisosHabilitados.Add(permiso);
+        return OnEnableAsync?.Invoke(permiso) ?? Task.CompletedTask;
     }
 
-    public Task DisableAsync(int idPermiso)
+    public Task DisableAsync(Permiso permiso)
     {
-        throw new NotImplementedException();
+        PermisosDeshabilitados.Add(permiso);
+        return OnDisableAsync?.Invoke(permiso) ?? Task.CompletedTask;
     }
 }

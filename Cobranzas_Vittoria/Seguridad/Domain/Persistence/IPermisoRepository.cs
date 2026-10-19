@@ -10,7 +10,7 @@ public interface IPermisoRepository
 
     Task<Permiso> UpdateAsync(Permiso permiso);
 
-    Task EnableAsync(int idPermiso);
+    Task EnableAsync(Permiso permiso);
 
-    Task DisableAsync(int idPermiso);
+    Task DisableAsync(Permiso permiso);
 }

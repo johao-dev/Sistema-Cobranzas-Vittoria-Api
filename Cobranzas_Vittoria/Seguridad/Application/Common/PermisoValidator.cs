@@ -1,5 +1,6 @@
-using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Habilitar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Deshabilitar;
 using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 
 namespace Cobranzas_Vittoria.Seguridad.Application.Common;
@@ -8,21 +9,33 @@ public sealed class PermisoValidator
 {
     public static void ValidarUpdate(UpdatePermisoCommand command)
     {
-        if (command is null)
-            throw new ArgumentNullException(nameof(command));
+        ArgumentNullException.ThrowIfNull(command);
+        
+        ValidarIdPermiso(command.IdPermiso);
+    }
 
-        var errores = new List<DetalleErrorValidacion>();
+    public static void ValidarEnable(EnablePermisoCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
 
-        if (command.IdPermiso <= 0)
+        ValidarIdPermiso(command.IdPermiso);
+    }
+
+    public static void ValidarDisable(DisablePermisoCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        ValidarIdPermiso(command.IdPermiso);
+    }
+
+    private static void ValidarIdPermiso(int idPermiso)
+    {
+        if (idPermiso <= 0)
         {
-            errores.Add(new DetalleErrorValidacion(
-                null,
-                nameof(command.IdPermiso),
+            throw new ValidacionNegocioSeguridadException(
+                "IdPermiso",
                 "PERMISO_ID_INVALIDO",
-                "El identificador del permiso no es valido."));
+                "El identificador del permiso no es valido.");
         }
-
-        if (errores.Count > 0)
-            throw new ValidacionNegocioSeguridadException(errores);
     }
 }

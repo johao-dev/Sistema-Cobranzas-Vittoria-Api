@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Cobranzas_Vittoria.Seguridad.Presentation.Dto;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Listar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.Actualizar;
 using Cobranzas_Vittoria.Seguridad.Application.Permiso.ObtenerPorId;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Habilitar;
+using Cobranzas_Vittoria.Seguridad.Application.Permiso.Deshabilitar;
 
 namespace Cobranzas_Vittoria.Seguridad.Presentation.Controller;
 
@@ -89,17 +92,21 @@ public class PermisoController : ControllerBase
 
     [HttpPatch("{idPermiso}/enable")]
     public async Task<IActionResult> Enable(
-        [FromServices] UpdatePermisoHandler handler,
+        [FromServices] EnablePermisoHandler handler,
+        [Range(1, int.MaxValue, ErrorMessage = "El identificador del permiso debe ser mayor que cero.")]
         int idPermiso)
     {
-        throw new NotImplementedException();
+        await handler.HandleAsync(new EnablePermisoCommand(idPermiso));
+        return NoContent();
     }
 
     [HttpPatch("{idPermiso}/disable")]
     public async Task<IActionResult> Disable(
-        [FromServices] UpdatePermisoHandler handler,
+        [FromServices] DisablePermisoHandler handler,
+        [Range(1, int.MaxValue, ErrorMessage = "El identificador del permiso debe ser mayor que cero.")]
         int idPermiso)
     {
-        throw new NotImplementedException();
+        await handler.HandleAsync(new DisablePermisoCommand(idPermiso));
+        return NoContent();
     }
 }

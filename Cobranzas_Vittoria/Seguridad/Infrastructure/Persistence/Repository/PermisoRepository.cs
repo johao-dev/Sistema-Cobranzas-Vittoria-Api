@@ -2,6 +2,7 @@ using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Seguridad.Domain.Model;
 using Cobranzas_Vittoria.Repositories;
 using Cobranzas_Vittoria.Seguridad.Domain.Persistence;
+using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
 using System.Data;
 using Dapper;
 using Cobranzas_Vittoria.Seguridad.Infrastructure.Persistence.Entity;
@@ -45,7 +46,6 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
                 permiso.IdPermiso,
                 permiso.Nombre,
                 permiso.Descripcion,
-                permiso.Activo,
                 permiso.FechaModificacion,
                 permiso.UsuarioModificacion
             },
@@ -54,24 +54,54 @@ public class PermisoRepository : RepositoryBase, IPermisoRepository
         return PermisoMapper.ToDomain(entity);
     }
 
-    // TODO: Implement EnableAsync and DisableAsync methods
-
-    /*
-        SQL parametrizado de referencia:
-
-        UPDATE seguridad.Permiso
-        SET Activo = @Activo,
-            FechaModificacion = @FechaModificacion,
-            UsuarioModificacion = @UsuarioModificacion
-        WHERE IdPermiso = @IdPermiso;
-    */
-    public Task EnableAsync(int idPermiso)
+    public async Task EnableAsync(Permiso permiso)
     {
-        throw new NotImplementedException();
+        string sql = @"
+            UPDATE seguridad.Permiso
+            SET Activo = 1,
+                FechaModificacion = @FechaModificacion,
+                UsuarioModificacion = @UsuarioModificacion
+            WHERE IdPermiso = @IdPermiso;";
+
+        using IDbConnection db = Open();
+        int filasAfectadas = await db.ExecuteAsync(sql, new
+        {
+            permiso.IdPermiso,
+            permiso.FechaModificacion,
+            permiso.UsuarioModificacion
+        });
+
+        ValidarPermisoEncontrado(filasAfectadas, permiso.IdPermiso);
     }
 
-    public Task DisableAsync(int idPermiso)
+    public async Task DisableAsync(Permiso permiso)
     {
-        throw new NotImplementedException();
+        string sql = @"
+            UPDATE seguridad.Permiso
+            SET Activo = 0,
+                FechaModificacion = @FechaModificacion,
+                UsuarioModificacion = @UsuarioModificacion
+            WHERE IdPermiso = @IdPermiso;";
+
+        using IDbConnection db = Open();
+        int filasAfectadas = await db.ExecuteAsync(sql, new
+        {
+            permiso.IdPermiso,
+            permiso.FechaModificacion,
+            permiso.UsuarioModificacion
+        });
+        
+        ValidarPermisoEncontrado(filasAfectadas, permiso.IdPermiso);
+    }
+
+    private static void ValidarPermisoEncontrado(int filasAfectadas, int idPermiso)
+    {
+        if (filasAfectadas == 0)
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(idPermiso),
+                "PERMISO_NO_ENCONTRADO",
+                $"No se encontro el permiso con Id {idPermiso}.");
+        }
     }
 }

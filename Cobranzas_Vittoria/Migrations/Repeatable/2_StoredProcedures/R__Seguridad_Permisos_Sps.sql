@@ -50,12 +50,11 @@ END;
 GO
 
 -- Procedimiento para actualizar un permiso existente.
--- Solo se actualizan Nombre, Descripcion, Activo y auditoria de modificacion.
+-- Solo se actualizan Nombre, Descripcion y auditoria de modificacion.
 CREATE OR ALTER PROCEDURE seguridad.usp_Permiso_Update
     @IdPermiso INT,
     @Nombre NVARCHAR(100),
     @Descripcion NVARCHAR(255),
-    @Activo BIT,
     @FechaModificacion DATETIME = NULL,
     @UsuarioModificacion NVARCHAR(100) = NULL
 AS
@@ -66,7 +65,6 @@ BEGIN
     SET
         Nombre = @Nombre,
         Descripcion = @Descripcion,
-        Activo = @Activo,
         FechaModificacion = ISNULL(@FechaModificacion, GETUTCDATE()),
         UsuarioModificacion = @UsuarioModificacion
     WHERE IdPermiso = @IdPermiso;

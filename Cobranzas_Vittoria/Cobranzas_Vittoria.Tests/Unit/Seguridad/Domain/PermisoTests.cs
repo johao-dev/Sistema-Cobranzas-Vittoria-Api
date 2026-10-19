@@ -70,10 +70,13 @@ public class PermisoTests
     {
         Permiso permiso = PermisoBuilder.Nuevo().BuildDomain();
 
-        permiso.Desactivar();
+        DateTime antes = DateTime.UtcNow;
+
+        permiso.Desactivar("admin-test");
 
         Assert.That(permiso.Activo, Is.False);
-        Assert.That(permiso.FechaModificacion, Is.Not.Null);
+        Assert.That(permiso.FechaModificacion, Is.GreaterThanOrEqualTo(antes));
+        Assert.That(permiso.UsuarioModificacion, Is.EqualTo("admin-test"));
     }
 
     [Test]
@@ -83,10 +86,39 @@ public class PermisoTests
 
         Assert.That(permiso.Activo, Is.False);
 
-        permiso.Activar();
+        DateTime antes = DateTime.UtcNow;
+
+        permiso.Activar("admin-test");
 
         Assert.That(permiso.Activo, Is.True);
-        Assert.That(permiso.FechaModificacion, Is.Not.Null);
+        Assert.That(permiso.FechaModificacion, Is.GreaterThanOrEqualTo(antes));
+        Assert.That(permiso.UsuarioModificacion, Is.EqualTo("admin-test"));
+    }
+
+    [TestCase(true, "PERMISO_YA_HABILITADO")]
+    [TestCase(false, "PERMISO_YA_DESHABILITADO")]
+    public void CambiarEstado_EstadoRepetido_RechazaSinAlterarAuditoria(bool habilitar, string codigoError)
+    {
+        DateTime fechaAnterior = new DateTime(2025, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        Permiso permiso = Permiso.Reconstruir(1, "permiso.test", "Nombre", "Descripcion", habilitar,
+            fechaModificacion: fechaAnterior, usuarioModificacion: "usuario-anterior");
+
+        ValidacionNegocioSeguridadException? excepcion = Assert.Throws<ValidacionNegocioSeguridadException>(() =>
+        {
+            if (habilitar)
+                permiso.Activar("otro-usuario");
+            else
+                permiso.Desactivar("otro-usuario");
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(excepcion!.Errores.Single().CodigoError, Is.EqualTo(codigoError));
+            Assert.That(excepcion.Errores.Single().Campo, Is.EqualTo(nameof(Permiso.Activo)));
+            Assert.That(permiso.Activo, Is.EqualTo(habilitar));
+            Assert.That(permiso.FechaModificacion, Is.EqualTo(fechaAnterior));
+            Assert.That(permiso.UsuarioModificacion, Is.EqualTo("usuario-anterior"));
+        });
     }
 
     // =====================================================================

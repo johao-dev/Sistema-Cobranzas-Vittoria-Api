@@ -20,6 +20,17 @@ public class SeguridadAuthorizationTests
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
+    [TestCase("enable")]
+    [TestCase("disable")]
+    public async Task CambiarEstado_SinToken_Retorna401(string accion)
+    {
+        using HttpClient client = GlobalSetupFixture.Factory.CreateClient();
+
+        HttpResponseMessage response = await client.PatchAsync($"/api/seguridad/permisos/1/{accion}", null);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public async Task EndpointsSeguridad_ConTokenInvalidoOExpirado_RetornanUnauthorized(bool expirado)

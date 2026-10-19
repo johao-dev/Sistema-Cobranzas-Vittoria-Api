@@ -24,7 +24,7 @@ public class Permiso : IEquatable<Permiso>
     /// Actualiza solo los campos editables del permiso: Nombre y Descripcion.
     /// El Codigo no se puede cambiar una vez creado.
     /// </summary>
-    public void ActualizarDatos(string nombre, string descripcion)
+    public void ActualizarDatos(string nombre, string descripcion) // Invocar a EstablecerAuditoriaModificacion()
     {
         ValidarNombre(nombre);
 
@@ -33,26 +33,42 @@ public class Permiso : IEquatable<Permiso>
         FechaModificacion = DateTime.UtcNow;
     }
 
+    public void Desactivar(string usuarioModificacion)
+    {
+        if (!Activo)
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(Activo),
+                "PERMISO_YA_DESHABILITADO",
+                "El permiso ya se encuentra deshabilitado.");
+        }
+
+        Activo = false;
+        EstablecerAuditoriaModificacion(usuarioModificacion);
+    }
+
+    public void Activar(string usuarioModificacion)
+    {
+        if (Activo)
+        {
+            throw new ValidacionNegocioSeguridadException(
+                nameof(Activo),
+                "PERMISO_YA_HABILITADO",
+                "El permiso ya se encuentra habilitado.");
+        }
+
+        Activo = true;
+        EstablecerAuditoriaModificacion(usuarioModificacion);
+    }
+
     /// <summary>
     /// Establece el usuario y fecha de modificacion. Se invoca desde el caso de uso
     /// justo antes de persistir.
     /// </summary>
-    public void EstablecerAuditoriaModificacion(string usuarioModificacion)
+    public void EstablecerAuditoriaModificacion(string usuarioModificacion) // TODO: Hacer privado
     {
         FechaModificacion = DateTime.UtcNow;
         UsuarioModificacion = usuarioModificacion;
-    }
-
-    public void Desactivar()
-    {
-        Activo = false;
-        FechaModificacion = DateTime.UtcNow;
-    }
-
-    public void Activar()
-    {
-        Activo = true;
-        FechaModificacion = DateTime.UtcNow;
     }
 
     /// <summary>
