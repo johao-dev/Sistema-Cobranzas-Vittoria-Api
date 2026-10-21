@@ -26,9 +26,6 @@ public sealed class KardexSalidaCreateDto
     /// <summary>PK. Null en POST; obligatorio en PUT (validado contra la ruta).</summary>
     public int? IdKardexSalida { get; set; }
 
-    /// <summary>FK a maestra.Especialidad (REQUERIDO).</summary>
-    public int IdEspecialidad { get; set; }
-
     /// <summary>FK a maestra.Proyecto (REQUERIDO). Etiqueta informativa; no segmenta stock.</summary>
     public int? IdProyecto { get; set; }
 

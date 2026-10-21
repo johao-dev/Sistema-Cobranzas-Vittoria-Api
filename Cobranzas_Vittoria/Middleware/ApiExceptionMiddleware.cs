@@ -194,6 +194,13 @@ namespace Cobranzas_Vittoria.Middleware
                     IdRutaInconsistenteException.CodigoError,
                     ex.Message);
             }
+            catch (EspecialidadMaterialConMovimientosException ex)
+            {
+                _logger.LogWarning("Rechazo 409 al reclasificar material en {Method} {Path}: {Codigo}",
+                    context.Request.Method, context.Request.Path, EspecialidadMaterialConMovimientosException.CodigoError);
+                await EscribirErrorAsync(context, StatusCodes.Status409Conflict,
+                    EspecialidadMaterialConMovimientosException.CodigoError, ex.Message);
+            }
             catch (KardexNoEncontradoException ex)
             {
                 // El SP del modulo Inventario responde 51104 cuando un

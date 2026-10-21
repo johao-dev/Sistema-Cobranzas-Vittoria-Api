@@ -3,7 +3,9 @@ using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Dtos.Maestra;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
+using Cobranzas_Vittoria.Inventario.Domain.Excepciones;
 using Dapper;
+using Microsoft.Data.SqlClient;
 
 namespace Cobranzas_Vittoria.Repositories
 {
@@ -42,18 +44,25 @@ namespace Cobranzas_Vittoria.Repositories
                 ? await ObtenerCodigoActualAsync(db, dto.IdMaterial.Value, dto.Codigo)
                 : await GenerarCodigoMaterialAsync(db);
 
-            return await db.ExecuteScalarAsync<int>("maestra.usp_Material_Upsert", new
+            try
             {
-                dto.IdMaterial,
-                dto.IdEspecialidad,
-                Codigo = codigo,
-                CodigoProveedor = string.IsNullOrWhiteSpace(dto.CodigoProveedor) ? null : dto.CodigoProveedor.Trim(),
-                dto.Descripcion,
-                dto.UnidadMedida,
-                dto.StockMinimo,
-                dto.Activo,
-                IdCatalogoPartida = dto.IdCatalogoPartida is > 0 ? dto.IdCatalogoPartida : null
-            }, commandType: CommandType.StoredProcedure);
+                return await db.ExecuteScalarAsync<int>("maestra.usp_Material_Upsert", new
+                {
+                    dto.IdMaterial,
+                    dto.IdEspecialidad,
+                    Codigo = codigo,
+                    CodigoProveedor = string.IsNullOrWhiteSpace(dto.CodigoProveedor) ? null : dto.CodigoProveedor.Trim(),
+                    dto.Descripcion,
+                    dto.UnidadMedida,
+                    dto.StockMinimo,
+                    dto.Activo,
+                    IdCatalogoPartida = dto.IdCatalogoPartida is > 0 ? dto.IdCatalogoPartida : null
+                }, commandType: CommandType.StoredProcedure);
+            }
+            catch (SqlException ex) when (ex.Number == 51112)
+            {
+                throw new EspecialidadMaterialConMovimientosException();
+            }
         }
 
         private static async Task<string> ObtenerCodigoActualAsync(IDbConnection db, int idMaterial, string? codigoRecibido)

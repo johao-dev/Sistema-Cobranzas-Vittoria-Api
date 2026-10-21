@@ -218,7 +218,7 @@ public class KardexInventarioController : ControllerBase
     // ============================================================================
 
     /// <summary>
-    /// Lista el stock actual consolidado por (material, especialidad).
+    /// Lista el stock actual consolidado por (material).
     /// Filtros: idEspecialidad, fechaDesde, fechaHasta
     /// (filtran sobre <c>FechaUltimaMovimiento</c>, no sobre la fecha del movimiento).
     /// </summary>

@@ -209,86 +209,48 @@ GO
 
 
 -- =============================================================================
--- Modulo Inventario (Kardex manual entradas/salidas/stock)
--- Version 1.2.0. Los siguientes SPs son 100% nuevos y no modifican
--- ningun objeto existente en este archivo. Rigen el modulo Kardex manual
--- (entradas, salidas y stock), independiente del flujo de Compras que
--- sigue usando almacen.KardexMovimiento + los SPs legacy de arriba.
---
--- Convenciones de errores:
---   - Rango SQL: 51100-51199 (reservado para este modulo).
---   - Formato del mensaje: 'CODIGO: detalle' (ej: 'STOCK_INSUFICIENTE:
---     idMaterial=7 disponible=3 solicitado=10'). El Application/Common/
---     SqlExceptionTranslator del backend parsea este prefijo para mapear
---     a un codigoError estructurado en la respuesta 400/422.
---   - Transacciones: SET XACT_ABORT ON + TRY/CATCH explicito + ROLLBACK
---     en CATCH. KardexStock se mantiene en la MISMA transaccion que
---     KardexEntrada/KardexSalida (insert/update/delete + diff de stock).
+-- Kardex manual: stock global único por material. La especialidad se deriva de
+-- maestra.Material tanto en respuestas como en filtros, por cada detalle de salida.
+-- Los rechazos del módulo usan el rango 51100-51199 y mensajes CODIGO: detalle.
 -- =============================================================================
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexEntrada_Listar
---   Lista entradas manuales con filtros opcionales. Ordena por fecha DESC
---   para que el front vea primero lo mas reciente.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexEntrada_Listar]
+CREATE OR ALTER PROCEDURE almacen.usp_KardexEntrada_Listar
     @IdEspecialidad INT = NULL,
-    @IdProyecto     INT = NULL,
-    @IdProveedor    INT = NULL,
-    @FechaDesde     DATE = NULL,
-    @FechaHasta     DATE = NULL
+    @IdProyecto INT = NULL,
+    @IdProveedor INT = NULL,
+    @FechaDesde DATE = NULL,
+    @FechaHasta DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT
-        ke.IdKardexEntrada,
-        ke.IdEspecialidad,
-        e.Nombre          AS Especialidad,
-        ke.IdMaterial,
-        m.Codigo          AS CodigoMaterial,
-        m.Descripcion     AS Nombre,
-        ke.IdProveedor,
-        p.RazonSocial     AS Proveedor,
-        ke.IdProyecto,
-        pr.NombreProyecto AS Proyecto,
-        ke.NumeroDocumento,
-        ke.Fecha,
-        ke.Cantidad,
-        ke.Observacion,
-        ke.FechaCreacion
+    SELECT ke.IdKardexEntrada, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ke.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        ke.IdProveedor, p.RazonSocial AS Proveedor, ke.IdProyecto,
+        pr.NombreProyecto AS Proyecto, ke.NumeroDocumento, ke.Fecha,
+        ke.Cantidad, ke.Observacion, ke.FechaCreacion
     FROM almacen.KardexEntrada ke
-    INNER JOIN maestra.Material      m  ON m.IdMaterial     = ke.IdMaterial
-    INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ke.IdEspecialidad
-    LEFT  JOIN maestra.Proveedor     p  ON p.IdProveedor    = ke.IdProveedor
-    LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ke.IdProyecto
-    WHERE (@IdEspecialidad IS NULL OR ke.IdEspecialidad = @IdEspecialidad)
-      AND (@IdProyecto     IS NULL OR ke.IdProyecto     = @IdProyecto)
-      AND (@IdProveedor    IS NULL OR ke.IdProveedor    = @IdProveedor)
-      AND (@FechaDesde     IS NULL OR ke.Fecha         >= @FechaDesde)
-      AND (@FechaHasta     IS NULL OR ke.Fecha         <= @FechaHasta)
-    ORDER BY
-        ke.Fecha DESC,
-        ke.IdKardexEntrada DESC;
+    JOIN maestra.Material m ON m.IdMaterial = ke.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proveedor p ON p.IdProveedor = ke.IdProveedor
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ke.IdProyecto
+    WHERE (@IdEspecialidad IS NULL OR m.IdEspecialidad = @IdEspecialidad)
+      AND (@IdProyecto IS NULL OR ke.IdProyecto = @IdProyecto)
+      AND (@IdProveedor IS NULL OR ke.IdProveedor = @IdProveedor)
+      AND (@FechaDesde IS NULL OR ke.Fecha >= @FechaDesde)
+      AND (@FechaHasta IS NULL OR ke.Fecha <= @FechaHasta)
+    ORDER BY ke.Fecha DESC, ke.IdKardexEntrada DESC;
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexEntrada_Registrar
---   Crea una entrada manual y actualiza KardexStock dentro de la misma TX.
---   Idempotente solo por la PK identity (no UPSERT).
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexEntrada_Registrar]
-    @IdEspecialidad  INT,
-    @IdMaterial      INT,
-    @IdProveedor     INT = NULL,
-    @IdProyecto      INT = NULL,
+CREATE OR ALTER PROCEDURE almacen.usp_KardexEntrada_Registrar
+    @IdMaterial INT,
+    @IdProveedor INT = NULL,
+    @IdProyecto INT = NULL,
     @NumeroDocumento NVARCHAR(50) = NULL,
-    @Fecha           DATE,
-    @Cantidad        DECIMAL(18, 2),
-    @Observacion     NVARCHAR(250) = NULL
+    @Fecha DATE,
+    @Cantidad DECIMAL(18,2),
+    @Observacion NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -297,91 +259,54 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        -- ---------- Validaciones ----------
-        IF @IdEspecialidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idEspecialidad', 1;
-        IF @IdMaterial IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idMaterial', 1;
-        IF @Fecha IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: fecha', 1;
-        IF @Cantidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: cantidad', 1;
-        IF @Cantidad < 0
-            THROW 51103, 'CANTIDAD_INVALIDA: la cantidad no puede ser negativa', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
-            THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
-        IF NOT EXISTS (SELECT 1 FROM maestra.Material WHERE IdMaterial = @IdMaterial)
+        IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
+        IF @Cantidad < 0
+            THROW 51103, 'CANTIDAD_INVALIDA: La cantidad no puede ser negativa.', 1;
+
+        -- HOLDLOCK coordina el alta de movimientos con la reclasificación de Material.
+        IF NOT EXISTS (SELECT 1 FROM maestra.Material WITH (HOLDLOCK) WHERE IdMaterial = @IdMaterial)
             THROW 51101, 'FK_NO_EXISTE: idMaterial', 1;
-        IF @IdProveedor IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
+        IF @IdProveedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
             THROW 51101, 'FK_NO_EXISTE: idProveedor', 1;
         IF @IdProyecto IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
         IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
-        -- ---------- Insert en KardexEntrada ----------
-        DECLARE @NewId INT;
-        INSERT INTO almacen.KardexEntrada (
-            IdEspecialidad, IdMaterial, IdProveedor, IdProyecto,
-            NumeroDocumento, Fecha, Cantidad, Observacion
-        ) VALUES (
-            @IdEspecialidad, @IdMaterial, @IdProveedor, @IdProyecto,
-            @NumeroDocumento, @Fecha, @Cantidad, @Observacion
-        );
-        SET @NewId = SCOPE_IDENTITY();
+        INSERT INTO almacen.KardexEntrada
+            (IdMaterial, IdProveedor, IdProyecto, NumeroDocumento, Fecha, Cantidad, Observacion)
+        VALUES (@IdMaterial, @IdProveedor, @IdProyecto, @NumeroDocumento, @Fecha, @Cantidad, @Observacion);
+        DECLARE @NewId INT = CONVERT(INT, SCOPE_IDENTITY());
 
-        -- ---------- Upsert KardexStock (stock global por material + especialidad) ----------
-        IF EXISTS (
-            SELECT 1 FROM almacen.KardexStock
-            WHERE IdMaterial = @IdMaterial
-              AND IdEspecialidad = @IdEspecialidad
-        )
-        BEGIN
-            UPDATE almacen.KardexStock
-            SET TotalEntrada = TotalEntrada + @Cantidad,
-                Stock        = Stock        + @Cantidad,
-                FechaUltimaMovimiento = @Fecha
-            WHERE IdMaterial = @IdMaterial
-              AND IdEspecialidad = @IdEspecialidad;
-        END
-        ELSE
-        BEGIN
-            INSERT INTO almacen.KardexStock (
-                IdMaterial, IdEspecialidad,
-                TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento
-            ) VALUES (
-                @IdMaterial, @IdEspecialidad,
-                @Cantidad, 0, @Cantidad, @Fecha
-            );
-        END
+        UPDATE almacen.KardexStock
+        SET TotalEntrada = TotalEntrada + @Cantidad,
+            Stock = Stock + @Cantidad, FechaUltimaMovimiento = @Fecha
+        WHERE IdMaterial = @IdMaterial;
+        IF @@ROWCOUNT = 0
+            INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
+            VALUES (@IdMaterial, @Cantidad, 0, @Cantidad, @Fecha);
 
         COMMIT;
-
-        -- Devolver la fila insertada con los joins que el front espera.
-        SELECT
-            ke.IdKardexEntrada,
-            ke.IdEspecialidad,
-            e.Nombre          AS Especialidad,
-            ke.IdMaterial,
-            m.Codigo          AS CodigoMaterial,
-            m.Descripcion     AS Nombre,
-            ke.IdProveedor,
-            p.RazonSocial     AS Proveedor,
-            ke.IdProyecto,
-            pr.NombreProyecto AS Proyecto,
-            ke.NumeroDocumento,
-            ke.Fecha,
-            ke.Cantidad,
-            ke.Observacion,
-            ke.FechaCreacion
-        FROM almacen.KardexEntrada ke
-        INNER JOIN maestra.Material      m  ON m.IdMaterial     = ke.IdMaterial
-        INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ke.IdEspecialidad
-        LEFT  JOIN maestra.Proveedor     p  ON p.IdProveedor    = ke.IdProveedor
-        LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ke.IdProyecto
-        WHERE ke.IdKardexEntrada = @NewId;
+    SELECT ke.IdKardexEntrada, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ke.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        ke.IdProveedor, p.RazonSocial AS Proveedor, ke.IdProyecto,
+        pr.NombreProyecto AS Proyecto, ke.NumeroDocumento, ke.Fecha,
+        ke.Cantidad, ke.Observacion, ke.FechaCreacion
+    FROM almacen.KardexEntrada ke
+    JOIN maestra.Material m ON m.IdMaterial = ke.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proveedor p ON p.IdProveedor = ke.IdProveedor
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ke.IdProyecto
+    WHERE ke.IdKardexEntrada = @NewId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -390,23 +315,15 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexEntrada_Actualizar
---   Actualiza una entrada. Si cambia (IdMaterial, IdEspecialidad)
---   se hace rollback del stock en la dupla vieja y aplicacion en la nueva,
---   todo en la misma TX. Si la dupla no cambia, se aplica un diff simple.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexEntrada_Actualizar]
+CREATE OR ALTER PROCEDURE almacen.usp_KardexEntrada_Actualizar
     @IdKardexEntrada INT,
-    @IdEspecialidad  INT,
-    @IdMaterial      INT,
-    @IdProveedor     INT = NULL,
-    @IdProyecto      INT = NULL,
+    @IdMaterial INT,
+    @IdProveedor INT = NULL,
+    @IdProyecto INT = NULL,
     @NumeroDocumento NVARCHAR(50) = NULL,
-    @Fecha           DATE,
-    @Cantidad        DECIMAL(18, 2),
-    @Observacion     NVARCHAR(250) = NULL
+    @Fecha DATE,
+    @Cantidad DECIMAL(18,2),
+    @Observacion NVARCHAR(250) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -415,131 +332,77 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        -- ---------- Validaciones de entrada ----------
-        IF @IdKardexEntrada IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idKardexEntrada', 1;
-        IF @IdEspecialidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idEspecialidad', 1;
-        IF @IdMaterial IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idMaterial', 1;
-        IF @Fecha IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: fecha', 1;
-        IF @Cantidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: cantidad', 1;
-        IF @Cantidad < 0
-            THROW 51103, 'CANTIDAD_INVALIDA: la cantidad no puede ser negativa', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
-            THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
-        IF NOT EXISTS (SELECT 1 FROM maestra.Material WHERE IdMaterial = @IdMaterial)
+        IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
+        IF @Cantidad < 0
+            THROW 51103, 'CANTIDAD_INVALIDA: La cantidad no puede ser negativa.', 1;
+
+        -- HOLDLOCK coordina el alta de movimientos con la reclasificación de Material.
+        IF NOT EXISTS (SELECT 1 FROM maestra.Material WITH (HOLDLOCK) WHERE IdMaterial = @IdMaterial)
             THROW 51101, 'FK_NO_EXISTE: idMaterial', 1;
-        IF @IdProveedor IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
+        IF @IdProveedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM maestra.Proveedor WHERE IdProveedor = @IdProveedor)
             THROW 51101, 'FK_NO_EXISTE: idProveedor', 1;
         IF @IdProyecto IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
         IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
-        -- ---------- Leer valores viejos ----------
-        DECLARE @OldIdMaterial INT, @OldIdEspecialidad INT, @OldIdProyecto INT,
-                @OldCantidad DECIMAL(18,2);
-        SELECT
-            @OldIdMaterial     = IdMaterial,
-            @OldIdEspecialidad = IdEspecialidad,
-            @OldIdProyecto     = IdProyecto,
-            @OldCantidad       = Cantidad
-        FROM almacen.KardexEntrada
-        WHERE IdKardexEntrada = @IdKardexEntrada;
-
-        IF @OldIdMaterial IS NULL
+        DECLARE @MaterialAnterior INT, @CantidadAnterior DECIMAL(18,2);
+        SELECT @MaterialAnterior = IdMaterial, @CantidadAnterior = Cantidad
+        FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
+        IF @MaterialAnterior IS NULL
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexEntrada', 1;
 
-        -- ---------- Update de la entrada ----------
+        DECLARE @Delta DECIMAL(19,2) = CASE WHEN @MaterialAnterior = @IdMaterial
+            THEN @Cantidad - @CantidadAnterior ELSE -@CantidadAnterior END;
+        IF ISNULL((SELECT Stock FROM almacen.KardexStock WHERE IdMaterial = @MaterialAnterior), 0) + @Delta < 0
+            THROW 51111, 'STOCK_INCONSISTENTE_AL_ELIMINAR: La modificación dejaría stock negativo.', 1;
+
+        UPDATE almacen.KardexStock
+        SET TotalEntrada = TotalEntrada + @Delta,
+            Stock = Stock + @Delta, FechaUltimaMovimiento = @Fecha
+        WHERE IdMaterial = @MaterialAnterior;
+
+        IF @@ROWCOUNT = 0 AND @MaterialAnterior = @IdMaterial
+            INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
+            VALUES (@IdMaterial, @Cantidad, 0, @Cantidad, @Fecha);
+
+        IF @MaterialAnterior <> @IdMaterial
+        BEGIN
+        UPDATE almacen.KardexStock
+        SET TotalEntrada = TotalEntrada + @Cantidad,
+            Stock = Stock + @Cantidad, FechaUltimaMovimiento = @Fecha
+        WHERE IdMaterial = @IdMaterial;
+        IF @@ROWCOUNT = 0
+            INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
+            VALUES (@IdMaterial, @Cantidad, 0, @Cantidad, @Fecha);
+        END;
+
         UPDATE almacen.KardexEntrada
-        SET IdEspecialidad  = @IdEspecialidad,
-            IdMaterial      = @IdMaterial,
-            IdProveedor     = @IdProveedor,
-            IdProyecto      = @IdProyecto,
-            NumeroDocumento = @NumeroDocumento,
-            Fecha           = @Fecha,
-            Cantidad        = @Cantidad,
-            Observacion     = @Observacion
+        SET IdMaterial = @IdMaterial, IdProveedor = @IdProveedor, IdProyecto = @IdProyecto,
+            NumeroDocumento = @NumeroDocumento, Fecha = @Fecha, Cantidad = @Cantidad, Observacion = @Observacion
         WHERE IdKardexEntrada = @IdKardexEntrada;
 
-        -- ---------- Ajustar KardexStock (stock global por material + especialidad) ----------
-        DECLARE @Diff DECIMAL(18,2) = @Cantidad - @OldCantidad;
-
-        IF (@OldIdMaterial = @IdMaterial)
-           AND (@OldIdEspecialidad = @IdEspecialidad)
-        BEGIN
-            -- Misma dupla material+especialidad: diff simple.
-            UPDATE almacen.KardexStock
-            SET TotalEntrada = TotalEntrada + @Diff,
-                Stock        = Stock        + @Diff,
-                FechaUltimaMovimiento = @Fecha
-            WHERE IdMaterial = @IdMaterial
-              AND IdEspecialidad = @IdEspecialidad;
-        END
-        ELSE
-        BEGIN
-            -- Cambio de material o especialidad: rollback de la vieja + apply a la nueva.
-            UPDATE almacen.KardexStock
-            SET TotalEntrada = TotalEntrada - @OldCantidad,
-                Stock        = Stock        - @OldCantidad
-            WHERE IdMaterial = @OldIdMaterial
-              AND IdEspecialidad = @OldIdEspecialidad;
-
-            IF EXISTS (
-                SELECT 1 FROM almacen.KardexStock
-                WHERE IdMaterial = @IdMaterial
-                  AND IdEspecialidad = @IdEspecialidad
-            )
-            BEGIN
-                UPDATE almacen.KardexStock
-                SET TotalEntrada = TotalEntrada + @Cantidad,
-                    Stock        = Stock        + @Cantidad,
-                    FechaUltimaMovimiento = @Fecha
-                WHERE IdMaterial = @IdMaterial
-                  AND IdEspecialidad = @IdEspecialidad;
-            END
-            ELSE
-            BEGIN
-                INSERT INTO almacen.KardexStock (
-                    IdMaterial, IdEspecialidad,
-                    TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento
-                ) VALUES (
-                    @IdMaterial, @IdEspecialidad,
-                    @Cantidad, 0, @Cantidad, @Fecha
-                );
-            END
-        END
-
         COMMIT;
-
-        -- Devolver la fila actualizada.
-        SELECT
-            ke.IdKardexEntrada,
-            ke.IdEspecialidad,
-            e.Nombre          AS Especialidad,
-            ke.IdMaterial,
-            m.Codigo          AS CodigoMaterial,
-            m.Descripcion     AS Nombre,
-            ke.IdProveedor,
-            p.RazonSocial     AS Proveedor,
-            ke.IdProyecto,
-            pr.NombreProyecto AS Proyecto,
-            ke.NumeroDocumento,
-            ke.Fecha,
-            ke.Cantidad,
-            ke.Observacion,
-            ke.FechaCreacion
-        FROM almacen.KardexEntrada ke
-        INNER JOIN maestra.Material      m  ON m.IdMaterial     = ke.IdMaterial
-        INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ke.IdEspecialidad
-        LEFT  JOIN maestra.Proveedor     p  ON p.IdProveedor    = ke.IdProveedor
-        LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ke.IdProyecto
-        WHERE ke.IdKardexEntrada = @IdKardexEntrada;
+    SELECT ke.IdKardexEntrada, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ke.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        ke.IdProveedor, p.RazonSocial AS Proveedor, ke.IdProyecto,
+        pr.NombreProyecto AS Proyecto, ke.NumeroDocumento, ke.Fecha,
+        ke.Cantidad, ke.Observacion, ke.FechaCreacion
+    FROM almacen.KardexEntrada ke
+    JOIN maestra.Material m ON m.IdMaterial = ke.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proveedor p ON p.IdProveedor = ke.IdProveedor
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ke.IdProyecto
+    WHERE ke.IdKardexEntrada = @IdKardexEntrada;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -548,15 +411,7 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexEntrada_Eliminar
---   Elimina una entrada y descuenta su cantidad de KardexStock. Si la fila
---   de KardexStock queda con TotalEntrada=0 y Stock=0, no se elimina la
---   fila (se conserva el historial). Si la resta dejaria Stock<0, lanza
---   51111 (hay salidas posteriores que dependen de esta entrada).
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexEntrada_Eliminar]
+CREATE OR ALTER PROCEDURE almacen.usp_KardexEntrada_Eliminar
     @IdKardexEntrada INT
 AS
 BEGIN
@@ -566,44 +421,26 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        IF @IdKardexEntrada IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idKardexEntrada', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        DECLARE @IdMaterial INT, @IdEspecialidad INT, @Cantidad DECIMAL(18,2);
-        SELECT
-            @IdMaterial     = IdMaterial,
-            @IdEspecialidad = IdEspecialidad,
-            @Cantidad       = Cantidad
-        FROM almacen.KardexEntrada
-        WHERE IdKardexEntrada = @IdKardexEntrada;
-
+        DECLARE @IdMaterial INT, @Cantidad DECIMAL(18,2);
+        SELECT @IdMaterial = IdMaterial, @Cantidad = Cantidad
+        FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
         IF @IdMaterial IS NULL
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexEntrada', 1;
-
-        -- Verificar que al restar la cantidad el stock no quede negativo.
-        DECLARE @StockActual DECIMAL(18,2);
-        SELECT @StockActual = Stock
-        FROM almacen.KardexStock
-        WHERE IdMaterial = @IdMaterial
-          AND IdEspecialidad = @IdEspecialidad;
-
-        IF @StockActual IS NOT NULL AND @StockActual - @Cantidad < 0
-        BEGIN
-            DECLARE @MsgInconsistente NVARCHAR(1000) =
-                N'STOCK_INCONSISTENTE_AL_ELIMINAR: idKardexEntrada='
-                + CAST(@IdKardexEntrada AS NVARCHAR(20))
-                + N' stockActual=' + CAST(@StockActual AS NVARCHAR(20))
-                + N' cantidad=' + CAST(@Cantidad AS NVARCHAR(20));
-            THROW 51111, @MsgInconsistente, 1;
-        END;
-
-        DELETE FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
+        IF ISNULL((SELECT Stock FROM almacen.KardexStock WHERE IdMaterial = @IdMaterial), 0) < @Cantidad
+            THROW 51111, 'STOCK_INCONSISTENTE_AL_ELIMINAR: Hay salidas que dependen de esta entrada.', 1;
 
         UPDATE almacen.KardexStock
-        SET TotalEntrada = TotalEntrada - @Cantidad,
-            Stock        = Stock        - @Cantidad
-        WHERE IdMaterial = @IdMaterial
-          AND IdEspecialidad = @IdEspecialidad;
+        SET TotalEntrada = TotalEntrada - @Cantidad, Stock = Stock - @Cantidad
+        WHERE IdMaterial = @IdMaterial;
+        DELETE FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
 
         COMMIT;
     END TRY
@@ -614,69 +451,40 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexSalida_Listar
---   Lista salidas manuales con sus items. Una fila por cada item
---   (KardexSalidaDetalle), repitiendo los datos de cabecera.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexSalida_Listar]
+CREATE OR ALTER PROCEDURE almacen.usp_KardexSalida_Listar
     @IdEspecialidad INT = NULL,
-    @IdProyecto     INT = NULL,
-    @FechaDesde     DATE = NULL,
-    @FechaHasta     DATE = NULL
+    @IdProyecto INT = NULL,
+    @FechaDesde DATE = NULL,
+    @FechaHasta DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT
-        ks.IdKardexSalida,
-        ks.IdEspecialidad,
-        e.Nombre          AS Especialidad,
-        ks.IdProyecto,
-        pr.NombreProyecto AS Proyecto,
-        ks.NumeroDocumento,
-        ks.Fecha,
-        ks.Solicitante,
-        ks.Observacion,
-        ksd.IdKardexSalidaDetalle,
-        ksd.IdMaterial,
-        m.Codigo          AS CodigoMaterial,
-        m.Descripcion     AS Nombre,
-        ksd.Cantidad,
-        ksd.Observacion   AS DetalleObservacion,
-        ks.FechaCreacion
+    SELECT ks.IdKardexSalida, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ks.IdProyecto, pr.NombreProyecto AS Proyecto, ks.NumeroDocumento,
+        ks.Fecha, ks.Solicitante, ks.Observacion, d.IdKardexSalidaDetalle,
+        d.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        d.Cantidad, d.Observacion AS DetalleObservacion, ks.FechaCreacion
     FROM almacen.KardexSalida ks
-    INNER JOIN almacen.KardexSalidaDetalle ksd ON ksd.IdKardexSalida = ks.IdKardexSalida
-    INNER JOIN maestra.Material      m  ON m.IdMaterial     = ksd.IdMaterial
-    INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ks.IdEspecialidad
-    LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ks.IdProyecto
-    WHERE (@IdEspecialidad IS NULL OR ks.IdEspecialidad = @IdEspecialidad)
-      AND (@IdProyecto     IS NULL OR ks.IdProyecto     = @IdProyecto)
-      AND (@FechaDesde     IS NULL OR ks.Fecha         >= @FechaDesde)
-      AND (@FechaHasta     IS NULL OR ks.Fecha         <= @FechaHasta)
-    ORDER BY
-        ks.Fecha DESC,
-        ks.IdKardexSalida DESC,
-        ksd.IdKardexSalidaDetalle ASC;
+    JOIN almacen.KardexSalidaDetalle d ON d.IdKardexSalida = ks.IdKardexSalida
+    JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ks.IdProyecto
+    WHERE (@IdEspecialidad IS NULL OR m.IdEspecialidad = @IdEspecialidad)
+      AND (@IdProyecto IS NULL OR ks.IdProyecto = @IdProyecto)
+      AND (@FechaDesde IS NULL OR ks.Fecha >= @FechaDesde)
+      AND (@FechaHasta IS NULL OR ks.Fecha <= @FechaHasta)
+    ORDER BY ks.Fecha DESC, ks.IdKardexSalida DESC, d.IdKardexSalidaDetalle;
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexSalida_Registrar
---   Crea una salida manual con 1..N items. Antes de aplicar, valida que
---   exista stock suficiente para cada item; si falta, lanza 51110.
---   KardexStock se actualiza en la misma TX.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexSalida_Registrar]
-    @IdEspecialidad  INT,
-    @IdProyecto      INT = NULL,
+CREATE OR ALTER PROCEDURE almacen.usp_KardexSalida_Registrar
+    @IdProyecto INT = NULL,
     @NumeroDocumento NVARCHAR(50) = NULL,
-    @Fecha           DATE,
-    @Solicitante     NVARCHAR(150),
-    @Observacion     NVARCHAR(250) = NULL,
-    @Items           almacen.TVP_KardexSalidaItem READONLY
+    @Fecha DATE,
+    @Solicitante NVARCHAR(150),
+    @Observacion NVARCHAR(250) = NULL,
+    @Items almacen.TVP_KardexSalidaItem READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -685,135 +493,78 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        -- ---------- Validaciones de cabecera ----------
-        IF @IdEspecialidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idEspecialidad', 1;
-        IF @Fecha IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: fecha', 1;
-        IF @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
-            THROW 51100, 'CAMPO_REQUERIDO: solicitante', 1;
-        IF NOT EXISTS (SELECT 1 FROM @Items)
-            THROW 51100, 'CAMPO_REQUERIDO: items (debe tener al menos uno)', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
-            THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
+        IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
+            THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
         IF @IdProyecto IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
         IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
-
-        -- ---------- Validar items: idMaterial existe, cantidad valida ----------
+        IF NOT EXISTS (SELECT 1 FROM @Items)
+            THROW 51100, 'CAMPO_REQUERIDO: items (debe tener al menos uno)', 1;
+        IF EXISTS (SELECT 1 FROM @Items WHERE IdMaterial IS NULL OR Cantidad IS NULL OR Cantidad < 0)
+            THROW 51103, 'CANTIDAD_INVALIDA: Los ítems requieren material y cantidad no negativa.', 1;
         IF EXISTS (
             SELECT 1 FROM @Items i
-            WHERE i.IdMaterial IS NULL
-               OR i.Cantidad IS NULL
-               OR i.Cantidad < 0
-        )
-            THROW 51103, 'CANTIDAD_INVALIDA: items contiene filas con idMaterial NULL o cantidad invalida', 1;
-
-        IF EXISTS (
-            SELECT i.IdMaterial FROM @Items i
-            LEFT JOIN maestra.Material m ON m.IdMaterial = i.IdMaterial
+            LEFT JOIN maestra.Material m WITH (HOLDLOCK) ON m.IdMaterial = i.IdMaterial
             WHERE m.IdMaterial IS NULL
         )
-            THROW 51101, 'FK_NO_EXISTE: items contiene idMaterial que no existe en maestra.Material', 1;
+            THROW 51101, 'FK_NO_EXISTE: items contiene un material inexistente.', 1;
 
-        -- ---------- Validar stock para cada item ----------
-        -- El stock es GLOBAL por (IdMaterial, IdEspecialidad). El IdProyecto
-        -- de la salida solo es una etiqueta informativa; no segmenta stock.
-        DECLARE @Insuficientes TABLE (
-            IdMaterial INT,
-            Solicitado DECIMAL(18,2),
-            Disponible DECIMAL(18,2)
-        );
+        -- Agrupar antes de validar: un material puede repetirse en varios detalles.
+        DECLARE @Nuevos TABLE (IdMaterial INT PRIMARY KEY, Cantidad DECIMAL(28,2));
+        INSERT INTO @Nuevos SELECT IdMaterial, SUM(Cantidad) FROM @Items GROUP BY IdMaterial;
 
-        INSERT INTO @Insuficientes (IdMaterial, Solicitado, Disponible)
-        SELECT
-            i.IdMaterial,
-            i.Cantidad,
-            ISNULL(ks.Stock, 0)
-        FROM @Items i
-        LEFT JOIN almacen.KardexStock ks
-            ON  ks.IdMaterial     = i.IdMaterial
-            AND ks.IdEspecialidad = @IdEspecialidad
-        WHERE ISNULL(ks.Stock, 0) < i.Cantidad;
-
-        IF EXISTS (SELECT 1 FROM @Insuficientes)
+        IF EXISTS (
+            SELECT 1 FROM @Nuevos n LEFT JOIN almacen.KardexStock ks ON ks.IdMaterial = n.IdMaterial
+            WHERE n.Cantidad > ISNULL(ks.Stock, 0)
+        )
         BEGIN
-            DECLARE @DetalleInsuficiente NVARCHAR(1000) = N'';
-            SELECT @DetalleInsuficiente = @DetalleInsuficiente
-                + N' idMaterial=' + CAST(IdMaterial AS NVARCHAR(20))
-                + N' disponible=' + CAST(Disponible AS NVARCHAR(20))
-                + N' solicitado=' + CAST(Solicitado AS NVARCHAR(20)) + N';'
-            FROM @Insuficientes;
-            DECLARE @MsgStockInsuficiente NVARCHAR(1500) =
-                N'STOCK_INSUFICIENTE:' + @DetalleInsuficiente;
-            THROW 51110, @MsgStockInsuficiente, 1;
-        END
+            DECLARE @Detalle NVARCHAR(MAX);
+            SELECT @Detalle = STRING_AGG(CONVERT(NVARCHAR(MAX), CONCAT(
+                'idMaterial=', n.IdMaterial, ' disponible=', ISNULL(ks.Stock, 0), ' solicitado=', n.Cantidad)), N'; ')
+            FROM @Nuevos n LEFT JOIN almacen.KardexStock ks ON ks.IdMaterial = n.IdMaterial
+            WHERE n.Cantidad > ISNULL(ks.Stock, 0);
+            DECLARE @Mensaje NVARCHAR(2048) = LEFT(CONCAT('STOCK_INSUFICIENTE: ', @Detalle), 2048);
+            THROW 51110, @Mensaje, 1;
+        END;
 
-        -- ---------- Insert cabecera ----------
-        DECLARE @NewId INT;
-        INSERT INTO almacen.KardexSalida (
-            IdEspecialidad, IdProyecto, NumeroDocumento,
-            Fecha, Solicitante, Observacion
-        ) VALUES (
-            @IdEspecialidad, @IdProyecto, @NumeroDocumento,
-            @Fecha, @Solicitante, @Observacion
-        );
-        SET @NewId = SCOPE_IDENTITY();
+        INSERT INTO almacen.KardexSalida (IdProyecto, NumeroDocumento, Fecha, Solicitante, Observacion)
+        VALUES (@IdProyecto, @NumeroDocumento, @Fecha, @Solicitante, @Observacion);
+        DECLARE @NewId INT = CONVERT(INT, SCOPE_IDENTITY());
+        INSERT INTO almacen.KardexSalidaDetalle (IdKardexSalida, IdMaterial, Cantidad, Observacion)
+        SELECT @NewId, IdMaterial, Cantidad, Observacion FROM @Items;
 
-        -- ---------- Insert detalle (1..N) ----------
-        INSERT INTO almacen.KardexSalidaDetalle (
-            IdKardexSalida, IdMaterial, Cantidad, Observacion
-        )
-        SELECT @NewId, i.IdMaterial, i.Cantidad, i.Observacion
-        FROM @Items i;
+        -- Una salida cero sin entradas previas también conserva una fila de stock.
+        INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
+        SELECT n.IdMaterial, 0, 0, 0, @Fecha FROM @Nuevos n
+        WHERE NOT EXISTS (SELECT 1 FROM almacen.KardexStock ks WHERE ks.IdMaterial = n.IdMaterial);
 
-        -- ---------- Actualizar KardexStock (stock global por material + especialidad) ----------
-        ;WITH StockUpdate AS (
-            SELECT
-                i.IdMaterial,
-                @IdEspecialidad  AS IdEspecialidad,
-                SUM(i.Cantidad)  AS TotalCantidad
-            FROM @Items i
-            GROUP BY i.IdMaterial
-        )
         UPDATE ks
-        SET TotalSalida = ks.TotalSalida + su.TotalCantidad,
-            Stock        = ks.Stock       - su.TotalCantidad,
+        SET TotalSalida = ks.TotalSalida + n.Cantidad, Stock = ks.Stock - n.Cantidad,
             FechaUltimaMovimiento = @Fecha
-        FROM almacen.KardexStock ks
-        INNER JOIN StockUpdate su
-            ON  su.IdMaterial     = ks.IdMaterial
-            AND su.IdEspecialidad = ks.IdEspecialidad;
+        FROM almacen.KardexStock ks JOIN @Nuevos n ON n.IdMaterial = ks.IdMaterial;
 
         COMMIT;
-
-        -- Devolver la salida registrada con sus items.
-        SELECT
-            ks.IdKardexSalida,
-            ks.IdEspecialidad,
-            e.Nombre          AS Especialidad,
-            ks.IdProyecto,
-            pr.NombreProyecto AS Proyecto,
-            ks.NumeroDocumento,
-            ks.Fecha,
-            ks.Solicitante,
-            ks.Observacion,
-            ksd.IdKardexSalidaDetalle,
-            ksd.IdMaterial,
-            m.Codigo          AS CodigoMaterial,
-            m.Descripcion     AS Nombre,
-            ksd.Cantidad,
-            ksd.Observacion   AS DetalleObservacion,
-            ks.FechaCreacion
-        FROM almacen.KardexSalida ks
-        INNER JOIN almacen.KardexSalidaDetalle ksd ON ksd.IdKardexSalida = ks.IdKardexSalida
-        INNER JOIN maestra.Material      m  ON m.IdMaterial     = ksd.IdMaterial
-        INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ks.IdEspecialidad
-        LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ks.IdProyecto
-        WHERE ks.IdKardexSalida = @NewId
-        ORDER BY ksd.IdKardexSalidaDetalle ASC;
+    SELECT ks.IdKardexSalida, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ks.IdProyecto, pr.NombreProyecto AS Proyecto, ks.NumeroDocumento,
+        ks.Fecha, ks.Solicitante, ks.Observacion, d.IdKardexSalidaDetalle,
+        d.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        d.Cantidad, d.Observacion AS DetalleObservacion, ks.FechaCreacion
+    FROM almacen.KardexSalida ks
+    JOIN almacen.KardexSalidaDetalle d ON d.IdKardexSalida = ks.IdKardexSalida
+    JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ks.IdProyecto
+    WHERE ks.IdKardexSalida = @NewId
+    ORDER BY d.IdKardexSalidaDetalle;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -822,22 +573,14 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexSalida_Actualizar
---   Reemplaza cabecera + items en TX. Calcula el diff por dupla
---   (IdMaterial, IdEspecialidad) y lo aplica a KardexStock. Antes valida
---   que con la nueva lista ningun item deje el stock por debajo de lo ya consumido.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexSalida_Actualizar]
-    @IdKardexSalida  INT,
-    @IdEspecialidad  INT,
-    @IdProyecto      INT = NULL,
+CREATE OR ALTER PROCEDURE almacen.usp_KardexSalida_Actualizar
+    @IdKardexSalida INT,
+    @IdProyecto INT = NULL,
     @NumeroDocumento NVARCHAR(50) = NULL,
-    @Fecha           DATE,
-    @Solicitante     NVARCHAR(150),
-    @Observacion     NVARCHAR(250) = NULL,
-    @Items           almacen.TVP_KardexSalidaItem READONLY
+    @Fecha DATE,
+    @Solicitante NVARCHAR(150),
+    @Observacion NVARCHAR(250) = NULL,
+    @Items almacen.TVP_KardexSalidaItem READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -846,163 +589,91 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        -- ---------- Validaciones de cabecera ----------
-        IF @IdKardexSalida IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idKardexSalida', 1;
-        IF @IdEspecialidad IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idEspecialidad', 1;
-        IF @Fecha IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: fecha', 1;
-        IF @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
-            THROW 51100, 'CAMPO_REQUERIDO: solicitante', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
+
+        IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
+            THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
+        IF @IdProyecto IS NULL
+            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
+            THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
         IF NOT EXISTS (SELECT 1 FROM @Items)
             THROW 51100, 'CAMPO_REQUERIDO: items (debe tener al menos uno)', 1;
+        IF EXISTS (SELECT 1 FROM @Items WHERE IdMaterial IS NULL OR Cantidad IS NULL OR Cantidad < 0)
+            THROW 51103, 'CANTIDAD_INVALIDA: Los ítems requieren material y cantidad no negativa.', 1;
+        IF EXISTS (
+            SELECT 1 FROM @Items i
+            LEFT JOIN maestra.Material m WITH (HOLDLOCK) ON m.IdMaterial = i.IdMaterial
+            WHERE m.IdMaterial IS NULL
+        )
+            THROW 51101, 'FK_NO_EXISTE: items contiene un material inexistente.', 1;
+
+        -- Agrupar antes de validar: un material puede repetirse en varios detalles.
+        DECLARE @Nuevos TABLE (IdMaterial INT PRIMARY KEY, Cantidad DECIMAL(28,2));
+        INSERT INTO @Nuevos SELECT IdMaterial, SUM(Cantidad) FROM @Items GROUP BY IdMaterial;
 
         IF NOT EXISTS (SELECT 1 FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida)
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;
 
-        IF NOT EXISTS (SELECT 1 FROM maestra.Especialidad WHERE IdEspecialidad = @IdEspecialidad)
-            THROW 51101, 'FK_NO_EXISTE: idEspecialidad', 1;
-        IF @IdProyecto IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idProyecto', 1;
-        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
-            THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
-
-        -- ---------- Validar items ----------
-        IF EXISTS (
-            SELECT 1 FROM @Items i
-            WHERE i.IdMaterial IS NULL OR i.Cantidad IS NULL OR i.Cantidad < 0
+        DECLARE @Diff TABLE (IdMaterial INT PRIMARY KEY, Cantidad DECIMAL(29,2));
+        ;WITH Anteriores AS (
+            SELECT IdMaterial, CAST(SUM(Cantidad) AS DECIMAL(28,2)) AS Cantidad FROM almacen.KardexSalidaDetalle
+            WHERE IdKardexSalida = @IdKardexSalida GROUP BY IdMaterial
         )
-            THROW 51103, 'CANTIDAD_INVALIDA: items contiene filas con idMaterial NULL o cantidad invalida', 1;
+        INSERT INTO @Diff
+        SELECT COALESCE(n.IdMaterial, a.IdMaterial), ISNULL(n.Cantidad, 0) - ISNULL(a.Cantidad, 0)
+        FROM @Nuevos n FULL JOIN Anteriores a ON a.IdMaterial = n.IdMaterial;
 
         IF EXISTS (
-            SELECT i.IdMaterial FROM @Items i
-            LEFT JOIN maestra.Material m ON m.IdMaterial = i.IdMaterial
-            WHERE m.IdMaterial IS NULL
-        )
-            THROW 51101, 'FK_NO_EXISTE: items contiene idMaterial que no existe en maestra.Material', 1;
-
-        -- ---------- Calcular diff por dupla (IdMaterial, IdEspecialidad) ----------
-        -- diff > 0: la nueva salida pide MAS que la vieja -> hay que validar stock.
-        -- diff < 0: la nueva salida pide MENOS -> el stock se repone automaticamente.
-        -- Usamos una tabla temporal porque necesitamos reutilizar el diff en dos
-        -- sentencias separadas (IF EXISTS y luego SELECT para armar el mensaje).
-        DECLARE @Diff TABLE (
-            IdMaterial INT          NOT NULL,
-            Cantidad   DECIMAL(18,2) NOT NULL
-        );
-
-        ;WITH OldItems AS (
-            SELECT ksd.IdMaterial, SUM(ksd.Cantidad) AS Cantidad
-            FROM almacen.KardexSalidaDetalle ksd
-            WHERE ksd.IdKardexSalida = @IdKardexSalida
-            GROUP BY ksd.IdMaterial
-        ),
-        NewItems AS (
-            SELECT i.IdMaterial, SUM(i.Cantidad) AS Cantidad
-            FROM @Items i
-            GROUP BY i.IdMaterial
-        )
-        INSERT INTO @Diff (IdMaterial, Cantidad)
-        SELECT
-            COALESCE(o.IdMaterial, n.IdMaterial)         AS IdMaterial,
-            ISNULL(n.Cantidad, 0) - ISNULL(o.Cantidad, 0) AS Cantidad
-        FROM NewItems n
-        FULL OUTER JOIN OldItems o ON o.IdMaterial = n.IdMaterial;
-
-        -- Validar que para los diffs positivos haya stock suficiente (stock global).
-        IF EXISTS (
-            SELECT 1
-            FROM @Diff d
-            LEFT JOIN almacen.KardexStock ks
-                ON  ks.IdMaterial     = d.IdMaterial
-                AND ks.IdEspecialidad = @IdEspecialidad
-            WHERE d.Cantidad > 0
-              AND ISNULL(ks.Stock, 0) < d.Cantidad
+            SELECT 1 FROM @Diff d LEFT JOIN almacen.KardexStock ks ON ks.IdMaterial = d.IdMaterial
+            WHERE d.Cantidad > ISNULL(ks.Stock, 0)
         )
         BEGIN
-            DECLARE @DetalleInsuficienteUpd NVARCHAR(1000) = N'';
-            SELECT @DetalleInsuficienteUpd = @DetalleInsuficienteUpd
-                + N' idMaterial=' + CAST(d.IdMaterial AS NVARCHAR(20))
-                + N' solicitado=' + CAST(d.Cantidad AS NVARCHAR(20))
-                + N' disponible=' + CAST(ISNULL(ks.Stock, 0) AS NVARCHAR(20)) + N';'
-            FROM @Diff d
-            LEFT JOIN almacen.KardexStock ks
-                ON  ks.IdMaterial     = d.IdMaterial
-                AND ks.IdEspecialidad = @IdEspecialidad
-            WHERE d.Cantidad > 0
-              AND ISNULL(ks.Stock, 0) < d.Cantidad;
-            DECLARE @MsgStockInsuficienteUpd NVARCHAR(1500) =
-                N'STOCK_INSUFICIENTE:' + @DetalleInsuficienteUpd;
-            THROW 51110, @MsgStockInsuficienteUpd, 1;
-        END
+            DECLARE @Detalle NVARCHAR(MAX);
+            SELECT @Detalle = STRING_AGG(CONVERT(NVARCHAR(MAX), CONCAT(
+                'idMaterial=', d.IdMaterial, ' disponible=', ISNULL(ks.Stock, 0), ' solicitado=', d.Cantidad)), N'; ')
+            FROM @Diff d LEFT JOIN almacen.KardexStock ks ON ks.IdMaterial = d.IdMaterial
+            WHERE d.Cantidad > ISNULL(ks.Stock, 0);
+            DECLARE @Mensaje NVARCHAR(2048) = LEFT(CONCAT('STOCK_INSUFICIENTE: ', @Detalle), 2048);
+            THROW 51110, @Mensaje, 1;
+        END;
 
-        -- ---------- Update cabecera ----------
-        UPDATE almacen.KardexSalida
-        SET IdEspecialidad  = @IdEspecialidad,
-            IdProyecto      = @IdProyecto,
-            NumeroDocumento = @NumeroDocumento,
-            Fecha           = @Fecha,
-            Solicitante     = @Solicitante,
-            Observacion     = @Observacion
-        WHERE IdKardexSalida = @IdKardexSalida;
+        INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
+        SELECT d.IdMaterial, 0, 0, 0, @Fecha FROM @Diff d
+        WHERE NOT EXISTS (SELECT 1 FROM almacen.KardexStock ks WHERE ks.IdMaterial = d.IdMaterial);
 
-        -- ---------- Reemplazar detalle: borrar todo e insertar el nuevo ----------
-        DELETE FROM almacen.KardexSalidaDetalle WHERE IdKardexSalida = @IdKardexSalida;
-
-        INSERT INTO almacen.KardexSalidaDetalle (
-            IdKardexSalida, IdMaterial, Cantidad, Observacion
-        )
-        SELECT @IdKardexSalida, i.IdMaterial, i.Cantidad, i.Observacion
-        FROM @Items i;
-
-        -- ---------- Aplicar diff a KardexStock ----------
-        -- Reutilizamos @Diff (calculado arriba ANTES de borrar el detalle
-        -- antiguo). Si recalcularamos aqui leyendo de KardexSalidaDetalle,
-        -- OldItems seria 0 (el detalle ya fue reemplazado) y la formula
-        -- Diff = New - Old daria siempre el valor nuevo completo,
-        -- descontando o sumando de mas.
-        -- Recordar: Cantidad del diff es New - Old. Positivo = la nueva
-        -- salida pide MAS que la vieja (hay que descontar del stock);
-        -- negativo = pide MENOS (se repone stock). Stock - CantidadDiff
-        -- cubre ambos signos.
         UPDATE ks
-        SET TotalSalida = ks.TotalSalida + d.Cantidad,
-            Stock        = ks.Stock       - d.Cantidad,
+        SET TotalSalida = ks.TotalSalida + d.Cantidad, Stock = ks.Stock - d.Cantidad,
             FechaUltimaMovimiento = @Fecha
-        FROM almacen.KardexStock ks
-        INNER JOIN @Diff d
-            ON  d.IdMaterial     = ks.IdMaterial
-            AND ks.IdEspecialidad = @IdEspecialidad
-        WHERE d.Cantidad <> 0;
+        FROM almacen.KardexStock ks JOIN @Diff d ON d.IdMaterial = ks.IdMaterial;
+
+        UPDATE almacen.KardexSalida
+        SET IdProyecto = @IdProyecto, NumeroDocumento = @NumeroDocumento, Fecha = @Fecha,
+            Solicitante = @Solicitante, Observacion = @Observacion
+        WHERE IdKardexSalida = @IdKardexSalida;
+        DELETE FROM almacen.KardexSalidaDetalle WHERE IdKardexSalida = @IdKardexSalida;
+        INSERT INTO almacen.KardexSalidaDetalle (IdKardexSalida, IdMaterial, Cantidad, Observacion)
+        SELECT @IdKardexSalida, IdMaterial, Cantidad, Observacion FROM @Items;
 
         COMMIT;
-
-        -- Devolver la salida actualizada con sus items.
-        SELECT
-            ks.IdKardexSalida,
-            ks.IdEspecialidad,
-            e.Nombre          AS Especialidad,
-            ks.IdProyecto,
-            pr.NombreProyecto AS Proyecto,
-            ks.NumeroDocumento,
-            ks.Fecha,
-            ks.Solicitante,
-            ks.Observacion,
-            ksd.IdKardexSalidaDetalle,
-            ksd.IdMaterial,
-            m.Codigo          AS CodigoMaterial,
-            m.Descripcion     AS Nombre,
-            ksd.Cantidad,
-            ksd.Observacion   AS DetalleObservacion,
-            ks.FechaCreacion
-        FROM almacen.KardexSalida ks
-        INNER JOIN almacen.KardexSalidaDetalle ksd ON ksd.IdKardexSalida = ks.IdKardexSalida
-        INNER JOIN maestra.Material      m  ON m.IdMaterial     = ksd.IdMaterial
-        INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ks.IdEspecialidad
-        LEFT  JOIN maestra.Proyecto      pr ON pr.IdProyecto    = ks.IdProyecto
-        WHERE ks.IdKardexSalida = @IdKardexSalida
-        ORDER BY ksd.IdKardexSalidaDetalle ASC;
+    SELECT ks.IdKardexSalida, m.IdEspecialidad, e.Nombre AS Especialidad,
+        ks.IdProyecto, pr.NombreProyecto AS Proyecto, ks.NumeroDocumento,
+        ks.Fecha, ks.Solicitante, ks.Observacion, d.IdKardexSalidaDetalle,
+        d.IdMaterial, m.Codigo AS CodigoMaterial, m.Descripcion AS Nombre,
+        d.Cantidad, d.Observacion AS DetalleObservacion, ks.FechaCreacion
+    FROM almacen.KardexSalida ks
+    JOIN almacen.KardexSalidaDetalle d ON d.IdKardexSalida = ks.IdKardexSalida
+    JOIN maestra.Material m ON m.IdMaterial = d.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    LEFT JOIN maestra.Proyecto pr ON pr.IdProyecto = ks.IdProyecto
+    WHERE ks.IdKardexSalida = @IdKardexSalida
+    ORDER BY d.IdKardexSalidaDetalle;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -1011,13 +682,7 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_KardexSalida_Eliminar
---   Elimina una salida (CASCADE borra los detalles) y repone el stock.
---   Siempre es seguro: eliminar una salida solo aumenta el stock.
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_KardexSalida_Eliminar]
+CREATE OR ALTER PROCEDURE almacen.usp_KardexSalida_Eliminar
     @IdKardexSalida INT
 AS
 BEGIN
@@ -1027,33 +692,24 @@ BEGIN
     BEGIN TRY
         BEGIN TRAN;
 
-        IF @IdKardexSalida IS NULL
-            THROW 51100, 'CAMPO_REQUERIDO: idKardexSalida', 1;
+        -- Serializar escrituras del Kardex manual, incluidas altas sin fila de stock.
+        DECLARE @Bloqueo INT;
+        EXEC @Bloqueo = sys.sp_getapplock
+            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @Bloqueo < 0
+            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        DECLARE @IdEspecialidad INT, @IdProyecto INT;
-        SELECT @IdEspecialidad = IdEspecialidad,
-               @IdProyecto     = IdProyecto
-        FROM almacen.KardexSalida
-        WHERE IdKardexSalida = @IdKardexSalida;
-
-        IF @IdEspecialidad IS NULL
+        IF NOT EXISTS (SELECT 1 FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida)
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;
 
-        -- Calcular el total a reponer en el stock global.
         ;WITH Reponer AS (
-            SELECT ksd.IdMaterial, SUM(ksd.Cantidad) AS Cantidad
-            FROM almacen.KardexSalidaDetalle ksd
-            WHERE ksd.IdKardexSalida = @IdKardexSalida
-            GROUP BY ksd.IdMaterial
+            SELECT IdMaterial, CAST(SUM(Cantidad) AS DECIMAL(28,2)) AS Cantidad FROM almacen.KardexSalidaDetalle
+            WHERE IdKardexSalida = @IdKardexSalida GROUP BY IdMaterial
         )
         UPDATE ks
-        SET TotalSalida = ks.TotalSalida - r.Cantidad,
-            Stock        = ks.Stock       + r.Cantidad
-        FROM almacen.KardexStock ks
-        INNER JOIN Reponer r ON r.IdMaterial = ks.IdMaterial
-        WHERE ks.IdEspecialidad = @IdEspecialidad;
-
-        -- CASCADE borra los detalles.
+        SET TotalSalida = ks.TotalSalida - r.Cantidad, Stock = ks.Stock + r.Cantidad
+        FROM almacen.KardexStock ks JOIN Reponer r ON r.IdMaterial = ks.IdMaterial;
         DELETE FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida;
 
         COMMIT;
@@ -1065,47 +721,24 @@ BEGIN
 END;
 GO
 
-
--- -----------------------------------------------------------------------------
--- usp_Kardex_StockActual_Listar
---   Lee el inventario consolidado (almacen.KardexStock) con los joins
---   a maestra para que el front reciba CodigoMaterial, Nombre, UnidadMedida
---   y los nombres legibles. El stock es global por (IdMaterial, IdEspecialidad);
---   no hay filtro por proyecto porque el proyecto no segmenta el stock.
---
---   Filtros (todos opcionales):
---     @IdEspecialidad : por especialidad del kardex
---     @FechaDesde     : FechaUltimaMovimiento >= @FechaDesde
---     @FechaHasta     : FechaUltimaMovimiento <= @FechaHasta
--- -----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE [almacen].[usp_Kardex_StockActual_Listar]
-    @IdEspecialidad INT  = NULL,
-    @FechaDesde     DATE = NULL,
-    @FechaHasta     DATE = NULL
+CREATE OR ALTER PROCEDURE almacen.usp_Kardex_StockActual_Listar
+    @IdEspecialidad INT = NULL,
+    @FechaDesde DATE = NULL,
+    @FechaHasta DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT
-        ks.IdKardexStock,
-        ks.IdMaterial,
-        m.Codigo          AS CodigoMaterial,
-        m.Descripcion     AS Nombre,
-        m.UnidadMedida,
-        ks.IdEspecialidad,
-        e.Nombre          AS Especialidad,
-        ks.TotalEntrada,
-        ks.TotalSalida,
-        ks.Stock,
-        ks.FechaUltimaMovimiento
+    SELECT ks.IdKardexStock, ks.IdMaterial, m.Codigo AS CodigoMaterial,
+        m.Descripcion AS Nombre, m.UnidadMedida, m.IdEspecialidad,
+        e.Nombre AS Especialidad, ks.TotalEntrada, ks.TotalSalida,
+        ks.Stock, ks.FechaUltimaMovimiento
     FROM almacen.KardexStock ks
-    INNER JOIN maestra.Material      m  ON m.IdMaterial     = ks.IdMaterial
-    INNER JOIN maestra.Especialidad  e  ON e.IdEspecialidad = ks.IdEspecialidad
-    WHERE (@IdEspecialidad IS NULL OR ks.IdEspecialidad = @IdEspecialidad)
+    JOIN maestra.Material m ON m.IdMaterial = ks.IdMaterial
+    JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+    WHERE (@IdEspecialidad IS NULL OR m.IdEspecialidad = @IdEspecialidad)
       AND (@FechaDesde IS NULL OR ks.FechaUltimaMovimiento >= @FechaDesde)
       AND (@FechaHasta IS NULL OR ks.FechaUltimaMovimiento <= @FechaHasta)
-    ORDER BY
-        e.Nombre,
-        m.Descripcion;
+    ORDER BY e.Nombre, m.Descripcion;
 END;
 GO

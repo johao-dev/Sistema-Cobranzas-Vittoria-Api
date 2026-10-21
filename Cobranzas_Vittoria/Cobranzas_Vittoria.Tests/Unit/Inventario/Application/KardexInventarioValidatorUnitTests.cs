@@ -60,7 +60,6 @@ public class KardexInventarioValidatorUnitTests
     private static RegistroKardexEntrada EntradaValida()
         => new()
         {
-            IdEspecialidad = IdEspecialidadOk,
             IdMaterial = IdMaterialOk,
             IdProveedor = IdProveedorOk,
             IdProyecto = IdProyectoOk,
@@ -73,7 +72,6 @@ public class KardexInventarioValidatorUnitTests
     private static RegistroKardexSalida SalidaValida()
         => new()
         {
-            IdEspecialidad = IdEspecialidadOk,
             IdProyecto = IdProyectoOk,
             NumeroDocumento = "SAL-001",
             Fecha = DateOnly.FromDateTime(DateTime.Today),
@@ -111,20 +109,7 @@ public class KardexInventarioValidatorUnitTests
     // ValidarEntrada: campos requeridos
     // =========================================================================
 
-    [Test]
-    public void ValidarEntrada_IdEspecialidadCero_AcumulaError()
-    {
-        var validator = CrearValidatorConDatosValidos();
-        var dto = EntradaValida();
-        dto.IdEspecialidad = 0;
 
-        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
-            await validator.ValidarEntradaAsync(dto))!;
-
-        Assert.That(ex.Errores.Any(e => e.Campo == "idEspecialidad"), Is.True);
-        Assert.That(ex.Errores.First(e => e.Campo == "idEspecialidad").CodigoError,
-            Is.EqualTo(CodigosErrorInventario.Validacion.CampoRequerido));
-    }
 
     [Test]
     public void ValidarEntrada_IdMaterialCero_AcumulaError()
@@ -185,15 +170,13 @@ public class KardexInventarioValidatorUnitTests
     {
         var validator = CrearValidatorConDatosValidos();
         var dto = EntradaValida();
-        dto.IdEspecialidad = 0;
         dto.IdMaterial = -5;
         dto.Cantidad = -1m;
 
         var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
             await validator.ValidarEntradaAsync(dto))!;
 
-        Assert.That(ex.Errores.Count, Is.GreaterThanOrEqualTo(3));
-        Assert.That(ex.Errores.Any(e => e.Campo == "idEspecialidad"), Is.True);
+        Assert.That(ex.Errores.Count, Is.GreaterThanOrEqualTo(2));
         Assert.That(ex.Errores.Any(e => e.Campo == "idMaterial"), Is.True);
         Assert.That(ex.Errores.Any(e => e.Campo == "cantidad"), Is.True);
     }
@@ -211,18 +194,21 @@ public class KardexInventarioValidatorUnitTests
     // =========================================================================
 
     [Test]
-    public void ValidarEntrada_EspecialidadNoExiste_AcumulaErrorFk()
+    public void ValidarEntrada_EspecialidadDelMaterialInactiva_AcumulaErrorEnMaterial()
     {
-        var validator = CrearValidatorConDatosValidos();
-        var dto = EntradaValida();
-        dto.IdEspecialidad = 999; // No existe en el stub.
+        StubEspecialidadRepository especialidades = new();
+        StubMaterialRepository materiales = new();
+        materiales.Add(IdMaterialOk, IdEspecialidadOk, "Material");
+        StubProyectoRepository proyectos = new();
+        proyectos.Add(IdProyectoOk, "Proyecto");
+        KardexInventarioValidator validator = new(especialidades, materiales, new StubProveedorRepository(), proyectos);
+        RegistroKardexEntrada entrada = EntradaValida();
+        entrada.IdProveedor = null;
 
-        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
-            await validator.ValidarEntradaAsync(dto))!;
+        ValidacionNegocioInventarioException? error = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(
+            () => validator.ValidarEntradaAsync(entrada));
 
-        Assert.That(ex.Errores.Any(e =>
-            e.Campo == "idEspecialidad" &&
-            e.CodigoError == CodigosErrorInventario.Validacion.FkNoExiste), Is.True);
+        Assert.That(error!.Errores.Any(e => e.Campo == "idMaterial" && e.CodigoError == "FK_NO_EXISTE"), Is.True);
     }
 
     [Test]
@@ -241,13 +227,9 @@ public class KardexInventarioValidatorUnitTests
     }
 
     [Test]
-    public void ValidarEntrada_MaterialDeOtraEspecialidad_AcumulaErrorFk()
+    public void ValidarEntrada_DerivaEspecialidadDelMaterial_NoLanza()
     {
-        // Material 200 pertenece a especialidad 99, no a la 2 del DTO.
-        var validator = CrearValidatorConDatosValidos();
-        validator.GetType(); // No-op para lectura
-        // Modificamos el stub via una rama de datos:
-        // (Aqui re-creamos el validator con el material en otra especialidad.)
+        // La clasificación se obtiene del material, sin enviarla en el request.
         var esp = new StubEspecialidadRepository();
         esp.Add(IdEspecialidadOk, "Alba");
         esp.Add(99, "Otra");
@@ -262,12 +244,7 @@ public class KardexInventarioValidatorUnitTests
         var dto = EntradaValida();
         dto.IdMaterial = 200;
 
-        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
-            await validator2.ValidarEntradaAsync(dto))!;
-
-        Assert.That(ex.Errores.Any(e =>
-            e.Campo == "idMaterial" &&
-            e.Mensaje.Contains("especialidad 99")), Is.True);
+        Assert.DoesNotThrowAsync(() => validator2.ValidarEntradaAsync(dto));
     }
 
     [Test]
@@ -301,18 +278,16 @@ public class KardexInventarioValidatorUnitTests
     {
         // Si ya hay errores de campos, el validator NO llama a ValidarFkAsync
         // (los errores de FK serian ruido y duplicarian los de campo).
-        // Verificamos esto contando errores: con idEspecialidad=0 e idMaterial=0
-        // solo deben aparecer 2 errores (los de campo), no 4 (los de FK).
+        // Un material inválido produce un error de campo, sin consultar sus FK.
         var validator = CrearValidatorConDatosValidos();
         var dto = EntradaValida();
-        dto.IdEspecialidad = 0;
         dto.IdMaterial = 0;
 
         var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
             await validator.ValidarEntradaAsync(dto))!;
 
-        // Exactamente los 2 errores de campo; NINGUNO de FK.
-        Assert.That(ex.Errores.Count, Is.EqualTo(2));
+        // Solo el error de campo, sin errores de FK adicionales.
+        Assert.That(ex.Errores.Count, Is.EqualTo(1));
         Assert.That(ex.Errores.Any(e => e.CodigoError == CodigosErrorInventario.Validacion.FkNoExiste),
             Is.False);
     }
@@ -416,7 +391,7 @@ public class KardexInventarioValidatorUnitTests
     }
 
     [Test]
-    public void ValidarSalida_ItemConMaterialDeOtraEspecialidad_AcumulaErrorFk()
+    public void ValidarSalida_MaterialesDeVariasEspecialidades_NoLanza()
     {
         var esp = new StubEspecialidadRepository();
         esp.Add(IdEspecialidadOk, "Alba");
@@ -432,15 +407,11 @@ public class KardexInventarioValidatorUnitTests
         var dto = SalidaValida();
         dto.Items = new List<ItemKardexSalida>
         {
+            new() { IdMaterial = IdMaterialOk, Cantidad = 1m },
             new() { IdMaterial = 200, Cantidad = 1m }
         };
 
-        var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(async () =>
-            await validator.ValidarSalidaAsync(dto))!;
-
-        Assert.That(ex.Errores.Any(e =>
-            e.Campo == "items[0].idMaterial" &&
-            e.CodigoError == CodigosErrorInventario.Validacion.FkNoExiste), Is.True);
+        Assert.DoesNotThrowAsync(() => validator.ValidarSalidaAsync(dto));
     }
 
     [Test]

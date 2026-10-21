@@ -1,6 +1,6 @@
 namespace Cobranzas_Vittoria.Inventario.Presentation.Dto;
 
-/// <summary>Respuesta HTTP del stock global por material y especialidad, con entradas y salidas acumuladas.</summary>
+/// <summary>Respuesta HTTP del stock global por material, con la especialidad derivada de Material, con entradas y salidas acumuladas.</summary>
 public sealed class KardexStockActualResponseDto
 {
     public int IdKardexStock { get; set; }

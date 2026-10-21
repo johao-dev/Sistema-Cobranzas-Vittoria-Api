@@ -58,7 +58,6 @@ internal static class KardexMapper
         => new()
         {
             IdKardexEntrada = origen.IdKardexEntrada,
-            IdEspecialidad = origen.IdEspecialidad,
             IdMaterial = origen.IdMaterial,
             IdProveedor = origen.IdProveedor,
             IdProyecto = origen.IdProyecto,
@@ -72,7 +71,6 @@ internal static class KardexMapper
         => new()
         {
             IdKardexSalida = origen.IdKardexSalida,
-            IdEspecialidad = origen.IdEspecialidad,
             IdProyecto = origen.IdProyecto,
             NumeroDocumento = origen.NumeroDocumento,
             Fecha = origen.Fecha,

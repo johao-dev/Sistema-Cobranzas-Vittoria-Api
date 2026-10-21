@@ -25,9 +25,9 @@ public interface IKardexEntradaRepository
         CancellationToken ct = default);
 
     /// <summary>
-    /// Actualiza una entrada existente. Si la dupla (IdMaterial, IdEspecialidad)
-    /// cambia, el SP hace rollback del stock en la dupla vieja y aplicacion
-    /// en la nueva, todo en la misma TX. Lanza 51104 si el id no existe.
+    /// Actualiza una entrada existente. Si cambia el material, revierte la
+    /// cantidad del anterior y aplica la nueva dentro de la misma transacción.
+    /// Rechaza modificaciones que dejan stock negativo o un id inexistente.
     /// </summary>
     /// <param name="dto">Datos actualizados. <c>IdKardexEntrada</c> es obligatorio.</param>
     /// <param name="ct">Token de cancelacion.</param>

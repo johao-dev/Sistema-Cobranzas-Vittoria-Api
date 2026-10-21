@@ -5,8 +5,6 @@ public sealed class RegistroKardexEntrada
 {
     public int? IdKardexEntrada { get; set; }
 
-    public int IdEspecialidad { get; set; }
-
     public int IdMaterial { get; set; }
 
     public int? IdProveedor { get; set; }

@@ -59,7 +59,6 @@ public class KardexInventarioServiceUnitTests
     private static RegistroKardexEntrada EntradaValida()
         => new()
         {
-            IdEspecialidad = 1,
             IdMaterial = 1,
             IdProveedor = 1,
             IdProyecto = 1,
@@ -70,7 +69,6 @@ public class KardexInventarioServiceUnitTests
     private static RegistroKardexSalida SalidaValida()
         => new()
         {
-            IdEspecialidad = 1,
             IdProyecto = 1,
             Fecha = DateOnly.FromDateTime(DateTime.Today),
             Solicitante = "Juan",
@@ -162,7 +160,7 @@ public class KardexInventarioServiceUnitTests
         entradaRepo.OnRegistrar = dto => new KardexEntrada
         {
             IdKardexEntrada = 99,
-            IdEspecialidad = dto.IdEspecialidad,
+            IdEspecialidad = 1,
             IdMaterial = dto.IdMaterial,
             Cantidad = dto.Cantidad
         };

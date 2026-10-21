@@ -27,8 +27,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Inventario;
 /// <para>
 /// <b>Patron de setup</b>: se siguen las mismas convenciones que
 /// <c>KardexInventarioControllerTests</c> (entradas via API, IdMaterial=2 de
-/// la seed para Albañileria). A partir de V1_2_1 el KardexStock es global por
-/// (IdMaterial, IdEspecialidad); el proyecto es solo una etiqueta informativa.
+/// la seed para Albañileria). El KardexStock es global por material; el proyecto es solo una etiqueta informativa.
 /// </para>
 /// </summary>
 public class KardexInventarioExportTests : IntegrationTestBase
@@ -45,12 +44,10 @@ public class KardexInventarioExportTests : IntegrationTestBase
 
     private static KardexEntradaCreateDto EntradaValida(
         decimal cantidad,
-        int idMaterial = IdMaterialAlbanileria,
-        int idEspecialidad = IdEspecialidadAlbanileria)
+        int idMaterial = IdMaterialAlbanileria)
         => new()
         {
             IdKardexEntrada = null,
-            IdEspecialidad = idEspecialidad,
             IdMaterial = idMaterial,
             IdProveedor = IdProveedor,
             IdProyecto = IdProyecto,
@@ -60,9 +57,9 @@ public class KardexInventarioExportTests : IntegrationTestBase
             Observacion = "Entrada para test de export"
         };
 
-    private async Task CrearEntradaAsync(decimal cantidad, int idMaterial = IdMaterialAlbanileria, int idEspecialidad = IdEspecialidadAlbanileria)
+    private async Task CrearEntradaAsync(decimal cantidad, int idMaterial = IdMaterialAlbanileria)
     {
-        var dto = EntradaValida(cantidad, idMaterial, idEspecialidad);
+        var dto = EntradaValida(cantidad, idMaterial);
         var response = await _client.PostAsJsonAsync("/api/almacen/kardex/entradas", dto);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Setup fallo al crear entrada. Body: {await response.Content.ReadAsStringAsync()}");
@@ -160,7 +157,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
         }
 
         // 2 filas de datos (filas 7 y 8). El KardexStock es global por
-        // (IdMaterial, IdEspecialidad), cada material aparece en una fila propia.
+        // (IdMaterial), cada material aparece en una fila propia.
         var dataRow1 = sheet.GetRow(7);
         var dataRow2 = sheet.GetRow(8);
         Assert.That(dataRow1, Is.Not.Null);

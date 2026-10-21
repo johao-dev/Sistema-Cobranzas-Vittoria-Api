@@ -52,7 +52,6 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
                     commandText: "almacen.usp_KardexEntrada_Registrar",
                     parameters: new
                     {
-                        IdEspecialidad = dto.IdEspecialidad,
                         IdMaterial = dto.IdMaterial,
                         IdProveedor = dto.IdProveedor,
                         IdProyecto = dto.IdProyecto,
@@ -80,7 +79,6 @@ public sealed class KardexEntradaRepository : RepositoryBase, IKardexEntradaRepo
                     parameters: new
                     {
                         IdKardexEntrada = dto.IdKardexEntrada,
-                        IdEspecialidad = dto.IdEspecialidad,
                         IdMaterial = dto.IdMaterial,
                         IdProveedor = dto.IdProveedor,
                         IdProyecto = dto.IdProyecto,

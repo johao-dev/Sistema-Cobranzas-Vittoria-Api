@@ -62,12 +62,10 @@ public class KardexInventarioControllerTests : IntegrationTestBase
 
     private static KardexEntradaCreateDto EntradaValida(
         decimal cantidad = 10m,
-        int idMaterial = IdMaterialAlbanileria,
-        int idEspecialidad = IdEspecialidadAlbanileria)
+        int idMaterial = IdMaterialAlbanileria)
         => new()
         {
             IdKardexEntrada = null,
-            IdEspecialidad = idEspecialidad,
             IdMaterial = idMaterial,
             IdProveedor = IdProveedor,
             IdProyecto = IdProyecto,
@@ -77,13 +75,12 @@ public class KardexInventarioControllerTests : IntegrationTestBase
             Observacion = "Entrada de prueba"
         };
 
-    private static KardexSalidaCreateDto SalidaValida(int idMaterial = IdMaterialAlbanileria, decimal cantidad = 3m, int? idEspecialidad = null)
+    private static KardexSalidaCreateDto SalidaValida(int idMaterial = IdMaterialAlbanileria, decimal cantidad = 3m)
         => new()
         {
             IdKardexSalida = null,
-            IdEspecialidad = idEspecialidad ?? IdEspecialidadAlbanileria,
             // IdProyecto obligatorio para entradas y salidas (etiqueta). A partir
-            // de V1_4_1 el stock es global por (IdMaterial, IdEspecialidad), asi que
+            // de la normalización el stock es global por material, asi que
             // la salida consume del mismo stock independientemente del proyecto.
             IdProyecto = IdProyecto,
             NumeroDocumento = "S001-TEST",
@@ -99,9 +96,9 @@ public class KardexInventarioControllerTests : IntegrationTestBase
     /// <summary>
     /// Crea una entrada valida via API y devuelve el IdKardexEntrada.
     /// </summary>
-    private async Task<int> CrearEntradaAsync(decimal cantidad = 10m, int idMaterial = IdMaterialAlbanileria, int idEspecialidad = IdEspecialidadAlbanileria)
+    private async Task<int> CrearEntradaAsync(decimal cantidad = 10m, int idMaterial = IdMaterialAlbanileria)
     {
-        var dto = EntradaValida(cantidad, idMaterial, idEspecialidad);
+        var dto = EntradaValida(cantidad, idMaterial);
         var response = await _client.PostAsJsonAsync("/api/almacen/kardex/entradas", dto);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Setup falló al crear entrada. Body: {await response.Content.ReadAsStringAsync()}");
@@ -118,9 +115,9 @@ public class KardexInventarioControllerTests : IntegrationTestBase
     /// de la primera fila (todos los items de una misma salida comparten ese id).
     /// </para>
     /// </summary>
-    private async Task<int> CrearSalidaAsync(decimal cantidad = 3m, int idMaterial = IdMaterialAlbanileria, int? idEspecialidad = null)
+    private async Task<int> CrearSalidaAsync(decimal cantidad = 3m, int idMaterial = IdMaterialAlbanileria)
     {
-        var dto = SalidaValida(idMaterial, cantidad, idEspecialidad);
+        var dto = SalidaValida(idMaterial, cantidad);
         var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             $"Setup falló al crear salida. Body: {await response.Content.ReadAsStringAsync()}");
@@ -166,10 +163,8 @@ public class KardexInventarioControllerTests : IntegrationTestBase
     public async Task ListarEntradas_FiltroPorIdEspecialidad_AplicaCorrectamente()
     {
         // Arrange: una entrada de Albañileria y otra de Estructura.
-        // IdMaterial=11 pertenece a la especialidad 4 (Estructura); usar
-        // IdEspecialidad=2 (Albañileria) haria fallar la validacion FK.
-        await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria, idEspecialidad: IdEspecialidadAlbanileria);
-        await CrearEntradaAsync(cantidad: 7m, idMaterial: IdMaterialCasco, idEspecialidad: IdEspecialidadCasco);
+        await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria);
+        await CrearEntradaAsync(cantidad: 7m, idMaterial: IdMaterialCasco);
 
         // Act
         var response = await _client.GetAsync(
@@ -208,7 +203,6 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         // Arrange: dto con idMaterial=0 y cantidad negativa
         var dto = new KardexEntradaCreateDto
         {
-            IdEspecialidad = 0,
             IdMaterial = 0,
             Cantidad = -1m,
             Fecha = default, // 0001-01-01
@@ -400,17 +394,15 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         // Arrange: entradas de los 2 materiales para tener stock, y una salida
         // con 2 items. Materiales 2-5 son de Albañileria segun la seed
         // (V1_1_0__SeedData.sql). El validador exige que cada item pertenezca
-        // a la especialidad de la cabecera, por lo que no se pueden mezclar
-        // especialidades en una misma salida.
+        // a su propia especialidad, obtenida desde Material.
         //
-        // El stock es global por (IdMaterial, IdEspecialidad). Las entradas de
+        // El stock es global por (IdMaterial). Las entradas de
         // prueba usan IdProyecto=10 (Mayta Capac II), pero la salida puede usar
         // cualquier proyecto (o ninguno) y consume del mismo stock global.
         await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria);
         await CrearEntradaAsync(cantidad: 5m, idMaterial: 3 /* PLASTICO AZUL */);
         var dto = new KardexSalidaCreateDto
         {
-            IdEspecialidad = IdEspecialidadAlbanileria,
             IdProyecto = IdProyecto,
             Fecha = new DateOnly(2026, 1, 17),
             Solicitante = "Test multi-item",
@@ -534,7 +526,6 @@ public class KardexInventarioControllerTests : IntegrationTestBase
         // Arrange: dto con Items vacios (lo bloquea el validator antes del SP)
         var dto = new KardexSalidaCreateDto
         {
-            IdEspecialidad = IdEspecialidadAlbanileria,
             Fecha = new DateOnly(2026, 1, 18),
             Solicitante = "Test sin items",
             Items = new List<KardexSalidaItemCreateDto>() // vacio
@@ -683,10 +674,8 @@ public class KardexInventarioControllerTests : IntegrationTestBase
     public async Task StockActual_FiltroPorIdEspecialidad_AplicaCorrectamente()
     {
         // Arrange: una entrada de Albañileria y otra de Casco.
-        // IdMaterial=11 pertenece a la especialidad 4 (Casco); usar
-        // IdEspecialidad=2 (Albañileria) haria fallar la validacion FK.
-        await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria, idEspecialidad: IdEspecialidadAlbanileria);
-        await CrearEntradaAsync(cantidad: 8m, idMaterial: IdMaterialCasco, idEspecialidad: IdEspecialidadCasco);
+        await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria);
+        await CrearEntradaAsync(cantidad: 8m, idMaterial: IdMaterialCasco);
 
         // Act
         var response = await _client.GetAsync(

@@ -1,6 +1,6 @@
 namespace Cobranzas_Vittoria.Inventario.Domain.Model;
 
-/// <summary>Stock consolidado por material y especialidad, con los totales de entradas y salidas.</summary>
+/// <summary>Stock consolidado por material, con la especialidad derivada de Material, con los totales de entradas y salidas.</summary>
 public sealed class StockKardex
 {
     public int IdKardexStock { get; set; }

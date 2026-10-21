@@ -11,7 +11,7 @@ namespace Cobranzas_Vittoria.Inventario.Application.Common;
 ///
 /// <para>
 /// <b>Responsabilidad</b>: aplicar las reglas de negocio que se pueden
-/// verificar SIN tocar la base de datos, antes de invocar al SP. Si la
+/// verificar antes de invocar al SP que modifica el inventario. Si la
 /// validacion falla, lanza <see cref="ValidacionNegocioInventarioException"/>
 /// (que extiende <see cref="DatosInvalidosValidacionException"/>) y el
 /// middleware la traduce a 422.
@@ -78,10 +78,6 @@ public sealed class KardexInventarioValidator
         List<DetalleErrorValidacion> errores = new List<DetalleErrorValidacion>();
 
         // ---------- Campos requeridos ----------
-        if (dto.IdEspecialidad <= 0)
-            errores.Add(Error("idEspecialidad", CodigosErrorInventario.Validacion.CampoRequerido,
-                "El campo idEspecialidad es obligatorio y debe ser mayor a 0."));
-
         if (dto.IdMaterial <= 0)
             errores.Add(Error("idMaterial", CodigosErrorInventario.Validacion.CampoRequerido,
                 "El campo idMaterial es obligatorio y debe ser mayor a 0."));
@@ -109,7 +105,6 @@ public sealed class KardexInventarioValidator
         {
             await ValidarFkAsync(
                 errores,
-                idEspecialidad: dto.IdEspecialidad,
                 idMaterial: dto.IdMaterial,
                 idProveedor: dto.IdProveedor,
                 idProyecto: dto.IdProyecto,
@@ -140,10 +135,6 @@ public sealed class KardexInventarioValidator
         List<DetalleErrorValidacion> errores = new List<DetalleErrorValidacion>();
 
         // ---------- Campos de cabecera requeridos ----------
-        if (dto.IdEspecialidad <= 0)
-            errores.Add(Error("idEspecialidad", CodigosErrorInventario.Validacion.CampoRequerido,
-                "El campo idEspecialidad es obligatorio y debe ser mayor a 0."));
-
         if (!dto.IdProyecto.HasValue || dto.IdProyecto.Value <= 0)
             errores.Add(Error("idProyecto", CodigosErrorInventario.Validacion.CampoRequerido,
                 "El campo idProyecto es obligatorio y debe ser mayor a 0."));
@@ -202,37 +193,20 @@ public sealed class KardexInventarioValidator
         {
             await ValidarFkAsync(
                 errores,
-                idEspecialidad: dto.IdEspecialidad,
                 idMaterial: null, // items usan IdMaterial propio, se valida abajo
                 idProveedor: null,
                 idProyecto: dto.IdProyecto,
                 validarProveedor: false,
                 ct);
 
-            // Validar que cada IdMaterial de los items exista y pertenezca a la especialidad.
-            if (dto.Items is not null)
-            {
-                for (int i = 0; i < dto.Items.Count; i++)
-                {
-                    ItemKardexSalida? item = dto.Items[i];
-                    if (item is null || item.IdMaterial <= 0) continue;
+            // Una salida admite varias especialidades; cada material aporta la suya.
+            IEnumerable<Especialidad> especialidades = await _especialidadRepository.ListAsync(activo: true);
+            HashSet<int> especialidadesActivas = especialidades.Select(e => e.IdEspecialidad).ToHashSet();
 
-                    Material? material = await _materialRepository.GetAsync(item.IdMaterial);
-                    if (material is null)
-                    {
-                        errores.Add(Error(
-                            $"items[{i}].idMaterial",
-                            CodigosErrorInventario.Validacion.FkNoExiste,
-                            $"El item en la posicion {i} referencia el material {item.IdMaterial} que no existe."));
-                    }
-                    else if (material.IdEspecialidad != dto.IdEspecialidad)
-                    {
-                        errores.Add(Error(
-                            $"items[{i}].idMaterial",
-                            CodigosErrorInventario.Validacion.FkNoExiste,
-                            $"El material {item.IdMaterial} pertenece a la especialidad {material.IdEspecialidad}, no a la {dto.IdEspecialidad} indicada en la cabecera."));
-                    }
-                }
+            for (int i = 0; i < dto.Items!.Count; i++)
+            {
+                ItemKardexSalida item = dto.Items[i];
+                await ValidarMaterialAsync(errores, item.IdMaterial, $"items[{i}].idMaterial", especialidadesActivas);
             }
         }
 
@@ -279,41 +253,18 @@ public sealed class KardexInventarioValidator
     /// </summary>
     private async Task ValidarFkAsync(
         List<DetalleErrorValidacion> errores,
-        int idEspecialidad,
         int? idMaterial,
         int? idProveedor,
         int? idProyecto,
         bool validarProveedor,
         CancellationToken ct)
     {
-        // Especialidad
-        IEnumerable<Especialidad> especialidades = await _especialidadRepository.ListAsync(activo: true);
-        if (!especialidades.Any(e => e.IdEspecialidad == idEspecialidad))
+        if (idMaterial.HasValue)
         {
-            errores.Add(Error(
-                "idEspecialidad",
-                CodigosErrorInventario.Validacion.FkNoExiste,
-                $"La especialidad {idEspecialidad} no existe o esta inactiva."));
-        }
+            IEnumerable<Especialidad> especialidades = await _especialidadRepository.ListAsync(activo: true);
+            HashSet<int> especialidadesActivas = especialidades.Select(e => e.IdEspecialidad).ToHashSet();
 
-        // Material (si se indico)
-        if (idMaterial.HasValue && idMaterial.Value > 0)
-        {
-            Material? material = await _materialRepository.GetAsync(idMaterial.Value);
-            if (material is null)
-            {
-                errores.Add(Error(
-                    "idMaterial",
-                    CodigosErrorInventario.Validacion.FkNoExiste,
-                    $"El material {idMaterial.Value} no existe."));
-            }
-            else if (material.IdEspecialidad != idEspecialidad)
-            {
-                errores.Add(Error(
-                    "idMaterial",
-                    CodigosErrorInventario.Validacion.FkNoExiste,
-                    $"El material {idMaterial.Value} pertenece a la especialidad {material.IdEspecialidad}, no a la {idEspecialidad} indicada."));
-            }
+            await ValidarMaterialAsync(errores, idMaterial.Value, "idMaterial", especialidadesActivas);
         }
 
         // Proveedor (opcional, si se indico y el contexto lo requiere)
@@ -340,6 +291,25 @@ public sealed class KardexInventarioValidator
                     CodigosErrorInventario.Validacion.FkNoExiste,
                     $"El proyecto {idProyecto.Value} no existe o esta inactivo."));
             }
+        }
+    }
+
+    private async Task ValidarMaterialAsync(
+        List<DetalleErrorValidacion> errores,
+        int idMaterial,
+        string campo,
+        HashSet<int> especialidadesActivas)
+    {
+        Material? material = await _materialRepository.GetAsync(idMaterial);
+        if (material is null)
+        {
+            errores.Add(Error(campo, CodigosErrorInventario.Validacion.FkNoExiste,
+                $"El material {idMaterial} no existe."));
+        }
+        else if (!especialidadesActivas.Contains(material.IdEspecialidad))
+        {
+            errores.Add(Error(campo, CodigosErrorInventario.Validacion.FkNoExiste,
+                $"La especialidad del material {idMaterial} no existe o está inactiva."));
         }
     }
 

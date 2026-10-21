@@ -65,8 +65,8 @@ public sealed class KardexInventarioService : IKardexInventarioService
         await _validator.ValidarEntradaAsync(dto, ct);
 
         _logger.LogDebug(
-            "Registrando entrada de Kardex. idEspecialidad={IdEspecialidad} idMaterial={IdMaterial} cantidad={Cantidad}",
-            dto.IdEspecialidad, dto.IdMaterial, dto.Cantidad);
+            "Registrando entrada de Kardex. idMaterial={IdMaterial} cantidad={Cantidad}",
+            dto.IdMaterial, dto.Cantidad);
 
         return await _entradaRepository.RegistrarAsync(dto, ct);
     }
@@ -141,8 +141,8 @@ public sealed class KardexInventarioService : IKardexInventarioService
         await _validator.ValidarSalidaAsync(dto, ct);
 
         _logger.LogDebug(
-            "Registrando salida de Kardex. idEspecialidad={IdEspecialidad} items={CantidadItems}",
-            dto.IdEspecialidad, dto.Items?.Count ?? 0);
+            "Registrando salida de Kardex. items={CantidadItems}",
+            dto.Items?.Count ?? 0);
 
         return await _salidaRepository.RegistrarAsync(dto, ct);
     }

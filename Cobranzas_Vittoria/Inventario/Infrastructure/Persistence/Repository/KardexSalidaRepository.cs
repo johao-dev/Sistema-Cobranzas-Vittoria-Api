@@ -64,7 +64,6 @@ public sealed class KardexSalidaRepository : RepositoryBase, IKardexSalidaReposi
                 direction: ParameterDirection.Input);
             parameters.AddDynamicParams(new
             {
-                IdEspecialidad = dto.IdEspecialidad,
                 IdProyecto = dto.IdProyecto,
                 NumeroDocumento = dto.NumeroDocumento,
                 Fecha = dto.Fecha.ToDateTime(TimeOnly.MinValue),
@@ -102,7 +101,6 @@ public sealed class KardexSalidaRepository : RepositoryBase, IKardexSalidaReposi
             parameters.AddDynamicParams(new
             {
                 IdKardexSalida = dto.IdKardexSalida,
-                IdEspecialidad = dto.IdEspecialidad,
                 IdProyecto = dto.IdProyecto,
                 NumeroDocumento = dto.NumeroDocumento,
                 Fecha = dto.Fecha.ToDateTime(TimeOnly.MinValue),

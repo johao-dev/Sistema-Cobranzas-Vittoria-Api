@@ -30,9 +30,6 @@ public sealed class KardexEntradaCreateDto
     /// <summary>PK. Null en POST (lo asigna la BD); obligatorio en PUT (validado contra la ruta).</summary>
     public int? IdKardexEntrada { get; set; }
 
-    /// <summary>FK a maestra.Especialidad (REQUERIDO).</summary>
-    public int IdEspecialidad { get; set; }
-
     /// <summary>FK a maestra.Material (REQUERIDO).</summary>
     public int IdMaterial { get; set; }
 
