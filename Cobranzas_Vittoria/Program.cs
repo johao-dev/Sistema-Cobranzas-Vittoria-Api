@@ -1,3 +1,4 @@
+using Cobranzas_Vittoria.Inventario;
 using System.Reflection;
 using Cobranzas_Vittoria.Compras;
 using Cobranzas_Vittoria.Application.Common;
@@ -7,14 +8,10 @@ using Cobranzas_Vittoria.Application.Importacion.Persistence;
 using Cobranzas_Vittoria.Application.Importacion.Processors;
 using Cobranzas_Vittoria.Application.Importacion.Services;
 using Cobranzas_Vittoria.Application.Importacion.Validators;
-using Cobranzas_Vittoria.Application.Inventario.Persistence;
-using Cobranzas_Vittoria.Application.Inventario.Services;
-using Cobranzas_Vittoria.Application.Inventario.Validators;
 using Cobranzas_Vittoria.ControlPresupuestario;
 using Cobranzas_Vittoria.Contable.GastosDirectos;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
-using Cobranzas_Vittoria.Infrastructure.Repositories.Inventario;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
@@ -142,28 +139,7 @@ builder.Services.AddScoped<ResolvedorEntidadesService>();
 // modulo -> processor en su constructor.
 builder.Services.AddScoped<IImportService, ImportService>();
 
-// ============================================================================
-// Feature: Modulo Inventario
-// ============================================================================
-// Feature aditiva. Los 3 nuevos repositories son la implementacion Dapper
-// de los contratos IKardex*Repository definidos en Application/Inventario.
-// Todos heredan de RepositoryBase (legacy) y reusan IDbConnectionFactory
-// registrada arriba como singleton.
-//
-// El KardexInventarioValidator consume los repos legacy de Maestra
-// (IEspecialidadRepository, IMaterialRepository, IProveedorRepository,
-// IProyectoRepository) que ya estan registrados arriba en la seccion
-// "Repositories", por lo que NO se vuelven a registrar aca.
-//
-// KardexInventarioService es scoped porque depende de los 3 repositories
-// (scoped) y del validator (scoped). El controller se resuelve por
-// ASP.NET Core a partir de IKardexInventarioService.
-// ============================================================================
-builder.Services.AddScoped<IKardexEntradaRepository, KardexEntradaRepository>();
-builder.Services.AddScoped<IKardexSalidaRepository, KardexSalidaRepository>();
-builder.Services.AddScoped<IKardexStockRepository, KardexStockRepository>();
-builder.Services.AddScoped<KardexInventarioValidator>();
-builder.Services.AddScoped<IKardexInventarioService, KardexInventarioService>();
+builder.Services.AddInventario();
 
 // IExcelExporter es un helper stateless (NPOI construye un workbook nuevo
 // por llamada, sin estado de instancia; la cache de reflexion es static).

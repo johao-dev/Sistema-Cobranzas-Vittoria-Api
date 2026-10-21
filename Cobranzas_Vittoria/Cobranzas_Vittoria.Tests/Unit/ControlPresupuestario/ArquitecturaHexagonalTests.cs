@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Cobranzas_Vittoria.Tests.Unit.ControlPresupuestario;
 
 /// <summary>
-/// Reglas de dependencia de los módulos hexagonales (ControlPresupuestario y Gastos directos):
+/// Reglas de dependencia de los módulos migrados a arquitectura hexagonal:
 /// el dominio no depende de nada externo y la aplicación no conoce a sus adaptadores.
 /// Se verifican sobre las directivas using del código fuente para que no dependan de la revisión humana.
 /// </summary>
@@ -11,6 +11,7 @@ public class ArquitecturaHexagonalTests
 {
     private static readonly (string Carpeta, string Namespace)[] Modulos =
     {
+        ("Inventario", "Cobranzas_Vittoria.Inventario"),
         ("Compras", "Cobranzas_Vittoria.Compras"),
         ("ControlPresupuestario", "Cobranzas_Vittoria.ControlPresupuestario"),
         (Path.Combine("Contable", "GastosDirectos"), "Cobranzas_Vittoria.Contable.GastosDirectos")

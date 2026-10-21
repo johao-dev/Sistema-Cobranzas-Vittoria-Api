@@ -126,7 +126,7 @@ public static class SwaggerConfiguration
             // CustomSchemaIds: usa el FullName (con namespace) para evitar
             // colisiones entre DTOs de distinto namespace que comparten nombre
             // simple. Caso concreto: el modulo Inventario introdujo
-            // Application.Inventario.Dtos.KardexSalidaCreateDto, que colisiona
+            // Inventario.Presentation.Dto.KardexSalidaCreateDto, que colisiona
             // con el legacy Dtos.Almacen.KardexSalidaCreateDto del KardexController
             // (marcado [Obsolete] pero aun presente). Swashbuckle, por defecto,
             // usa solo el nombre del tipo, lo que provoca

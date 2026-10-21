@@ -1,5 +1,5 @@
 using Cobranzas_Vittoria.Application.Common.Exports;
-using Cobranzas_Vittoria.Application.Inventario.Exports;
+using Cobranzas_Vittoria.Inventario.Application.Kardex.ExportarStock;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 

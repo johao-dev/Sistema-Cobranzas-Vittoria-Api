@@ -1,7 +1,8 @@
 using Cobranzas_Vittoria.Application.Common.Excepciones;
 using Cobranzas_Vittoria.Compras.Domain.Excepciones;
 using Cobranzas_Vittoria.Application.Importacion.Excepciones;
-using Cobranzas_Vittoria.Application.Inventario.Excepciones;
+using Cobranzas_Vittoria.Inventario.Domain.Excepciones;
+using Cobranzas_Vittoria.Inventario.Presentation.Excepciones;
 using Cobranzas_Vittoria.Contable.GastosDirectos.Domain.Excepciones;
 using Cobranzas_Vittoria.ControlPresupuestario.Domain.Excepciones;
 using Cobranzas_Vittoria.Seguridad.Domain.Excepciones;
@@ -196,7 +197,7 @@ namespace Cobranzas_Vittoria.Middleware
             catch (KardexNoEncontradoException ex)
             {
                 // El SP del modulo Inventario responde 51104 cuando un
-                // IdKardex* no existe. El KardexInventarioService lo traduce
+                // IdKardex* no existe. El adaptador de persistencia lo traduce
                 // a esta excepcion para evitar filtrar detalles del SP al
                 // cliente. Se mapea a 404 Not Found con el codigo del tipo.
                 _logger.LogWarning(

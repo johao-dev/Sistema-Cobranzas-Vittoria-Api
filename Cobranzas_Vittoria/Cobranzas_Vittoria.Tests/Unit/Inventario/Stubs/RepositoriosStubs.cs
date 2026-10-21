@@ -1,6 +1,6 @@
 using System.Data;
-using Cobranzas_Vittoria.Application.Inventario.Dtos;
-using Cobranzas_Vittoria.Application.Inventario.Persistence;
+using Cobranzas_Vittoria.Inventario.Domain.Model;
+using Cobranzas_Vittoria.Inventario.Domain.Persistence;
 using Cobranzas_Vittoria.Dtos.Maestra;
 using Cobranzas_Vittoria.Entities;
 using Cobranzas_Vittoria.Interfaces;
@@ -173,35 +173,35 @@ public sealed class StubProyectoRepository : IProyectoRepository
 /// </summary>
 public sealed class StubKardexEntradaRepository : IKardexEntradaRepository
 {
-    public Func<KardexFiltroInventarioDto, IReadOnlyList<KardexEntradaResponseDto>>? OnListar { get; set; }
-    public Func<KardexEntradaCreateDto, KardexEntradaResponseDto>? OnRegistrar { get; set; }
-    public Func<KardexEntradaCreateDto, KardexEntradaResponseDto>? OnActualizar { get; set; }
+    public Func<FiltroKardex, IReadOnlyList<KardexEntrada>>? OnListar { get; set; }
+    public Func<RegistroKardexEntrada, KardexEntrada>? OnRegistrar { get; set; }
+    public Func<RegistroKardexEntrada, KardexEntrada>? OnActualizar { get; set; }
     public Func<int, Task>? OnEliminar { get; set; }
 
-    public List<KardexFiltroInventarioDto> LlamadasListar { get; } = new();
-    public List<KardexEntradaCreateDto> LlamadasRegistrar { get; } = new();
-    public List<KardexEntradaCreateDto> LlamadasActualizar { get; } = new();
+    public List<FiltroKardex> LlamadasListar { get; } = new();
+    public List<RegistroKardexEntrada> LlamadasRegistrar { get; } = new();
+    public List<RegistroKardexEntrada> LlamadasActualizar { get; } = new();
     public List<int> LlamadasEliminar { get; } = new();
 
-    public Task<IReadOnlyList<KardexEntradaResponseDto>> ListarAsync(
-        KardexFiltroInventarioDto filtro, CancellationToken ct = default)
+    public Task<IReadOnlyList<KardexEntrada>> ListarAsync(
+        FiltroKardex filtro, CancellationToken ct = default)
     {
-        filtro ??= new KardexFiltroInventarioDto();
+        filtro ??= new FiltroKardex();
         LlamadasListar.Add(filtro);
-        var result = OnListar?.Invoke(filtro) ?? new List<KardexEntradaResponseDto>();
+        var result = OnListar?.Invoke(filtro) ?? new List<KardexEntrada>();
         return Task.FromResult(result);
     }
 
-    public Task<KardexEntradaResponseDto> RegistrarAsync(
-        KardexEntradaCreateDto dto, CancellationToken ct = default)
+    public Task<KardexEntrada> RegistrarAsync(
+        RegistroKardexEntrada dto, CancellationToken ct = default)
     {
         LlamadasRegistrar.Add(dto);
         if (OnRegistrar is null) throw new InvalidOperationException("OnRegistrar no fue configurado.");
         return Task.FromResult(OnRegistrar(dto));
     }
 
-    public Task<KardexEntradaResponseDto> ActualizarAsync(
-        KardexEntradaCreateDto dto, CancellationToken ct = default)
+    public Task<KardexEntrada> ActualizarAsync(
+        RegistroKardexEntrada dto, CancellationToken ct = default)
     {
         LlamadasActualizar.Add(dto);
         if (OnActualizar is null) throw new InvalidOperationException("OnActualizar no fue configurado.");
@@ -218,35 +218,35 @@ public sealed class StubKardexEntradaRepository : IKardexEntradaRepository
 
 public sealed class StubKardexSalidaRepository : IKardexSalidaRepository
 {
-    public Func<KardexFiltroInventarioDto, IReadOnlyList<KardexSalidaResponseDto>>? OnListar { get; set; }
-    public Func<KardexSalidaCreateDto, IReadOnlyList<KardexSalidaResponseDto>>? OnRegistrar { get; set; }
-    public Func<KardexSalidaCreateDto, IReadOnlyList<KardexSalidaResponseDto>>? OnActualizar { get; set; }
+    public Func<FiltroKardex, IReadOnlyList<KardexSalida>>? OnListar { get; set; }
+    public Func<RegistroKardexSalida, IReadOnlyList<KardexSalida>>? OnRegistrar { get; set; }
+    public Func<RegistroKardexSalida, IReadOnlyList<KardexSalida>>? OnActualizar { get; set; }
     public Func<int, Task>? OnEliminar { get; set; }
 
-    public List<KardexFiltroInventarioDto> LlamadasListar { get; } = new();
-    public List<KardexSalidaCreateDto> LlamadasRegistrar { get; } = new();
-    public List<KardexSalidaCreateDto> LlamadasActualizar { get; } = new();
+    public List<FiltroKardex> LlamadasListar { get; } = new();
+    public List<RegistroKardexSalida> LlamadasRegistrar { get; } = new();
+    public List<RegistroKardexSalida> LlamadasActualizar { get; } = new();
     public List<int> LlamadasEliminar { get; } = new();
 
-    public Task<IReadOnlyList<KardexSalidaResponseDto>> ListarAsync(
-        KardexFiltroInventarioDto filtro, CancellationToken ct = default)
+    public Task<IReadOnlyList<KardexSalida>> ListarAsync(
+        FiltroKardex filtro, CancellationToken ct = default)
     {
-        filtro ??= new KardexFiltroInventarioDto();
+        filtro ??= new FiltroKardex();
         LlamadasListar.Add(filtro);
-        var result = OnListar?.Invoke(filtro) ?? new List<KardexSalidaResponseDto>();
+        var result = OnListar?.Invoke(filtro) ?? new List<KardexSalida>();
         return Task.FromResult(result);
     }
 
-    public Task<IReadOnlyList<KardexSalidaResponseDto>> RegistrarAsync(
-        KardexSalidaCreateDto dto, CancellationToken ct = default)
+    public Task<IReadOnlyList<KardexSalida>> RegistrarAsync(
+        RegistroKardexSalida dto, CancellationToken ct = default)
     {
         LlamadasRegistrar.Add(dto);
         if (OnRegistrar is null) throw new InvalidOperationException("OnRegistrar no fue configurado.");
         return Task.FromResult(OnRegistrar(dto));
     }
 
-    public Task<IReadOnlyList<KardexSalidaResponseDto>> ActualizarAsync(
-        KardexSalidaCreateDto dto, CancellationToken ct = default)
+    public Task<IReadOnlyList<KardexSalida>> ActualizarAsync(
+        RegistroKardexSalida dto, CancellationToken ct = default)
     {
         LlamadasActualizar.Add(dto);
         if (OnActualizar is null) throw new InvalidOperationException("OnActualizar no fue configurado.");
@@ -263,15 +263,15 @@ public sealed class StubKardexSalidaRepository : IKardexSalidaRepository
 
 public sealed class StubKardexStockRepository : IKardexStockRepository
 {
-    public Func<KardexStockFiltroInventarioDto, IReadOnlyList<KardexStockActualResponseDto>>? OnListar { get; set; }
-    public List<KardexStockFiltroInventarioDto> LlamadasListar { get; } = new();
+    public Func<FiltroStockKardex, IReadOnlyList<StockKardex>>? OnListar { get; set; }
+    public List<FiltroStockKardex> LlamadasListar { get; } = new();
 
-    public Task<IReadOnlyList<KardexStockActualResponseDto>> ListarAsync(
-        KardexStockFiltroInventarioDto filtro, CancellationToken ct = default)
+    public Task<IReadOnlyList<StockKardex>> ListarAsync(
+        FiltroStockKardex filtro, CancellationToken ct = default)
     {
-        filtro ??= new KardexStockFiltroInventarioDto();
+        filtro ??= new FiltroStockKardex();
         LlamadasListar.Add(filtro);
-        var result = OnListar?.Invoke(filtro) ?? new List<KardexStockActualResponseDto>();
+        var result = OnListar?.Invoke(filtro) ?? new List<StockKardex>();
         return Task.FromResult(result);
     }
 }
