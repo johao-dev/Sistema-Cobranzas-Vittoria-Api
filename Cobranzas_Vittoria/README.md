@@ -112,3 +112,12 @@ docker compose run --rm --profile test test bash -lc "dotnet test ./Cobranzas_Vi
 No se agregó un `devcontainer.json` porque el flujo objetivo de este repositorio no
 depende de abrir el proyecto dentro de un contenedor desde el editor. Aquí el flujo
 es: editar en el host y ejecutar dentro de Docker.
+
+## Stock por proyecto
+
+Las migraciones de Inventario agregan la distribución por proyecto y las transferencias.
+Después del despliegue, las escrituras del Kardex manual requieren ejecutar
+`almacen.usp_StockProyecto_Inicializar` con la distribución completa validada por
+Almacén. No se reconstruye desde el histórico.
+
+Consultar [implementación, API y puesta en marcha](Docs/StockProyecto_Implementacion.md).

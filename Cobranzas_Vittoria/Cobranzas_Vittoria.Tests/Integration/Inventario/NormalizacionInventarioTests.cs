@@ -274,6 +274,7 @@ public class NormalizacionInventarioTests : IntegrationTestBase
                 DELETE FROM almacen.KardexEntrada WHERE IdMaterial = @id;
                 DELETE FROM almacen.KardexStock WHERE IdMaterial = @id;
                 DELETE FROM almacen.KardexMovimiento WHERE IdMaterial = @id;
+                DELETE FROM almacen.StockProyecto WHERE IdMaterial = @id;
                 DELETE FROM maestra.Material WHERE IdMaterial = @id;
                 """, new { id });
         }

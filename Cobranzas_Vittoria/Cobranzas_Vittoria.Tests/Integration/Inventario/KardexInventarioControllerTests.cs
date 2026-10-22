@@ -448,9 +448,9 @@ public class KardexInventarioControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task RegistrarSalida_DesdeOtroProyecto_ConsumeStockGlobal_Retorna200()
+    public async Task RegistrarSalida_DesdeOtroProyecto_SinAsignacion_Retorna422()
     {
-        // Arrange: entrada con IdProyecto=10. El stock es global.
+        // Entrada asignada al proyecto 10; el proyecto 20 no puede consumirla.
         await CrearEntradaAsync(cantidad: 10m);
 
         // Creamos un segundo proyecto valido para la salida. El seed solo trae
@@ -471,15 +471,16 @@ public class KardexInventarioControllerTests : IntegrationTestBase
             await cmd.ExecuteNonQueryAsync();
         }
 
-        // Act: salida con OTRO proyecto (IdProyecto=20) debe poder consumir el mismo stock.
+        // La disponibilidad global no autoriza el consumo desde otro proyecto.
         var dto = SalidaValida(cantidad: 4m);
         dto.IdProyecto = 20;
         var response = await _client.PostAsJsonAsync("/api/almacen/kardex/salidas", dto);
 
         // Assert
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.UnprocessableEntity),
             $"Body: {await response.Content.ReadAsStringAsync()}");
-        Assert.That(await ObtenerStockAsync(IdMaterialAlbanileria), Is.EqualTo(6m));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("STOCK_PROYECTO_INSUFICIENTE"));
+        Assert.That(await ObtenerStockAsync(IdMaterialAlbanileria), Is.EqualTo(10m));
     }
 
     [Test]

@@ -267,6 +267,8 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
         IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
         IF @Cantidad < 0
@@ -294,6 +296,10 @@ BEGIN
         IF @@ROWCOUNT = 0
             INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
             VALUES (@IdMaterial, @Cantidad, 0, @Cantidad, @Fecha);
+
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios VALUES (@IdMaterial, @IdProyecto, @Cantidad);
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     SELECT ke.IdKardexEntrada, m.IdEspecialidad, e.Nombre AS Especialidad,
@@ -340,6 +346,8 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
         IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
         IF @Cantidad < 0
@@ -355,8 +363,8 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WHERE IdProyecto = @IdProyecto)
             THROW 51101, 'FK_NO_EXISTE: idProyecto', 1;
 
-        DECLARE @MaterialAnterior INT, @CantidadAnterior DECIMAL(18,2);
-        SELECT @MaterialAnterior = IdMaterial, @CantidadAnterior = Cantidad
+        DECLARE @MaterialAnterior INT, @ProyectoAnterior INT, @CantidadAnterior DECIMAL(18,2);
+        SELECT @MaterialAnterior = IdMaterial, @ProyectoAnterior = IdProyecto, @CantidadAnterior = Cantidad
         FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
         IF @MaterialAnterior IS NULL
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexEntrada', 1;
@@ -365,6 +373,17 @@ BEGIN
             THEN @Cantidad - @CantidadAnterior ELSE -@CantidadAnterior END;
         IF ISNULL((SELECT Stock FROM almacen.KardexStock WHERE IdMaterial = @MaterialAnterior), 0) + @Delta < 0
             THROW 51111, 'STOCK_INCONSISTENTE_AL_ELIMINAR: La modificación dejaría stock negativo.', 1;
+
+        IF @ProyectoAnterior IS NULL
+            THROW 51119, 'PROYECTO_MOVIMIENTO_REQUERIDO: Regularice el proyecto del movimiento histórico antes de modificarlo.', 1;
+
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios
+        SELECT IdMaterial, IdProyecto, SUM(Cantidad)
+        FROM (VALUES (@MaterialAnterior, @ProyectoAnterior, -CAST(@CantidadAnterior AS DECIMAL(29,2))),
+                     (@IdMaterial, @IdProyecto, CAST(@Cantidad AS DECIMAL(29,2)))) c(IdMaterial, IdProyecto, Cantidad)
+        GROUP BY IdMaterial, IdProyecto;
+        EXEC almacen.usp_StockProyecto_ValidarCambios @Cambios;
 
         UPDATE almacen.KardexStock
         SET TotalEntrada = TotalEntrada + @Delta,
@@ -390,6 +409,8 @@ BEGIN
         SET IdMaterial = @IdMaterial, IdProveedor = @IdProveedor, IdProyecto = @IdProyecto,
             NumeroDocumento = @NumeroDocumento, Fecha = @Fecha, Cantidad = @Cantidad, Observacion = @Observacion
         WHERE IdKardexEntrada = @IdKardexEntrada;
+
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     SELECT ke.IdKardexEntrada, m.IdEspecialidad, e.Nombre AS Especialidad,
@@ -429,18 +450,29 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        DECLARE @IdMaterial INT, @Cantidad DECIMAL(18,2);
-        SELECT @IdMaterial = IdMaterial, @Cantidad = Cantidad
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
+        DECLARE @IdMaterial INT, @IdProyecto INT, @Cantidad DECIMAL(18,2);
+        SELECT @IdMaterial = IdMaterial, @IdProyecto = IdProyecto, @Cantidad = Cantidad
         FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
         IF @IdMaterial IS NULL
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexEntrada', 1;
         IF ISNULL((SELECT Stock FROM almacen.KardexStock WHERE IdMaterial = @IdMaterial), 0) < @Cantidad
             THROW 51111, 'STOCK_INCONSISTENTE_AL_ELIMINAR: Hay salidas que dependen de esta entrada.', 1;
 
+        IF @IdProyecto IS NULL
+            THROW 51119, 'PROYECTO_MOVIMIENTO_REQUERIDO: Regularice el proyecto del movimiento histórico antes de eliminarlo.', 1;
+
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios VALUES (@IdMaterial, @IdProyecto, -@Cantidad);
+        EXEC almacen.usp_StockProyecto_ValidarCambios @Cambios;
+
         UPDATE almacen.KardexStock
         SET TotalEntrada = TotalEntrada - @Cantidad, Stock = Stock - @Cantidad
         WHERE IdMaterial = @IdMaterial;
         DELETE FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
+
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     END TRY
@@ -501,6 +533,8 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
         IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
             THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
         IF @IdProyecto IS NULL
@@ -536,6 +570,10 @@ BEGIN
             THROW 51110, @Mensaje, 1;
         END;
 
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios SELECT IdMaterial, @IdProyecto, -Cantidad FROM @Nuevos;
+        EXEC almacen.usp_StockProyecto_ValidarCambios @Cambios;
+
         INSERT INTO almacen.KardexSalida (IdProyecto, NumeroDocumento, Fecha, Solicitante, Observacion)
         VALUES (@IdProyecto, @NumeroDocumento, @Fecha, @Solicitante, @Observacion);
         DECLARE @NewId INT = CONVERT(INT, SCOPE_IDENTITY());
@@ -551,6 +589,8 @@ BEGIN
         SET TotalSalida = ks.TotalSalida + n.Cantidad, Stock = ks.Stock - n.Cantidad,
             FechaUltimaMovimiento = @Fecha
         FROM almacen.KardexStock ks JOIN @Nuevos n ON n.IdMaterial = ks.IdMaterial;
+
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     SELECT ks.IdKardexSalida, m.IdEspecialidad, e.Nombre AS Especialidad,
@@ -597,6 +637,8 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
         IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
             THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
         IF @IdProyecto IS NULL
@@ -621,6 +663,22 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida)
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;
 
+        DECLARE @ProyectoAnterior INT;
+        SELECT @ProyectoAnterior = IdProyecto FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida;
+        IF @ProyectoAnterior IS NULL
+            THROW 51119, 'PROYECTO_MOVIMIENTO_REQUERIDO: Regularice el proyecto del movimiento histórico antes de modificarlo.', 1;
+
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios
+        SELECT IdMaterial, IdProyecto, SUM(Cantidad)
+        FROM (
+            SELECT IdMaterial, @ProyectoAnterior AS IdProyecto, CAST(Cantidad AS DECIMAL(29,2)) AS Cantidad
+            FROM almacen.KardexSalidaDetalle WHERE IdKardexSalida = @IdKardexSalida
+            UNION ALL
+            SELECT IdMaterial, @IdProyecto, -CAST(Cantidad AS DECIMAL(29,2)) FROM @Nuevos
+        ) c
+        GROUP BY IdMaterial, IdProyecto;
+
         DECLARE @Diff TABLE (IdMaterial INT PRIMARY KEY, Cantidad DECIMAL(29,2));
         ;WITH Anteriores AS (
             SELECT IdMaterial, CAST(SUM(Cantidad) AS DECIMAL(28,2)) AS Cantidad FROM almacen.KardexSalidaDetalle
@@ -644,6 +702,8 @@ BEGIN
             THROW 51110, @Mensaje, 1;
         END;
 
+        EXEC almacen.usp_StockProyecto_ValidarCambios @Cambios;
+
         INSERT INTO almacen.KardexStock (IdMaterial, TotalEntrada, TotalSalida, Stock, FechaUltimaMovimiento)
         SELECT d.IdMaterial, 0, 0, 0, @Fecha FROM @Diff d
         WHERE NOT EXISTS (SELECT 1 FROM almacen.KardexStock ks WHERE ks.IdMaterial = d.IdMaterial);
@@ -660,6 +720,8 @@ BEGIN
         DELETE FROM almacen.KardexSalidaDetalle WHERE IdKardexSalida = @IdKardexSalida;
         INSERT INTO almacen.KardexSalidaDetalle (IdKardexSalida, IdMaterial, Cantidad, Observacion)
         SELECT @IdKardexSalida, IdMaterial, Cantidad, Observacion FROM @Items;
+
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     SELECT ks.IdKardexSalida, m.IdEspecialidad, e.Nombre AS Especialidad,
@@ -700,8 +762,20 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
+        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
+
         IF NOT EXISTS (SELECT 1 FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida)
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;
+
+        DECLARE @IdProyecto INT;
+        SELECT @IdProyecto = IdProyecto FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida;
+        IF @IdProyecto IS NULL
+            THROW 51119, 'PROYECTO_MOVIMIENTO_REQUERIDO: Regularice el proyecto del movimiento histórico antes de eliminarlo.', 1;
+
+        DECLARE @Cambios almacen.TVP_StockProyectoCantidad;
+        INSERT INTO @Cambios
+        SELECT IdMaterial, @IdProyecto, SUM(Cantidad)
+        FROM almacen.KardexSalidaDetalle WHERE IdKardexSalida = @IdKardexSalida GROUP BY IdMaterial;
 
         ;WITH Reponer AS (
             SELECT IdMaterial, CAST(SUM(Cantidad) AS DECIMAL(28,2)) AS Cantidad FROM almacen.KardexSalidaDetalle
@@ -711,6 +785,8 @@ BEGIN
         SET TotalSalida = ks.TotalSalida - r.Cantidad, Stock = ks.Stock + r.Cantidad
         FROM almacen.KardexStock ks JOIN Reponer r ON r.IdMaterial = ks.IdMaterial;
         DELETE FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida;
+
+        EXEC almacen.usp_StockProyecto_AplicarCambios @Cambios;
 
         COMMIT;
     END TRY

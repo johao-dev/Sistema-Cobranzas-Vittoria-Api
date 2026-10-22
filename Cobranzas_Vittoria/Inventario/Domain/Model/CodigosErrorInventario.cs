@@ -44,6 +44,7 @@ public static class CodigosErrorInventario
 
         /// <summary>Lista de items vacia o con un item invalido.</summary>
         public const string ItemsInvalidos = "ITEMS_INVALIDOS";
+        public const string ProyectosIguales = "PROYECTOS_IGUALES";
     }
 
     /// <summary>
@@ -55,6 +56,10 @@ public static class CodigosErrorInventario
     {
         /// <summary>La salida solicitada supera el stock disponible (mapea a 51110 del SP).</summary>
         public const string StockInsuficiente = "STOCK_INSUFICIENTE";
+        public const string StockProyectoInsuficiente = "STOCK_PROYECTO_INSUFICIENTE";
+        public const string StockProyectoNoInicializado = "STOCK_PROYECTO_NO_INICIALIZADO";
+        public const string StockProyectoInconsistente = "STOCK_PROYECTO_INCONSISTENTE";
+        public const string StockProyectoYaInicializado = "STOCK_PROYECTO_YA_INICIALIZADO";
 
         /// <summary>
         /// La eliminacion de una entrada dejaria el stock negativo porque
@@ -75,6 +80,8 @@ public static class CodigosErrorInventario
 
         /// <summary>Kardex no encontrado por Id (mapea a 51104 del SP).</summary>
         public const string KardexNoEncontrado = "KARDEX_NO_ENCONTRADO";
+        public const string ContextoInventarioInvalido = "CONTEXTO_INVENTARIO_INVALIDO";
+        public const string ProyectoMovimientoRequerido = "PROYECTO_MOVIMIENTO_REQUERIDO";
     }
 
     /// <summary>

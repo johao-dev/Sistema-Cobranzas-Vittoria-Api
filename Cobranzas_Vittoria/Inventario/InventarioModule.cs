@@ -1,5 +1,6 @@
 using Cobranzas_Vittoria.Inventario.Application.Common;
 using Cobranzas_Vittoria.Inventario.Application.Kardex;
+using Cobranzas_Vittoria.Inventario.Application.StockProyecto;
 using Cobranzas_Vittoria.Inventario.Domain.Persistence;
 using Cobranzas_Vittoria.Inventario.Infrastructure.Persistence.Repository;
 
@@ -13,6 +14,10 @@ public static class InventarioModule
         services.AddScoped<IKardexEntradaRepository, KardexEntradaRepository>();
         services.AddScoped<IKardexSalidaRepository, KardexSalidaRepository>();
         services.AddScoped<IKardexStockRepository, KardexStockRepository>();
+
+        services.AddScoped<IStockProyectoRepository, StockProyectoRepository>();
+        services.AddScoped<TransferenciaProyectoValidator>();
+        services.AddScoped<IStockProyectoService, StockProyectoService>();
 
         services.AddScoped<KardexInventarioValidator>();
         services.AddScoped<IKardexInventarioService, KardexInventarioService>();
