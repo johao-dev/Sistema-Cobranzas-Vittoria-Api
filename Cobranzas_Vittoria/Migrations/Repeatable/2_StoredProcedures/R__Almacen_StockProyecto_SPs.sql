@@ -1,13 +1,4 @@
--- Auxiliares internos: participan de la transacción y bloqueo del SP operativo.
-CREATE OR ALTER PROCEDURE almacen.usp_StockProyecto_ExigirInicializacion
-AS
-BEGIN
-    SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM almacen.StockProyectoInicializacion WHERE Id = 1 AND FechaActivacion IS NOT NULL)
-        THROW 51115, 'STOCK_PROYECTO_NO_INICIALIZADO: Almacén debe validar y cargar la distribución inicial antes de operar.', 1;
-END;
-GO
-
+-- Auxiliares permanentes: participan de la transacción y bloqueo del SP operativo.
 CREATE OR ALTER PROCEDURE almacen.usp_StockProyecto_VerificarConsistencia
     @Cantidades almacen.TVP_StockProyectoCantidad READONLY
 AS
@@ -33,8 +24,6 @@ BEGIN
     -- No iniciar ni confirmar otra transacción: global y distribución son una unidad.
     IF @@TRANCOUNT = 0 OR ISNULL(APPLOCK_MODE('public', 'Inventario:Movimientos', 'Transaction'), 'NoLock') <> 'Exclusive'
         THROW 51118, 'CONTEXTO_INVENTARIO_INVALIDO: Se requiere la transacción y el bloqueo exclusivo de inventario.', 1;
-
-    EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
     IF EXISTS (
         SELECT 1 FROM @Cambios c
@@ -71,58 +60,6 @@ BEGIN
     WHERE NOT EXISTS (SELECT 1 FROM almacen.StockProyecto s WHERE s.IdMaterial = c.IdMaterial AND s.IdProyecto = c.IdProyecto);
 
     EXEC almacen.usp_StockProyecto_VerificarConsistencia @Cambios;
-END;
-GO
-
--- Operación administrativa explícita de puesta en marcha. No se publica por HTTP.
--- Recibe la distribución COMPLETA validada por Almacén; no altera KardexStock.
-CREATE OR ALTER PROCEDURE almacen.usp_StockProyecto_Inicializar
-    @Distribucion almacen.TVP_StockProyectoCantidad READONLY
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        BEGIN TRAN;
-        DECLARE @Bloqueo INT;
-        EXEC @Bloqueo = sys.sp_getapplock
-            @Resource = N'Inventario:Movimientos', @LockMode = 'Exclusive',
-            @LockOwner = 'Transaction', @LockTimeout = 10000;
-        IF @Bloqueo < 0
-            THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-        IF EXISTS (SELECT 1 FROM almacen.StockProyectoInicializacion WHERE FechaActivacion IS NOT NULL)
-            THROW 51117, 'STOCK_PROYECTO_YA_INICIALIZADO: La regularización inicial solo se permite una vez.', 1;
-        IF EXISTS (SELECT 1 FROM @Distribucion WHERE Cantidad < 0 OR Cantidad > 9999999999999999.99)
-            THROW 51103, 'CANTIDAD_INVALIDA: La distribución inicial debe contener cantidades no negativas dentro de DECIMAL(18,2).', 1;
-        IF EXISTS (
-            SELECT 1 FROM @Distribucion d
-            LEFT JOIN maestra.Material m WITH (HOLDLOCK) ON m.IdMaterial = d.IdMaterial
-            LEFT JOIN maestra.Proyecto p ON p.IdProyecto = d.IdProyecto
-            WHERE m.IdMaterial IS NULL OR p.IdProyecto IS NULL
-        )
-            THROW 51101, 'FK_NO_EXISTE: Material o proyecto inexistente en la distribución inicial.', 1;
-
-        DELETE FROM almacen.StockProyecto;
-        INSERT INTO almacen.StockProyecto (IdMaterial, IdProyecto, Stock)
-        SELECT IdMaterial, IdProyecto, Cantidad FROM @Distribucion;
-
-        -- Incluir todo el global detecta también materiales omitidos en la carga.
-        DECLARE @Afectados almacen.TVP_StockProyectoCantidad;
-        INSERT INTO @Afectados
-        SELECT IdMaterial, 0, 0 FROM almacen.KardexStock
-        UNION
-        SELECT IdMaterial, 0, 0 FROM @Distribucion;
-        EXEC almacen.usp_StockProyecto_VerificarConsistencia @Afectados;
-
-        IF NOT EXISTS (SELECT 1 FROM almacen.StockProyectoInicializacion WHERE Id = 1)
-            INSERT INTO almacen.StockProyectoInicializacion (Id) VALUES (1);
-        UPDATE almacen.StockProyectoInicializacion SET FechaActivacion = SYSDATETIME() WHERE Id = 1;
-        COMMIT;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK;
-        THROW;
-    END CATCH
 END;
 GO
 
@@ -198,7 +135,6 @@ BEGIN
             @LockOwner = 'Transaction', @LockTimeout = 10000;
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
         IF @IdProyectoOrigen IS NULL OR @IdProyectoDestino IS NULL OR @Fecha IS NULL OR @Observacion IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: origen, destino, fecha y observacion son obligatorios.', 1;

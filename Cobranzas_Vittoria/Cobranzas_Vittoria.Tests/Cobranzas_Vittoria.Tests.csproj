@@ -25,4 +25,8 @@
     <ProjectReference Include="..\Cobranzas_Vittoria.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Integration/Inventario/Fixtures/StockProyecto_PreLimpieza.sql" />
+  </ItemGroup>
+
 </Project>

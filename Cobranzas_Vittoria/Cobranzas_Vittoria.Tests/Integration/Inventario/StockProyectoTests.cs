@@ -423,26 +423,6 @@ public class StockProyectoTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Inicializacion_BloqueaTodosLosFlujosAntesDeActivar()
-    {
-        int idEntrada = await Entrada(10);
-        int idSalida = await Salida(ORIGEN, null, (MATERIAL, 1));
-        await using SqlConnection db = Conexion();
-        await db.ExecuteAsync("UPDATE almacen.StockProyectoInicializacion SET FechaActivacion = NULL");
-        string global = await Global();
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Entrada(1))!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Entrada(10, id: idEntrada))!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Eliminar("Entrada", idEntrada))!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Salida(ORIGEN, null, (MATERIAL, 1)))!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Salida(ORIGEN, idSalida, (MATERIAL, 1)))!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => Eliminar("Salida", idSalida))!.Number, Is.EqualTo(51115));
-        HttpResponseMessage transferencia = await Transferir(1);
-        Assert.That(await transferencia.Content.ReadAsStringAsync(), Does.Contain("STOCK_PROYECTO_NO_INICIALIZADO"));
-        Assert.That(await Global(), Is.EqualTo(global));
-        await Consistente();
-    }
-
-    [Test]
     public async Task AuxiliarDeEscrituraSinTransaccionNiBloqueo_SeRechaza()
     {
         await Entrada(10);
@@ -479,33 +459,5 @@ public class StockProyectoTests : IntegrationTestBase
         HttpResponseMessage response = await _client.GetAsync("/api/almacen/transferencias-proyecto/999999");
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
         Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("RECURSO_NO_ENCONTRADO"));
-    }
-
-    [Test]
-    public async Task Inicializacion_ExigeCargaCompleta_NoReconstruyeHistoricoYSeActivaUnaVez()
-    {
-        await Entrada(10);
-        await using SqlConnection db = Conexion();
-        await db.ExecuteAsync("DELETE FROM almacen.StockProyecto; UPDATE almacen.StockProyectoInicializacion SET FechaActivacion = NULL;");
-        SqlException? bloqueada = Assert.ThrowsAsync<SqlException>(() => Entrada(1));
-        Assert.That(bloqueada!.Number, Is.EqualTo(51115));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => db.ExecuteAsync("""
-            DECLARE @Distribucion almacen.TVP_StockProyectoCantidad;
-            INSERT INTO @Distribucion VALUES (2, 20, 9);
-            EXEC almacen.usp_StockProyecto_Inicializar @Distribucion;
-            """))!.Number, Is.EqualTo(51116));
-        Assert.That(await Stock(DESTINO), Is.Zero, "La carga incompleta debe revertirse.");
-        await db.ExecuteAsync("""
-            DECLARE @Distribucion almacen.TVP_StockProyectoCantidad;
-            INSERT INTO @Distribucion VALUES (2, 20, 10);
-            EXEC almacen.usp_StockProyecto_Inicializar @Distribucion;
-            """);
-        Assert.That(await Stock(ORIGEN), Is.Zero, "El histórico no determina la asignación actual.");
-        Assert.That(await Stock(DESTINO), Is.EqualTo(10));
-        Assert.That(Assert.ThrowsAsync<SqlException>(() => db.ExecuteAsync("""
-            DECLARE @Distribucion almacen.TVP_StockProyectoCantidad;
-            EXEC almacen.usp_StockProyecto_Inicializar @Distribucion;
-            """))!.Number, Is.EqualTo(51117));
-        await Consistente();
     }
 }

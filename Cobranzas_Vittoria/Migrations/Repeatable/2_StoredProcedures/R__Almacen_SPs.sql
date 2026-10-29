@@ -267,8 +267,6 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
-
         IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
         IF @Cantidad < 0
@@ -345,8 +343,6 @@ BEGIN
             @LockOwner = 'Transaction', @LockTimeout = 10000;
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
         IF @IdMaterial IS NULL OR @Fecha IS NULL OR @Cantidad IS NULL
             THROW 51100, 'CAMPO_REQUERIDO: idMaterial, fecha y cantidad son obligatorios.', 1;
@@ -450,8 +446,6 @@ BEGIN
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
 
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
-
         DECLARE @IdMaterial INT, @IdProyecto INT, @Cantidad DECIMAL(18,2);
         SELECT @IdMaterial = IdMaterial, @IdProyecto = IdProyecto, @Cantidad = Cantidad
         FROM almacen.KardexEntrada WHERE IdKardexEntrada = @IdKardexEntrada;
@@ -532,8 +526,6 @@ BEGIN
             @LockOwner = 'Transaction', @LockTimeout = 10000;
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
         IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
             THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
@@ -636,8 +628,6 @@ BEGIN
             @LockOwner = 'Transaction', @LockTimeout = 10000;
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
         IF @Fecha IS NULL OR @Solicitante IS NULL OR LTRIM(RTRIM(@Solicitante)) = ''
             THROW 51100, 'CAMPO_REQUERIDO: fecha y solicitante son obligatorios.', 1;
@@ -761,8 +751,6 @@ BEGIN
             @LockOwner = 'Transaction', @LockTimeout = 10000;
         IF @Bloqueo < 0
             THROW 51113, 'INVENTARIO_OCUPADO: No se pudo obtener el bloqueo de inventario. Reintente la operación.', 1;
-
-        EXEC almacen.usp_StockProyecto_ExigirInicializacion;
 
         IF NOT EXISTS (SELECT 1 FROM almacen.KardexSalida WHERE IdKardexSalida = @IdKardexSalida)
             THROW 51104, 'KARDEX_NO_ENCONTRADO: idKardexSalida', 1;

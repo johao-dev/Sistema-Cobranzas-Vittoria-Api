@@ -57,9 +57,7 @@ public static class CodigosErrorInventario
         /// <summary>La salida solicitada supera el stock disponible (mapea a 51110 del SP).</summary>
         public const string StockInsuficiente = "STOCK_INSUFICIENTE";
         public const string StockProyectoInsuficiente = "STOCK_PROYECTO_INSUFICIENTE";
-        public const string StockProyectoNoInicializado = "STOCK_PROYECTO_NO_INICIALIZADO";
         public const string StockProyectoInconsistente = "STOCK_PROYECTO_INCONSISTENTE";
-        public const string StockProyectoYaInicializado = "STOCK_PROYECTO_YA_INICIALIZADO";
 
         /// <summary>
         /// La eliminacion de una entrada dejaria el stock negativo porque

@@ -2,7 +2,6 @@ using Cobranzas_Vittoria.Tests.Integration.Common;
 using Microsoft.Data.SqlClient;
 using System.Net.Http.Headers;
 using Respawn;
-using Dapper;
 using Respawn.Graph;
 
 namespace Cobranzas_Vittoria.Tests.Integration;
@@ -68,11 +67,7 @@ public abstract class IntegrationTestBase
         await using var connection = new SqlConnection(GlobalSetupFixture.DbContainer.GetConnectionString());
         await connection.OpenAsync();
         await _respawner!.ResetAsync(connection);
-        // Base vacía: activar explícitamente la distribución vacía tras cada reset.
-        await connection.ExecuteAsync("""
-            DECLARE @Distribucion almacen.TVP_StockProyectoCantidad;
-            EXEC almacen.usp_StockProyecto_Inicializar @Distribucion;
-            """);
+
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Bearer", JwtTestTokenFactory.CrearToken());
     }
