@@ -278,10 +278,10 @@ BEGIN
             THROW 51213, 'PARTIDA_NO_HOJA: el snapshot contiene una partida con hijos.', 1;
 
         /*
-        Cobertura exclusivamente verificable mediante ledger efectivo.
+        Cobertura del ledger efectivo y de los gastos directos pendientes.
         Cada componente se acumula con signo en un solo SUM, conservando
         centavos. Un neto negativo tampoco permite ocultar una partida.
-        La detección de operaciones pendientes con neto cero queda diferida.
+        Los gastos REGISTRADO se comprueban aparte porque todavía no ejecutan saldo.
         */
         IF EXISTS
         (
@@ -323,6 +323,25 @@ BEGIN
             )
         )
             THROW 51214, 'PARTIDA_RELEVANTE_OMITIDA: falta un detalle real para el efecto neto del ledger.', 1;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM contable.GastoDirecto gd WITH (HOLDLOCK)
+            JOIN ControlPresupuestario.PresupuestoDetalle pd WITH (HOLDLOCK)
+                ON pd.IdPresupuestoDetalle = gd.IdPresupuestoDetalle
+            JOIN ControlPresupuestario.PresupuestoVersion pv WITH (HOLDLOCK)
+                ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+            WHERE gd.Estado = 'REGISTRADO' AND pv.IdPresupuesto = @IdPresupuesto
+                AND pv.IdEstadoPresupuesto IN (@IdAprobado, @IdHistorico)
+                AND NOT EXISTS
+                (
+                    SELECT 1 FROM ControlPresupuestario.PresupuestoDetalle objetivo WITH (HOLDLOCK)
+                    WHERE objetivo.IdPresupuestoVersion = @IdPresupuestoVersion
+                        AND objetivo.IdCatalogoPartida = pd.IdCatalogoPartida
+                )
+        )
+            THROW 51214, 'PARTIDA_RELEVANTE_OMITIDA: falta un detalle real para un gasto directo REGISTRADO pendiente de confirmación.', 1;
 
         DECLARE @FechaAprobacion DATETIME2(0) = SYSUTCDATETIME();
 

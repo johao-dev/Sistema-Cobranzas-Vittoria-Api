@@ -303,9 +303,26 @@ BEGIN
 
         DECLARE @Estado VARCHAR(20), @IdDetalle INT, @IdMoneda INT,
             @Monto DECIMAL(18,2), @Fecha DATE, @IdPresupuesto INT,
-            @IdPartida INT, @MontoPresupuestado DECIMAL(18,2),
+            @IdPartida INT,
             @CodigoEstado VARCHAR(30), @PresupuestoActivo BIT,
             @PartidaActiva BIT, @MonedaPresupuesto INT;
+
+        -- Lectura de localización; el detalle se revalida tras tomar el mutex.
+        -- Aprobación, confirmación y anulación bloquean el presupuesto antes del gasto.
+        SELECT @IdPresupuesto = pv.IdPresupuesto
+        FROM contable.GastoDirecto gd
+        JOIN ControlPresupuestario.PresupuestoDetalle pd
+            ON pd.IdPresupuestoDetalle = gd.IdPresupuestoDetalle
+        JOIN ControlPresupuestario.PresupuestoVersion pv
+            ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+        WHERE gd.IdGastoDirecto = @IdGastoDirecto;
+        IF @IdPresupuesto IS NULL
+            THROW 51505, 'GASTO_NO_EXISTE: no se encontró el gasto directo.', 1;
+
+        SELECT @PresupuestoActivo = Activo, @MonedaPresupuesto = IdMoneda
+        FROM ControlPresupuestario.Presupuesto WITH (UPDLOCK, HOLDLOCK, INDEX(PK_Presupuesto))
+        WHERE IdPresupuesto = @IdPresupuesto;
+
         SELECT @Estado = Estado, @IdDetalle = IdPresupuestoDetalle,
             @IdMoneda = IdMoneda, @Monto = Monto, @Fecha = Fecha
         FROM contable.GastoDirecto WITH (UPDLOCK, HOLDLOCK)
@@ -313,23 +330,20 @@ BEGIN
         IF @Estado IS NULL THROW 51505, 'GASTO_NO_EXISTE: no se encontró el gasto directo.', 1;
         IF @Estado = 'ANULADO' THROW 51506, 'ESTADO_INVALIDO: un gasto ANULADO no puede confirmarse.', 1;
 
-        SELECT @IdPresupuesto = pv.IdPresupuesto, @IdPartida = pd.IdCatalogoPartida,
-            @MontoPresupuestado = pd.MontoPresupuestado, @CodigoEstado = ep.Codigo,
-            @PresupuestoActivo = p.Activo, @PartidaActiva = cp.Activo,
-            @MonedaPresupuesto = p.IdMoneda
+        SELECT @IdPartida = pd.IdCatalogoPartida, @CodigoEstado = ep.Codigo,
+            @PartidaActiva = cp.Activo
         FROM ControlPresupuestario.PresupuestoDetalle pd WITH (HOLDLOCK)
         JOIN ControlPresupuestario.PresupuestoVersion pv WITH (HOLDLOCK)
             ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
         JOIN ControlPresupuestario.EstadoPresupuesto ep WITH (HOLDLOCK)
             ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
-        JOIN ControlPresupuestario.Presupuesto p WITH (UPDLOCK, HOLDLOCK)
-            ON p.IdPresupuesto = pv.IdPresupuesto
         JOIN ControlPresupuestario.CatalogoPartida cp WITH (HOLDLOCK)
             ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
-        WHERE pd.IdPresupuestoDetalle = @IdDetalle;
-        IF @IdPresupuesto IS NULL THROW 51502, 'PARTIDA_INVALIDA: no existe.', 1;
-        IF @Estado = 'REGISTRADO' AND @CodigoEstado <> 'APROBADO'
-            THROW 51507, 'VERSION_NO_VIGENTE: un gasto nuevo requiere la versión APROBADO.', 1;
+        WHERE pd.IdPresupuestoDetalle = @IdDetalle AND pv.IdPresupuesto = @IdPresupuesto;
+        IF @IdPartida IS NULL
+            THROW 51509, 'CONCURRENCIA: cambió el presupuesto del gasto; reintenta la operación.', 1;
+        IF @Estado = 'REGISTRADO' AND @CodigoEstado NOT IN ('APROBADO', 'HISTORICO')
+            THROW 51507, 'VERSION_NO_VIGENTE: el gasto debe proceder de una versión APROBADO o HISTORICO.', 1;
         IF @Estado = 'REGISTRADO' AND (@PresupuestoActivo <> 1 OR @PartidaActiva <> 1)
             THROW 51502, 'PARTIDA_INVALIDA: presupuesto o partida inactivos.', 1;
         IF @Estado = 'REGISTRADO' AND EXISTS
@@ -348,16 +362,22 @@ BEGIN
             IF @ResultadoLock < 0
                 THROW 51509, 'CONCURRENCIA: no se pudo serializar el saldo presupuestario.', 1;
 
-            DECLARE @PresupuestadoVigente DECIMAL(18,2);
-            SELECT @PresupuestadoVigente = pd.MontoPresupuestado
+            DECLARE @CantidadVersionesAprobadas INT, @IdVersionVigente INT;
+            SELECT @CantidadVersionesAprobadas = COUNT(*),
+                @IdVersionVigente = MAX(pv.IdPresupuestoVersion)
             FROM ControlPresupuestario.PresupuestoVersion pv WITH (HOLDLOCK)
             JOIN ControlPresupuestario.EstadoPresupuesto ep WITH (HOLDLOCK)
               ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto AND ep.Codigo = 'APROBADO'
-            JOIN ControlPresupuestario.PresupuestoDetalle pd WITH (HOLDLOCK)
-              ON pd.IdPresupuestoVersion = pv.IdPresupuestoVersion
-             AND pd.IdCatalogoPartida = @IdPartida
             WHERE pv.IdPresupuesto = @IdPresupuesto;
-            IF @PresupuestadoVigente IS NULL
+            IF @CantidadVersionesAprobadas <> 1
+                THROW 51507, 'VERSION_NO_VIGENTE: se requiere una única versión APROBADO del presupuesto.', 1;
+
+            DECLARE @PresupuestadoVigente DECIMAL(18,2), @IdDetalleVigente INT;
+            SELECT @IdDetalleVigente = IdPresupuestoDetalle,
+                @PresupuestadoVigente = MontoPresupuestado
+            FROM ControlPresupuestario.PresupuestoDetalle WITH (HOLDLOCK)
+            WHERE IdPresupuestoVersion = @IdVersionVigente AND IdCatalogoPartida = @IdPartida;
+            IF @IdDetalleVigente IS NULL
                 THROW 51507, 'VERSION_NO_VIGENTE: la partida no existe en la línea base aprobada.', 1;
 
             DECLARE @Comprometido DECIMAL(18,2), @Ejecutado DECIMAL(18,2);
@@ -382,6 +402,10 @@ BEGIN
               AND pd.IdCatalogoPartida = @IdPartida;
             IF @PresupuestadoVigente - @Comprometido - @Ejecutado - @Monto < 0
                 THROW 51510, 'SALDO_INSUFICIENTE: la confirmación dejaría la partida excedida.', 1;
+
+            -- Solo la primera confirmación resuelve la versión vigente. Un retry
+            -- conserva el detalle del movimiento original y su clave de evento.
+            SET @IdDetalle = @IdDetalleVigente;
         END;
 
         DECLARE @Movimiento TABLE
@@ -404,7 +428,8 @@ BEGIN
             @Observacion = N'Confirmación de gasto directo.';
 
         IF @Estado = 'REGISTRADO'
-            UPDATE contable.GastoDirecto SET Estado = 'CONFIRMADO',
+            UPDATE contable.GastoDirecto SET IdPresupuestoDetalle = @IdDetalle,
+                Estado = 'CONFIRMADO',
                 FechaActualizacion = SYSUTCDATETIME()
             WHERE IdGastoDirecto = @IdGastoDirecto AND Estado = 'REGISTRADO';
         IF @TranCount = 0 COMMIT TRANSACTION;
@@ -431,12 +456,39 @@ BEGIN
     BEGIN TRY
         IF @TranCount = 0 BEGIN TRANSACTION;
         ELSE BEGIN SAVE TRANSACTION GastoDirectoAnular; SET @SavepointCreado = 1; END;
-        DECLARE @Estado VARCHAR(20), @IdDetalle INT, @Monto DECIMAL(18,2), @Fecha DATE;
+        DECLARE @Estado VARCHAR(20), @IdDetalle INT, @Monto DECIMAL(18,2), @Fecha DATE,
+            @IdPresupuesto INT, @PresupuestoBloqueado INT;
+
+        -- Mismo orden que aprobación y confirmación: presupuesto antes del gasto.
+        SELECT @IdPresupuesto = pv.IdPresupuesto
+        FROM contable.GastoDirecto gd
+        JOIN ControlPresupuestario.PresupuestoDetalle pd
+            ON pd.IdPresupuestoDetalle = gd.IdPresupuestoDetalle
+        JOIN ControlPresupuestario.PresupuestoVersion pv
+            ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+        WHERE gd.IdGastoDirecto = @IdGastoDirecto;
+        IF @IdPresupuesto IS NULL
+            THROW 51505, 'GASTO_NO_EXISTE: no se encontró el gasto directo.', 1;
+
+        SELECT @PresupuestoBloqueado = IdPresupuesto
+        FROM ControlPresupuestario.Presupuesto WITH (UPDLOCK, HOLDLOCK, INDEX(PK_Presupuesto))
+        WHERE IdPresupuesto = @IdPresupuesto;
+
         SELECT @Estado = Estado, @IdDetalle = IdPresupuestoDetalle,
             @Monto = Monto, @Fecha = Fecha
         FROM contable.GastoDirecto WITH (UPDLOCK, HOLDLOCK)
         WHERE IdGastoDirecto = @IdGastoDirecto;
         IF @Estado IS NULL THROW 51505, 'GASTO_NO_EXISTE: no se encontró el gasto directo.', 1;
+
+        IF NOT EXISTS
+        (
+            SELECT 1
+            FROM ControlPresupuestario.PresupuestoDetalle pd WITH (HOLDLOCK)
+            JOIN ControlPresupuestario.PresupuestoVersion pv WITH (HOLDLOCK)
+                ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+            WHERE pd.IdPresupuestoDetalle = @IdDetalle AND pv.IdPresupuesto = @IdPresupuesto
+        )
+            THROW 51509, 'CONCURRENCIA: cambió el presupuesto del gasto; reintenta la operación.', 1;
 
         DECLARE @ClaveConfirmacion VARCHAR(200) =
             CONCAT('CONTABLE:GASTO_DIRECTO:', @IdGastoDirecto, ':CONFIRMACION');

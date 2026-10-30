@@ -9,7 +9,8 @@ using Dapper;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Contable;
 
-public sealed class GastosDirectosControllerTests : IntegrationTestBase
+[NonParallelizable]
+public sealed partial class GastosDirectosControllerTests : IntegrationTestBase
 {
     // Consultar exige gasto_directo.ver y operar gasto_directo.operar.
     private static readonly string[] PermisosGasto =
@@ -455,7 +456,7 @@ public sealed class GastosDirectosControllerTests : IntegrationTestBase
     }
 
     [Test]
-    public async Task Confirmar_DetalleHistoricoParaOperacionNueva_Rechaza()
+    public async Task Confirmar_SinVersionAprobada_RechazaSinMovimiento()
     {
         var detalle = await IntegracionEconomicaTestData.ObtenerOCrearDetalleAprobadoAsync();
         var moneda = await DbHelpersMoneda.ObtenerPenAsync();
