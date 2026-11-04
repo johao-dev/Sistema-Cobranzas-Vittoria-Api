@@ -76,7 +76,6 @@ public sealed class CentroCostoController : ControllerBase
             Title = "Plantilla de importacion - Centros de costo",
             FiltersSubtitle = "Tipo acepta el codigo o el nombre. Proyecto (nombre) solo para el tipo PROYECTO, y es obligatorio en ese caso.",
             GeneratedAtSubtitle = "Generado el: {0}",
-            IncludeTotalsRow = false,
             HeaderRowIndex = 0
         });
         return File(xlsx, PlantillaArchivo.TipoXlsx, nombre);

@@ -26,7 +26,6 @@ namespace Cobranzas_Vittoria.Tests.Unit.Common;
 ///   5: vacia
 ///   6: HEADER de columnas
 ///   7..N: datos
-///   N+1: fila de TOTALES (si IncludeTotalsRow = true y hay datos)
 /// </code>
 /// </para>
 /// </summary>
@@ -63,14 +62,13 @@ public class NpoiExcelExporterTests
     // ============================================================================
 
     [Test]
-    public void Export_DatosVaciosYSinTotales_SoloGeneraHeader()
+    public void Export_DatosVacios_SoloGeneraHeader()
     {
         // Arrange
         var config = new ExcelSheetConfig
         {
             Title = "CONSOLIDADO",
-            FiltersSubtitle = "Filtros: (sin filtros)",
-            IncludeTotalsRow = false
+            FiltersSubtitle = "Filtros: (sin filtros)"
         };
 
         // Act
@@ -81,7 +79,7 @@ public class NpoiExcelExporterTests
         var sheet = GetSheet(bytes);
         // Solo debe existir la fila de header (fila 6); el resto son null.
         Assert.That(sheet.LastRowNum, Is.EqualTo(6),
-            "Sin datos y sin totales, la ultima fila escrita debe ser la del header.");
+            "Sin datos, la ultima fila escrita debe ser la del header.");
     }
 
     [Test]
@@ -223,8 +221,7 @@ public class NpoiExcelExporterTests
         var config = new ExcelSheetConfig
         {
             Title = "CONSOLIDADO DE INVENTARIO",
-            FiltersSubtitle = "Filtros: idEspecialidad=2",
-            IncludeTotalsRow = true
+            FiltersSubtitle = "Filtros: idEspecialidad=2"
         };
 
         // Act
@@ -268,96 +265,6 @@ public class NpoiExcelExporterTests
             Assert.That(dataRow.GetCell(c).CellType, Is.EqualTo(CellType.Blank),
                 $"Celda {c} con valor null debe quedar en blanco.");
         }
-    }
-
-    // ============================================================================
-    // Totales
-    // ============================================================================
-
-    [Test]
-    public void Export_ConTotalesYMultiplesFilas_SumaColumnasNumericas()
-    {
-        // Arrange
-        var rows = new[]
-        {
-            new KardexStockExcelRow { Numero = 1, Entrada = 10m, Salida = 2m, Stock = 8m },
-            new KardexStockExcelRow { Numero = 2, Entrada = 20m, Salida = 5m, Stock = 15m },
-            new KardexStockExcelRow { Numero = 3, Entrada = 30m, Salida = 7m, Stock = 23m }
-        };
-        var config = new ExcelSheetConfig { IncludeTotalsRow = true };
-
-        // Act
-        var bytes = _exporter.ExportToXlsx(rows, config);
-        var sheet = GetSheet(bytes);
-        // Header en fila 6, 3 filas de datos en 7-9, totales en fila 10.
-        var totalsRow = sheet.GetRow(10);
-
-        // Assert
-        Assert.That(GetString(totalsRow.GetCell(0)), Is.EqualTo("TOTAL"),
-            "La primera columna no-total debe contener la etiqueta 'TOTAL'.");
-        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(60m),
-            "Suma de Entrada: 10 + 20 + 30.");
-        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(14m),
-            "Suma de Salida: 2 + 5 + 7.");
-        Assert.That((decimal)totalsRow.GetCell(7).NumericCellValue, Is.EqualTo(46m),
-            "Suma de Stock: 8 + 15 + 23.");
-    }
-
-    [Test]
-    public void Export_ConTotalesYValoresNullEnColumnasTotales_SumaComoCero()
-    {
-        // Arrange: una fila con Entrada null (se interpreta como 0 en el total).
-        var rows = new[]
-        {
-            new KardexStockExcelRow { Numero = 1, Entrada = 10m, Salida = null, Stock = 10m },
-            new KardexStockExcelRow { Numero = 2, Entrada = null, Salida = 5m, Stock = -5m }
-        };
-        var config = new ExcelSheetConfig { IncludeTotalsRow = true };
-
-        // Act
-        var bytes = _exporter.ExportToXlsx(rows, config);
-        var sheet = GetSheet(bytes);
-        var totalsRow = sheet.GetRow(9);
-
-        // Assert
-        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(10m));
-        Assert.That((decimal)totalsRow.GetCell(6).NumericCellValue, Is.EqualTo(5m));
-        Assert.That((decimal)totalsRow.GetCell(7).NumericCellValue, Is.EqualTo(5m));
-    }
-
-    [Test]
-    public void Export_SinTotalesYConDatos_NoAgregaFilaDeTotales()
-    {
-        // Arrange
-        var rows = new[]
-        {
-            new KardexStockExcelRow { Numero = 1, Entrada = 10m }
-        };
-        var config = new ExcelSheetConfig { IncludeTotalsRow = false };
-
-        // Act
-        var bytes = _exporter.ExportToXlsx(rows, config);
-        var sheet = GetSheet(bytes);
-
-        // Assert
-        // Header en fila 6, dato en fila 7, NO debe haber fila 8 (totales).
-        Assert.That(sheet.LastRowNum, Is.EqualTo(7),
-            "Sin totales, la ultima fila debe ser la del dato (fila 7).");
-    }
-
-    [Test]
-    public void Export_DatosVaciosConTotales_NoGeneraFilaDeTotales()
-    {
-        // Arrange: sin datos, no debe haber totales aunque IncludeTotalsRow=true.
-        var config = new ExcelSheetConfig { IncludeTotalsRow = true };
-
-        // Act
-        var bytes = _exporter.ExportToXlsx(Array.Empty<KardexStockExcelRow>(), config);
-        var sheet = GetSheet(bytes);
-
-        // Assert
-        Assert.That(sheet.LastRowNum, Is.EqualTo(6),
-            "Sin datos, la fila de totales no debe existir aunque IncludeTotalsRow=true.");
     }
 
     // ============================================================================

@@ -222,7 +222,6 @@ public class ImportController : ControllerBase
             Title = "Plantilla de importacion - Materiales",
             FiltersSubtitle = "Borre este archivo antes de cargar datos reales.",
             GeneratedAtSubtitle = "Generado el: {0}",
-            IncludeTotalsRow = false,
             HeaderRowIndex = 0
         };
 

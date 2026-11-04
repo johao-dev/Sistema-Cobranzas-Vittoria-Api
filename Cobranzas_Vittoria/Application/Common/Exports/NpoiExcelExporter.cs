@@ -130,37 +130,6 @@ public sealed class NpoiExcelExporter : IExcelExporter
             }
         }
 
-        // Fila de totales (opcional)
-        if (config.IncludeTotalsRow && data.Count > 0 && columns.Any(x => x.Attribute.IncludeInTotals))
-        {
-            var totalsRow = sheet.CreateRow(rowIndex++);
-            var firstNonTotal = -1;
-            for (var c = 0; c < columns.Length; c++)
-            {
-                if (!columns[c].Attribute.IncludeInTotals)
-                {
-                    firstNonTotal = c;
-                    break;
-                }
-            }
-            for (var c = 0; c < columns.Length; c++)
-            {
-                var col = columns[c];
-                var cell = totalsRow.CreateCell(c);
-                if (col.Attribute.IncludeInTotals && col.IsNumeric)
-                {
-                    var sum = data.Sum(item => Convert.ToDecimal(col.Property.GetValue(item) ?? 0m));
-                    cell.SetCellValue((double)sum);
-                    cell.CellStyle = styles.TotalNumber;
-                }
-                else
-                {
-                    cell.SetCellValue(c == firstNonTotal ? "TOTAL" : string.Empty);
-                    cell.CellStyle = styles.TotalText;
-                }
-            }
-        }
-
         // Anchos de columna
         for (var c = 0; c < columns.Length; c++)
         {
@@ -205,7 +174,7 @@ public sealed class NpoiExcelExporter : IExcelExporter
     }
 
     /// <summary>
-    /// Determina si un tipo es numerico a efectos de formato y totales.
+    /// Determina si un tipo es numerico a efectos de formato.
     /// Incluye los nullables de cada tipo.
     /// </summary>
     private static bool IsNumericType(Type type)
@@ -354,13 +323,8 @@ public sealed class NpoiExcelExporter : IExcelExporter
         var dataFont = workbook.CreateFont();
         dataFont.FontHeightInPoints = 10;
 
-        var totalFont = workbook.CreateFont();
-        totalFont.IsBold = true;
-        totalFont.FontHeightInPoints = 11;
-
         // ---- Colores de fondo ----
         var headerBg = new XSSFColor(new byte[] { 0x1F, 0x4E, 0x79 }); // azul oscuro
-        var totalBg = new XSSFColor(new byte[] { 0xF2, 0xF2, 0xF2 }); // gris claro
 
         var dataFormat = workbook.CreateDataFormat();
 
@@ -383,7 +347,7 @@ public sealed class NpoiExcelExporter : IExcelExporter
         header.VerticalAlignment = VerticalAlignment.Center;
         // NPOI 2.7.1: la propiedad de la interfaz ICellStyle es `short`; para
         // asignar un XSSFColor (RGB) hay que castear a XSSFCellStyle y usar
-        // SetFillForegroundColor(XSSFColor). Lo mismo aplica a TotalText/TotalNumber.
+        // SetFillForegroundColor(XSSFColor).
         ((XSSFCellStyle)header).SetFillForegroundColor(headerBg);
         header.FillPattern = FillPattern.SolidForeground;
         SetThinBorder(header);
@@ -412,25 +376,6 @@ public sealed class NpoiExcelExporter : IExcelExporter
         dataDate.DataFormat = dataFormat.GetFormat(DefaultDateFormat);
         SetThinBorder(dataDate);
 
-        // ---- Total text ----
-        var totalText = workbook.CreateCellStyle();
-        totalText.SetFont(totalFont);
-        totalText.Alignment = HorizontalAlignment.Left;
-        totalText.VerticalAlignment = VerticalAlignment.Center;
-        ((XSSFCellStyle)totalText).SetFillForegroundColor(totalBg);
-        totalText.FillPattern = FillPattern.SolidForeground;
-        SetThinBorder(totalText);
-
-        // ---- Total number ----
-        var totalNumber = workbook.CreateCellStyle();
-        totalNumber.SetFont(totalFont);
-        totalNumber.Alignment = HorizontalAlignment.Right;
-        totalNumber.VerticalAlignment = VerticalAlignment.Center;
-        totalNumber.DataFormat = dataFormat.GetFormat(DefaultNumberFormat);
-        ((XSSFCellStyle)totalNumber).SetFillForegroundColor(totalBg);
-        totalNumber.FillPattern = FillPattern.SolidForeground;
-        SetThinBorder(totalNumber);
-
         return new WorkbookStyles(
             Workbook: workbook,
             Title: title,
@@ -438,9 +383,7 @@ public sealed class NpoiExcelExporter : IExcelExporter
             Header: header,
             DataText: dataText,
             DataNumber: dataNumber,
-            DataDate: dataDate,
-            TotalText: totalText,
-            TotalNumber: totalNumber);
+            DataDate: dataDate);
     }
 
     private static void SetThinBorder(ICellStyle style)
@@ -471,7 +414,5 @@ public sealed class NpoiExcelExporter : IExcelExporter
         ICellStyle Header,
         ICellStyle DataText,
         ICellStyle DataNumber,
-        ICellStyle DataDate,
-        ICellStyle TotalText,
-        ICellStyle TotalNumber);
+        ICellStyle DataDate);
 }

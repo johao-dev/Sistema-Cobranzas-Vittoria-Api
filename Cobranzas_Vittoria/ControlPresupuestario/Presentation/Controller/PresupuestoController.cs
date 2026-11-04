@@ -182,7 +182,6 @@ public sealed class PresupuestoController : ControllerBase
             Title = "Plantilla de carga de presupuesto",
             FiltersSubtitle = "Complete la columna Monto (0 si la partida no aplica). La columna Partida es informativa.",
             GeneratedAtSubtitle = "Generado el: {0}",
-            IncludeTotalsRow = false,
             HeaderRowIndex = 0
         });
         return File(xlsx, PlantillaArchivo.TipoXlsx, nombre);
@@ -234,7 +233,6 @@ public sealed class PresupuestoController : ControllerBase
             Title = "Plantilla de presupuesto por categorías",
             FiltersSubtitle = "Monto solo en las partidas sin hijas (0 si no aplica); en las categorías déjalo vacío. Subtotal es informativo.",
             GeneratedAtSubtitle = "Generado el: {0}",
-            IncludeTotalsRow = false,
             HeaderRowIndex = 0
         });
         return File(xlsx, PlantillaArchivo.TipoXlsx, nombre);

@@ -4,7 +4,7 @@ namespace Cobranzas_Vittoria.Application.Common.Exports;
 /// Configuracion de la hoja Excel que produce <see cref="IExcelExporter"/>.
 /// Cada reporte instancia esta clase con sus particularidades; la
 /// implementacion con NPOI (<see cref="NpoiExcelExporter"/>) la consume
-/// para escribir titulo, subtitulos, fila de totales y metadata.
+/// para escribir titulo, subtitulos y metadata.
 ///
 /// <para>
 /// <b>Estructura tipica de la hoja</b> (filas 0-based, ajustables):
@@ -17,7 +17,6 @@ namespace Cobranzas_Vittoria.Application.Common.Exports;
 ///   5: (vacia)
 ///   6: HEADER (N° | Proyecto | ...)
 ///   7..N: datos
-///   N+1 (opcional): fila de TOTALES (si IncludeTotalsRow = true)
 /// </code>
 /// </para>
 /// </summary>
@@ -45,14 +44,6 @@ public sealed class ExcelSheetConfig
     /// <c>dd/MM/yyyy HH:mm:ss</c>. Default: <c>"Generado el: {0}"</c>.
     /// </summary>
     public string GeneratedAtSubtitle { get; set; } = "Generado el: {0}";
-
-    /// <summary>
-    /// Si es <c>true</c>, agrega una fila final con la suma de las
-    /// columnas marcadas con
-    /// <see cref="ExcelColumnAttribute.IncludeInTotals"/>.
-    /// Solo se agrega si hay al menos una fila de datos.
-    /// </summary>
-    public bool IncludeTotalsRow { get; set; } = false;
 
     /// <summary>Autor que se registra en las propiedades del workbook.</summary>
     public string Author { get; set; } = "Sistema de Cobranzas Vittoria";

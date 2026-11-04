@@ -212,7 +212,6 @@ public sealed class KardexInventarioService : IKardexInventarioService
 
     public async Task<byte[]> ExportarStockActualAsync(
         FiltroStockKardex filtro,
-        bool? incluirTotales = null,
         CancellationToken ct = default)
     {
         filtro ??= new FiltroStockKardex();
@@ -249,8 +248,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
         {
             SheetName = "Kardex Stock",
             Title = "CONSOLIDADO DE INVENTARIO",
-            FiltersSubtitle = BuildFiltersSubtitle(filtro),
-            IncludeTotalsRow = incluirTotales ?? false
+            FiltersSubtitle = BuildFiltersSubtitle(filtro)
         };
 
         // 4. Delegar al helper generico. Este metodo es sincrono (NPOI

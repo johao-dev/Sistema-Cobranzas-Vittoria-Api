@@ -19,7 +19,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Inventario;
 /// <list type="bullet">
 ///   <item>Verifican codigos HTTP y content-type.</item>
 ///   <item>Validan que el body es un XLSX valido (firma PK + parseable por NPOI).</item>
-///   <item>Validan la estructura de la hoja (titulo, subtitulo de filtros, header, datos, totales).</item>
+///   <item>Validan la estructura de la hoja (titulo, subtitulo de filtros, header, datos).</item>
 ///   <item>Validan que el subtitulo refleja los filtros aplicados (idEspecialidad, idProyecto, fecha).</item>
 ///   <item>Validan que el numero de filas de datos coincide con GET /stock-actual.</item>
 /// </list>
@@ -92,14 +92,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
             return 0;
         }
 
-        var lastRow = sheet.GetRow(sheet.LastRowNum);
-        var hasTotalsRow = string.Equals(
-            GetString(lastRow?.GetCell(0)),
-            "TOTAL",
-            StringComparison.OrdinalIgnoreCase);
-
-        var dataRows = sheet.LastRowNum - headerRowIndex - (hasTotalsRow ? 1 : 0);
-        return Math.Max(0, dataRows);
+        return sheet.LastRowNum - headerRowIndex;
     }
 
     // ============================================================================
@@ -140,7 +133,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
         await CrearEntradaAsync(cantidad: 5m, idMaterial: IdMaterialAlbanileria2);
 
         // Act
-        var response = await _client.GetAsync("/api/almacen/kardex/stock-actual/exportar-excel?incluirTotales=true");
+        var response = await _client.GetAsync("/api/almacen/kardex/stock-actual/exportar-excel");
 
         // Assert
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -169,11 +162,8 @@ public class KardexInventarioExportTests : IntegrationTestBase
         Assert.That((decimal)dataRow1.GetCell(5).NumericCellValue, Is.EqualTo(10m));
         Assert.That((decimal)dataRow2.GetCell(5).NumericCellValue, Is.EqualTo(5m));
 
-        // Fila de totales (fila 9): se solicito explicitamente con incluirTotales=true.
-        var totalsRow = sheet.GetRow(9);
-        Assert.That(totalsRow, Is.Not.Null, "Con incluirTotales=true debe agregarse fila de totales.");
-        Assert.That(GetString(totalsRow!.GetCell(0)), Is.EqualTo("TOTAL"));
-        Assert.That((decimal)totalsRow.GetCell(5).NumericCellValue, Is.EqualTo(15m));
+        Assert.That(sheet.LastRowNum, Is.EqualTo(8),
+            "La hoja debe terminar en la segunda fila de datos.");
     }
 
     [Test]
@@ -191,10 +181,10 @@ public class KardexInventarioExportTests : IntegrationTestBase
         var bytes = await response.Content.ReadAsByteArrayAsync();
         var sheet = GetSheet(bytes);
 
-        // Sin datos, no debe haber fila de totales. La ultima fila escrita
+        // Sin datos, la ultima fila escrita
         // debe ser la del header (fila 6).
         Assert.That(sheet.LastRowNum, Is.EqualTo(6),
-            "Sin filas para el filtro, no debe haber fila de totales.");
+            "Sin filas para el filtro, la hoja debe terminar en el header.");
 
         // El subtitulo de filtros debe mencionar el idEspecialidad aplicado.
         var filtersRow = sheet.GetRow(3);
@@ -312,8 +302,7 @@ public class KardexInventarioExportTests : IntegrationTestBase
         var bytes = await exportResponse.Content.ReadAsByteArrayAsync();
         var sheet = GetSheet(bytes);
 
-        // Header en fila 6; datos en filas 7..(6+N). La fila de totales es
-        // opcional y el endpoint no la incluye por defecto.
+        // Header en fila 6; datos en filas 7..(6+N).
         var filasEnExcel = sheet.LastRowNum - 6;
 
         // Assert

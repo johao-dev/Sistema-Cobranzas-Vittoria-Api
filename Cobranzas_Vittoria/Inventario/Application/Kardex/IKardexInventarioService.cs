@@ -81,15 +81,13 @@ public interface IKardexInventarioService
     /// <param name="filtro">
     /// Filtros opcionales. Si es null se trata como filtro vacio (lista completa).
     /// </param>
-    /// <param name="incluirTotales">Indica si se agrega una fila de totales.</param>
     /// <param name="ct">Token de cancelacion.</param>
     /// <returns>
     /// Bytes del archivo <c>.xlsx</c> con:
     /// titulo, subtitulo de filtros, fecha de generacion, header de columnas,
-    /// filas de datos y fila de totales (suma de Entrada/Salida/Stock).
+    /// filas de datos.
     /// </returns>
     Task<byte[]> ExportarStockActualAsync(
         FiltroStockKardex filtro,
-        bool? incluirTotales,
         CancellationToken ct = default);
 }

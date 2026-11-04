@@ -35,8 +35,7 @@ public interface IExcelExporter
     /// </typeparam>
     /// <param name="rows">Filas a exportar. Si es null o vacio, se
     /// genera un libro con solo el header.</param>
-    /// <param name="config">Configuracion de la hoja (titulo, subtitulos,
-    /// totales, etc.).</param>
+    /// <param name="config">Configuracion de la hoja (titulo, subtitulos y metadata).</param>
     /// <returns>Bytes del archivo <c>.xlsx</c>.</returns>
     byte[] ExportToXlsx<T>(IEnumerable<T> rows, ExcelSheetConfig config) where T : class;
 }

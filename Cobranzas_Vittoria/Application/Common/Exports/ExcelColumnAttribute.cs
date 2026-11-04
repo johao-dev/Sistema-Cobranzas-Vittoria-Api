@@ -45,13 +45,6 @@ public sealed class ExcelColumnAttribute : Attribute
     public string Format { get; set; } = string.Empty;
 
     /// <summary>
-    /// Si es <c>true</c> y la columna es numerica, se incluye en la fila
-    /// de totales (SUM) cuando <see cref="ExcelSheetConfig.IncludeTotalsRow"/>
-    /// esta activo. Para columnas no numericas se ignora.
-    /// </summary>
-    public bool IncludeInTotals { get; set; } = false;
-
-    /// <summary>
     /// Ancho de la columna en caracteres. <c>0</c> usa el ancho por
     /// defecto (15 chars para texto, 18 para numeros/fechas).
     /// </summary>

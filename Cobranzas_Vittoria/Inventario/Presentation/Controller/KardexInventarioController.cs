@@ -247,7 +247,7 @@ public class KardexInventarioController : ControllerBase
     /// <b>Respuesta</b>: <c>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</c>
     /// con header <c>Content-Disposition: attachment; filename="kardex-stock-{yyyyMMdd-HHmm}.xlsx"</c>.
     /// El cuerpo contiene: titulo, subtitulo de filtros, fecha de generacion,
-    /// header de columnas, filas de datos y fila de totales (suma de Entrada/Salida/Stock).
+    /// header de columnas y filas de datos.
     /// </para>
     ///
     /// <para>
@@ -263,7 +263,6 @@ public class KardexInventarioController : ControllerBase
         [FromQuery] int? idEspecialidad,
         [FromQuery] DateOnly? fechaDesde,
         [FromQuery] DateOnly? fechaHasta,
-        [FromQuery] bool? incluirTotales,
         CancellationToken ct = default)
     {
         FiltroStockKardex filtro = new FiltroStockKardex
@@ -273,7 +272,7 @@ public class KardexInventarioController : ControllerBase
             FechaHasta = fechaHasta
         };
 
-        byte[] bytes = await _service.ExportarStockActualAsync(filtro, incluirTotales, ct);
+        byte[] bytes = await _service.ExportarStockActualAsync(filtro, ct);
 
         // Nombre del archivo: kardex-stock-{yyyyMMdd-HHmm}.xlsx. Esto permite
         // al usuario descargar multiples reportes en la misma sesion sin

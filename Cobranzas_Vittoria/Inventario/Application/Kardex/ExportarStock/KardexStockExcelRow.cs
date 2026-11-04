@@ -16,9 +16,9 @@ namespace Cobranzas_Vittoria.Inventario.Application.Kardex.ExportarStock;
 ///   3. Cód. Material   CodigoMaterial      (text, sin formato)
 ///   4. Nombre          Nombre              (text, sin formato)
 ///   5. Unidad Medida   UnidadMedida        (text, sin formato)
-///   6. Entrada         Entrada             (decimal, totals, #,##0.00)
-///   7. Salida          Salida              (decimal, totals, #,##0.00)
-///   8. Stock           Stock               (decimal, totals, #,##0.00)
+///   6. Entrada         Entrada             (decimal, #,##0.00)
+///   7. Salida          Salida              (decimal, #,##0.00)
+///   8. Stock           Stock               (decimal, #,##0.00)
 ///   9. Fecha           Fecha               (DateOnly, dd/MM/yyyy)
 /// </code>
 /// </para>
@@ -60,13 +60,13 @@ public sealed class KardexStockExcelRow
     [ExcelColumn(Header = "Unidad Medida", Order = 4)]
     public string? UnidadMedida { get; set; }
 
-    [ExcelColumn(Header = "Entrada", Order = 5, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Entrada", Order = 5, Format = "#,##0.00")]
     public decimal? Entrada { get; set; }
 
-    [ExcelColumn(Header = "Salida", Order = 6, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Salida", Order = 6, Format = "#,##0.00")]
     public decimal? Salida { get; set; }
 
-    [ExcelColumn(Header = "Stock", Order = 7, Format = "#,##0.00", IncludeInTotals = true)]
+    [ExcelColumn(Header = "Stock", Order = 7, Format = "#,##0.00")]
     public decimal? Stock { get; set; }
 
     [ExcelColumn(Header = "Fecha", Order = 8, Format = "dd/MM/yyyy")]

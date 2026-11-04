@@ -79,7 +79,6 @@ public sealed class CatalogoPartidaController : ControllerBase
             Title = "Plantilla de importacion - Catalogo de partidas",
             FiltersSubtitle = "Tipo acepta el codigo o el nombre. CodigoPadre puede ser otra fila del archivo.",
             GeneratedAtSubtitle = "Generado el: {0}",
-            IncludeTotalsRow = false,
             HeaderRowIndex = 0
         });
         return File(xlsx, PlantillaArchivo.TipoXlsx, nombre);

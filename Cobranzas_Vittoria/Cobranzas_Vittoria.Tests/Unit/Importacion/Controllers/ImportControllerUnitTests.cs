@@ -232,8 +232,7 @@ public class ImportControllerUnitTests
         Assert.That(cell2, Is.EqualTo("UnidadMedida"));
         Assert.That(cell3, Is.EqualTo("Codigo"));
 
-        // Sin datos: el helper emite solo el header (no hay filas de datos
-        // ni fila de totales porque IncludeTotalsRow = false).
+        // Sin datos: el helper emite solo el header.
         Assert.That(sheet.LastRowNum, Is.EqualTo(5),
             "El sheet termina exactamente en la fila del header (sin filas de datos).");
     }
