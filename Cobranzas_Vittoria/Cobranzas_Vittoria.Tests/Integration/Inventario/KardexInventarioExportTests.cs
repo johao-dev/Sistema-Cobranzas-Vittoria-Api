@@ -27,7 +27,8 @@ namespace Cobranzas_Vittoria.Tests.Integration.Inventario;
 /// <para>
 /// <b>Patron de setup</b>: se siguen las mismas convenciones que
 /// <c>KardexInventarioControllerTests</c> (entradas via API, IdMaterial=2 de
-/// la seed para Albañileria). El KardexStock es global por material; el proyecto es solo una etiqueta informativa.
+/// la seed para Albañileria). Sin idProyecto se exporta el stock global por material.
+/// La exportación por proyecto se verifica en StockProyectoTests.
 /// </para>
 /// </summary>
 public class KardexInventarioExportTests : IntegrationTestBase
@@ -308,5 +309,20 @@ public class KardexInventarioExportTests : IntegrationTestBase
         // Assert
         Assert.That(filasEnExcel, Is.EqualTo(filasEnJson),
             "El numero de filas de datos en el Excel debe coincidir con GET /stock-actual.");
+    }
+    [TestCase("idProyecto=0")]
+    [TestCase("idProyecto=-1")]
+    [TestCase("idEspecialidad=0")]
+    [TestCase("idProyecto=abc")]
+    [TestCase("fechaDesde=invalida")]
+    [TestCase("fechaDesde=2026-11-05&fechaHasta=2026-11-04")]
+    [TestCase("idProyecto=10&fechaDesde=2026-11-05&fechaHasta=2026-11-04")]
+    public async Task ExportarStockActual_FiltrosInvalidos_Devuelve400(string filtros)
+    {
+        HttpResponseMessage response = await _client.GetAsync(
+            $"/api/almacen/kardex/stock-actual/exportar-excel?{filtros}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(response.Content.Headers.ContentType!.MediaType, Does.Contain("json"));
     }
 }

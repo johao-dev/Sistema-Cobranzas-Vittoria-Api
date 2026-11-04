@@ -3,6 +3,7 @@ using Cobranzas_Vittoria.Inventario.Domain.Model;
 using Cobranzas_Vittoria.Inventario.Application.Excepciones;
 using Cobranzas_Vittoria.Inventario.Domain.Excepciones;
 using Cobranzas_Vittoria.Inventario.Application.Kardex;
+using Cobranzas_Vittoria.Inventario.Application.Kardex.ExportarStock;
 using Cobranzas_Vittoria.Inventario.Application.Common;
 using Cobranzas_Vittoria.Tests.Unit.Inventario.Stubs;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,7 +51,7 @@ public class KardexInventarioServiceUnitTests
         var validator = new KardexInventarioValidator(esp, mat, prov, proy);
 
         var service = new KardexInventarioService(
-            entradaRepo, salidaRepo, stockRepo, validator,
+            entradaRepo, salidaRepo, stockRepo, new StubStockProyectoRepository(), validator,
             new StubExcelExporter(),
             NullLogger<KardexInventarioService>.Instance);
         return (service, entradaRepo, salidaRepo, stockRepo, validator);
@@ -347,23 +348,23 @@ public class KardexInventarioServiceUnitTests
         var exporter = new StubExcelExporter();
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            null!, salidaRepo, stockRepo, validator, exporter,
+            null!, salidaRepo, stockRepo, new StubStockProyectoRepository(), validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, null!, stockRepo, validator, exporter,
+            entradaRepo, null!, stockRepo, new StubStockProyectoRepository(), validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, salidaRepo, null!, validator, exporter,
+            entradaRepo, salidaRepo, null!, new StubStockProyectoRepository(), validator, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, salidaRepo, stockRepo, null!, exporter,
+            entradaRepo, salidaRepo, stockRepo, new StubStockProyectoRepository(), null!, exporter,
             NullLogger<KardexInventarioService>.Instance));
 
         Assert.Throws<ArgumentNullException>(() => new KardexInventarioService(
-            entradaRepo, salidaRepo, stockRepo, validator, null!,
+            entradaRepo, salidaRepo, stockRepo, new StubStockProyectoRepository(), validator, null!,
             NullLogger<KardexInventarioService>.Instance));
     }
 
@@ -397,7 +398,7 @@ public class KardexInventarioServiceUnitTests
             }
         };
 
-        var filtro = new FiltroStockKardex
+        var filtro = new FiltroExportacionStock
         {
             IdEspecialidad = 2
         };
@@ -437,7 +438,7 @@ public class KardexInventarioServiceUnitTests
         var (_, _, _, _, _) = serviceConExporter.GetStubs();
 
         // Act
-        await serviceConExporter.Service.ExportarStockActualAsync(new FiltroStockKardex());
+        await serviceConExporter.Service.ExportarStockActualAsync(new FiltroExportacionStock());
 
         // Assert
         Assert.That(exporter.Llamadas, Is.EqualTo(1),
@@ -455,7 +456,7 @@ public class KardexInventarioServiceUnitTests
 
         // Act + Assert
         var ex = Assert.ThrowsAsync<InvalidOperationException>(
-            () => serviceConExporter.Service.ExportarStockActualAsync(new FiltroStockKardex()));
+            () => serviceConExporter.Service.ExportarStockActualAsync(new FiltroExportacionStock()));
         Assert.That(ex!.Message, Is.EqualTo("BD no disponible"));
         Assert.That(exporter.Llamadas, Is.EqualTo(0),
             "El exporter no debe invocarse si la consulta al repo fallo.");
@@ -477,7 +478,7 @@ public class KardexInventarioServiceUnitTests
 
         // Act + Assert
         var ex = Assert.ThrowsAsync<ValidacionNegocioInventarioException>(
-            () => serviceConExporter.Service.ExportarStockActualAsync(new FiltroStockKardex()));
+            () => serviceConExporter.Service.ExportarStockActualAsync(new FiltroExportacionStock()));
         Assert.That(ex, Is.SameAs(error));
         Assert.That(ex!.Errores, Has.Count.EqualTo(1));
         Assert.That(ex.Errores[0].CodigoError, Is.EqualTo(CodigosErrorInventario.Stock.StockInsuficiente));
@@ -505,7 +506,7 @@ public class KardexInventarioServiceUnitTests
         var validator = new KardexInventarioValidator(esp, mat, prov, proy);
 
         var service = new KardexInventarioService(
-            entradaRepo, salidaRepo, stockRepo, validator,
+            entradaRepo, salidaRepo, stockRepo, new StubStockProyectoRepository(), validator,
             exporter,
             NullLogger<KardexInventarioService>.Instance);
         return new ServiceConStubs(service, entradaRepo, salidaRepo, stockRepo, validator);

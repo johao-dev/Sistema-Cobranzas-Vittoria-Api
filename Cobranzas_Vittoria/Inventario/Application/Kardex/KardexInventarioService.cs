@@ -17,6 +17,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
     private readonly IKardexEntradaRepository _entradaRepository;
     private readonly IKardexSalidaRepository _salidaRepository;
     private readonly IKardexStockRepository _stockRepository;
+    private readonly IStockProyectoRepository _stockProyectoRepository;
     private readonly KardexInventarioValidator _validator;
     private readonly IExcelExporter _exporter;
     private readonly ILogger<KardexInventarioService> _logger;
@@ -25,6 +26,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
         IKardexEntradaRepository entradaRepository,
         IKardexSalidaRepository salidaRepository,
         IKardexStockRepository stockRepository,
+        IStockProyectoRepository stockProyectoRepository,
         KardexInventarioValidator validator,
         IExcelExporter exporter,
         ILogger<KardexInventarioService> logger)
@@ -32,6 +34,7 @@ public sealed class KardexInventarioService : IKardexInventarioService
         _entradaRepository = entradaRepository ?? throw new ArgumentNullException(nameof(entradaRepository));
         _salidaRepository = salidaRepository ?? throw new ArgumentNullException(nameof(salidaRepository));
         _stockRepository = stockRepository ?? throw new ArgumentNullException(nameof(stockRepository));
+        _stockProyectoRepository = stockProyectoRepository ?? throw new ArgumentNullException(nameof(stockProyectoRepository));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
         _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -211,18 +214,64 @@ public sealed class KardexInventarioService : IKardexInventarioService
     }
 
     public async Task<byte[]> ExportarStockActualAsync(
-        FiltroStockKardex filtro,
+        FiltroExportacionStock filtro,
         CancellationToken ct = default)
     {
-        filtro ??= new FiltroStockKardex();
+        filtro ??= new FiltroExportacionStock();
 
         _logger.LogDebug(
-            "Exportando stock actual de Kardex a Excel. idEspecialidad={IdEspecialidad} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
-            filtro.IdEspecialidad, filtro.FechaDesde, filtro.FechaHasta);
+            "Exportando stock actual de Kardex a Excel. idProyecto={IdProyecto} idEspecialidad={IdEspecialidad} fechaDesde={FechaDesde} fechaHasta={FechaHasta}",
+            filtro.IdProyecto, filtro.IdEspecialidad, filtro.FechaDesde, filtro.FechaHasta);
 
-        // 1. Obtener datos via el mismo metodo que GET /stock-actual. Asi el
-        //    reporte refleja exactamente la misma vista que el JSON.
-        IReadOnlyList<StockKardex> stocks = await _stockRepository.ListarAsync(filtro, ct);
+        ExcelSheetConfig config = new ExcelSheetConfig
+        {
+            SheetName = "Kardex Stock",
+            Title = "CONSOLIDADO DE INVENTARIO",
+            FiltersSubtitle = BuildFiltersSubtitle(filtro)
+        };
+
+        if (filtro.IdProyecto.HasValue)
+        {
+            FiltroStockProyecto filtroProyecto = new FiltroStockProyecto
+            {
+                IdProyecto = filtro.IdProyecto,
+                IdEspecialidad = filtro.IdEspecialidad,
+                FechaDesde = filtro.FechaDesde,
+                FechaHasta = filtro.FechaHasta
+            };
+
+            // La asignación incluye transferencias y reversiones que no alteran el stock global.
+            IReadOnlyList<Domain.Model.StockProyecto> stocksProyecto =
+                await _stockProyectoRepository.ListarStockAsync(filtroProyecto, ct);
+
+            List<StockProyectoExcelRow> filasProyecto = stocksProyecto
+                .Select((stock, indice) => new StockProyectoExcelRow
+                {
+                    Numero = indice + 1,
+                    Especialidad = stock.Especialidad,
+                    CodigoMaterial = stock.CodigoMaterial,
+                    Nombre = stock.Nombre,
+                    UnidadMedida = stock.UnidadMedida,
+                    Proyecto = stock.Proyecto,
+                    Stock = stock.Stock,
+                    FechaUltimoMovimiento = stock.FechaUltimoMovimiento
+                })
+                .ToList();
+
+            config.SheetName = "Stock por Proyecto";
+            config.Title = "STOCK POR PROYECTO";
+
+            return _exporter.ExportToXlsx(filasProyecto, config);
+        }
+
+        FiltroStockKardex filtroGlobal = new FiltroStockKardex
+        {
+            IdEspecialidad = filtro.IdEspecialidad,
+            FechaDesde = filtro.FechaDesde,
+            FechaHasta = filtro.FechaHasta
+        };
+
+        IReadOnlyList<StockKardex> stocks = await _stockRepository.ListarAsync(filtroGlobal, ct);
 
         // 2. Mapear al DTO de export. El contador Numero se asigna aqui (no
         //    en el DTO) para que el helper de export permanezca generico.
@@ -241,16 +290,6 @@ public sealed class KardexInventarioService : IKardexInventarioService
             })
             .ToList();
 
-        // 3. Configurar la hoja. El subtitulo de filtros se construye a
-        //    partir del DTO de filtro; si todos los campos son null se
-        //    muestra "(sin filtros)".
-        ExcelSheetConfig config = new ExcelSheetConfig
-        {
-            SheetName = "Kardex Stock",
-            Title = "CONSOLIDADO DE INVENTARIO",
-            FiltersSubtitle = BuildFiltersSubtitle(filtro)
-        };
-
         // 4. Delegar al helper generico. Este metodo es sincrono (NPOI
         //    construye el workbook en memoria); el await de arriba ya
         //    libero el thread del request para la consulta a BD.
@@ -262,9 +301,13 @@ public sealed class KardexInventarioService : IKardexInventarioService
     ///   - Con filtros: "Filtros: idEspecialidad=2, fecha=2026-01-01..2026-12-31"
     ///   - Sin filtros: "Filtros: (sin filtros)"
     /// </summary>
-    private static string BuildFiltersSubtitle(FiltroStockKardex filtro)
+    private static string BuildFiltersSubtitle(FiltroExportacionStock filtro)
     {
         List<string> parts = new List<string>(4);
+        if (filtro.IdProyecto.HasValue)
+        {
+            parts.Add($"idProyecto={filtro.IdProyecto.Value}");
+        }
         if (filtro.IdEspecialidad.HasValue)
         {
             parts.Add($"idEspecialidad={filtro.IdEspecialidad.Value}");

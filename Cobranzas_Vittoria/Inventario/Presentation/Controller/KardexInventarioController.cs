@@ -6,6 +6,8 @@ using Cobranzas_Vittoria.Inventario.Application.Excepciones;
 using Cobranzas_Vittoria.Inventario.Domain.Excepciones;
 using Cobranzas_Vittoria.Inventario.Presentation.Excepciones;
 using Cobranzas_Vittoria.Inventario.Application.Kardex;
+using Cobranzas_Vittoria.Inventario.Application.Kardex.ExportarStock;
+using Cobranzas_Vittoria.Inventario.Application.StockProyecto;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Cobranzas_Vittoria.Inventario.Presentation.Controller;
@@ -15,7 +17,7 @@ namespace Cobranzas_Vittoria.Inventario.Presentation.Controller;
 /// Coexiste con el <see cref="KardexController"/> legacy sin reemplazarlo.
 ///
 /// <para>
-/// <b>Endpoints expuestos</b> (todos bajo <c>api/almacen/kardex</c>):
+/// <b>Endpoints expuestos</b> (bajo <c>api/almacen/kardex</c>, salvo transferencias):
 /// <list type="bullet">
 ///   <item><c>GET    /entradas</c>      -> listar entradas manuales (filtros: idEspecialidad, idProyecto, idProveedor, fechaDesde, fechaHasta).</item>
 ///   <item><c>POST   /entradas</c>      -> registrar entrada manual.</item>
@@ -25,8 +27,11 @@ namespace Cobranzas_Vittoria.Inventario.Presentation.Controller;
 ///   <item><c>POST   /salidas</c>       -> registrar salida manual (1..N items).</item>
 ///   <item><c>PUT    /salidas/{id}</c>  -> actualizar salida manual (reemplaza cabecera + items).</item>
 ///   <item><c>DELETE /salidas/{id}</c>  -> eliminar salida manual (repone stock).</item>
-///   <item><c>GET    /stock-actual</c>  -> stock consolidado (filtros: idEspecialidad, idProyecto, fechaDesde, fechaHasta).</item>
-///   <item><c>GET    /stock-actual/exportar-excel</c> -> descarga el stock consolidado en un archivo <c>.xlsx</c>.</item>
+///   <item><c>GET    /stock-actual</c>  -> stock global (filtros: idEspecialidad, fechaDesde, fechaHasta).</item>
+///   <item><c>GET    /stock-actual/exportar-excel</c> -> descarga stock global o por proyecto en un archivo <c>.xlsx</c>.</item>
+///   <item><c>GET    /stock-proyecto</c> -> distribución actual por proyecto y material.</item>
+///   <item><c>GET/POST /api/almacen/transferencias-proyecto</c> -> listar y registrar transferencias.</item>
+///   <item><c>GET /api/almacen/transferencias-proyecto/{id}</c> -> obtener una transferencia.</item>
 /// </list>
 /// </para>
 ///
@@ -68,10 +73,12 @@ namespace Cobranzas_Vittoria.Inventario.Presentation.Controller;
 public class KardexInventarioController : ControllerBase
 {
     private readonly IKardexInventarioService _service;
+    private readonly IStockProyectoService _stockProyectoService;
 
-    public KardexInventarioController(IKardexInventarioService service)
+    public KardexInventarioController(IKardexInventarioService service, IStockProyectoService stockProyectoService)
     {
         _service = service ?? throw new ArgumentNullException(nameof(service));
+        _stockProyectoService = stockProyectoService ?? throw new ArgumentNullException(nameof(stockProyectoService));
     }
 
     // ============================================================================
@@ -240,8 +247,8 @@ public class KardexInventarioController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta el stock actual consolidado a un archivo <c>.xlsx</c> listo
-    /// para descargar. Mismos filtros que <c>GET /stock-actual</c>.
+    /// Exporta el stock global o, si se indica idProyecto, la asignación actual del proyecto.
+    /// Aplica especialidad y fechas según la misma consulta usada por cada listado.
     ///
     /// <para>
     /// <b>Respuesta</b>: <c>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</c>
@@ -260,16 +267,15 @@ public class KardexInventarioController : ControllerBase
     /// </summary>
     [HttpGet("stock-actual/exportar-excel")]
     public async Task<IActionResult> ExportarStockActual(
-        [FromQuery] int? idEspecialidad,
-        [FromQuery] DateOnly? fechaDesde,
-        [FromQuery] DateOnly? fechaHasta,
+        [FromQuery] ExportarStockQueryDto query,
         CancellationToken ct = default)
     {
-        FiltroStockKardex filtro = new FiltroStockKardex
+        FiltroExportacionStock filtro = new FiltroExportacionStock
         {
-            IdEspecialidad = idEspecialidad,
-            FechaDesde = fechaDesde,
-            FechaHasta = fechaHasta
+            IdProyecto = query.IdProyecto,
+            IdEspecialidad = query.IdEspecialidad,
+            FechaDesde = query.FechaDesde,
+            FechaHasta = query.FechaHasta
         };
 
         byte[] bytes = await _service.ExportarStockActualAsync(filtro, ct);
@@ -283,6 +289,48 @@ public class KardexInventarioController : ControllerBase
             fileContents: bytes,
             contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             fileDownloadName: fileName);
+    }
+
+    // ============================================================================
+    // Stock por proyecto y transferencias
+    // ============================================================================
+
+    /// <summary>Distribución actual. Las fechas filtran el último cambio de asignación.</summary>
+    [HttpGet("stock-proyecto")]
+    public async Task<ActionResult<IReadOnlyList<StockProyecto>>> ListarStock(
+        [FromQuery] FiltroStockProyecto filtro, CancellationToken ct)
+        => Ok(await _stockProyectoService.ListarStockAsync(filtro, ct));
+
+    // Rutas absolutas para conservar el contrato de transferencias fuera del prefijo /kardex.
+    /// <summary>Transferencias con una fila por material consolidado.</summary>
+    [HttpGet("~/api/almacen/transferencias-proyecto")]
+    public async Task<ActionResult<IReadOnlyList<TransferenciaProyecto>>> ListarTransferencias(
+        [FromQuery] FiltroTransferenciaProyecto filtro, CancellationToken ct)
+        => Ok(await _stockProyectoService.ListarTransferenciasAsync(filtro, ct));
+
+    [HttpGet("~/api/almacen/transferencias-proyecto/{id:int:min(1)}")]
+    public async Task<ActionResult<IReadOnlyList<TransferenciaProyecto>>> ObtenerTransferencia(int id, CancellationToken ct)
+        => Ok(await _stockProyectoService.ObtenerTransferenciaAsync(id, ct));
+
+    /// <summary>Reasigna stock entre proyectos sin modificar el stock físico global.</summary>
+    [HttpPost("~/api/almacen/transferencias-proyecto")]
+    public async Task<ActionResult<IReadOnlyList<TransferenciaProyecto>>> RegistrarTransferencia(
+        [FromBody] TransferenciaProyectoCreateDto dto, CancellationToken ct)
+    {
+        RegistroTransferenciaProyecto registro = new()
+        {
+            IdProyectoOrigen = dto.IdProyectoOrigen,
+            IdProyectoDestino = dto.IdProyectoDestino,
+            Fecha = dto.Fecha!.Value,
+            Observacion = dto.Observacion!,
+            Items = dto.Items.Select(item => item is null ? null! : new ItemTransferenciaProyecto
+            {
+                IdMaterial = item.IdMaterial,
+                Cantidad = item.Cantidad
+            }).ToList()
+        };
+
+        return Ok(await _stockProyectoService.RegistrarTransferenciaAsync(registro, ct));
     }
 
     // ============================================================================

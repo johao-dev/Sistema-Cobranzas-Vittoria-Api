@@ -4,6 +4,8 @@ using System.Net.Http.Json;
 using Cobranzas_Vittoria.Inventario.Domain.Model;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Inventario;
 
@@ -459,5 +461,103 @@ public class StockProyectoTests : IntegrationTestBase
         HttpResponseMessage response = await _client.GetAsync("/api/almacen/transferencias-proyecto/999999");
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
         Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("RECURSO_NO_ENCONTRADO"));
+    }
+
+    [TestCase(ORIGEN, 6)]
+    [TestCase(DESTINO, 9)]
+    public async Task Exportacion_Proyecto_ReflejaTransferenciasYCoincideConListado(int proyecto, decimal saldoEsperado)
+    {
+        await Entrada(10);
+        await Entrada(5, DESTINO);
+        await Entrada(3, ORIGEN, OTRO_MATERIAL);
+        Assert.That((await Transferir(4)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        // También conserva la ruta de listado de transferencias tras mover el controller.
+        List<TransferenciaProyecto> transferencias = (await _client.GetFromJsonAsync<List<TransferenciaProyecto>>(
+            $"/api/almacen/transferencias-proyecto?idProyectoOrigen={ORIGEN}"))!;
+        Assert.That(transferencias, Has.Count.EqualTo(1));
+
+        string filtros = $"idProyecto={proyecto}";
+        List<StockProyecto> filas = (await _client.GetFromJsonAsync<List<StockProyecto>>(
+            $"/api/almacen/kardex/stock-proyecto?{filtros}"))!;
+        HttpResponseMessage response = await _client.GetAsync(
+            $"/api/almacen/kardex/stock-actual/exportar-excel?{filtros}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), await response.Content.ReadAsStringAsync());
+        Assert.That(response.Content.Headers.ContentType!.MediaType,
+            Is.EqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        Assert.That(response.Content.Headers.ContentDisposition!.FileName, Does.Contain("kardex-stock-"));
+
+        using MemoryStream stream = new(await response.Content.ReadAsByteArrayAsync());
+        using XSSFWorkbook workbook = new(stream);
+        ISheet hoja = workbook.GetSheetAt(0);
+        string[] encabezados = { "N°", "Especialidad", "Cód. Material", "Nombre", "Unidad Medida", "Proyecto", "Stock", "Fecha Últ. Movimiento" };
+
+        Assert.That(hoja.SheetName, Is.EqualTo("Stock por Proyecto"));
+        Assert.That(hoja.GetRow(1).GetCell(0).StringCellValue, Is.EqualTo("STOCK POR PROYECTO"));
+        Assert.That(hoja.GetRow(3).GetCell(0).StringCellValue, Does.Contain($"idProyecto={proyecto}"));
+        Assert.That(hoja.GetRow(6).Cells.Select(celda => celda.StringCellValue), Is.EqualTo(encabezados));
+        Assert.That(hoja.LastRowNum - 6, Is.EqualTo(filas.Count));
+        Assert.That(filas.Single(fila => fila.IdMaterial == MATERIAL).Stock, Is.EqualTo(saldoEsperado));
+
+        for (int indice = 0; indice < filas.Count; indice++)
+        {
+            StockProyecto fila = filas[indice];
+            IRow filaExcel = hoja.GetRow(7 + indice);
+
+            Assert.That(fila.IdProyecto, Is.EqualTo(proyecto));
+            Assert.That(filaExcel.GetCell(0).NumericCellValue, Is.EqualTo(indice + 1));
+            Assert.That(filaExcel.GetCell(1).StringCellValue, Is.EqualTo(fila.Especialidad));
+            Assert.That(filaExcel.GetCell(2).StringCellValue, Is.EqualTo(fila.CodigoMaterial));
+            Assert.That(filaExcel.GetCell(3).StringCellValue, Is.EqualTo(fila.Nombre));
+            Assert.That(filaExcel.GetCell(4).StringCellValue, Is.EqualTo(fila.UnidadMedida));
+            Assert.That(filaExcel.GetCell(5).StringCellValue, Is.EqualTo(fila.Proyecto));
+            Assert.That((decimal)filaExcel.GetCell(6).NumericCellValue, Is.EqualTo(fila.Stock));
+            Assert.That(filaExcel.GetCell(7).DateCellValue,
+                Is.EqualTo(fila.FechaUltimoMovimiento).Within(TimeSpan.FromMilliseconds(1)));
+        }
+    }
+
+    [TestCase(ORIGEN, 2, "2026-11-04", "2026-11-04", 1)]
+    [TestCase(ORIGEN, 2, "2026-11-05", "2026-11-05", 0)]
+    [TestCase(ORIGEN, 4, "2026-11-04", "2026-11-04", 0)]
+    [TestCase(DESTINO, 2, "2026-11-04", "2026-11-04", 0)]
+    [TestCase(999999, 2, "2026-11-04", "2026-11-04", 0)]
+    public async Task Exportacion_Proyecto_AplicaEspecialidadYFechasYConservaEncabezadosSinDatos(
+        int proyecto, int especialidad, string desde, string hasta, int cantidadEsperada)
+    {
+        await Entrada(10);
+        await Entrada(5, DESTINO);
+        await Entrada(3, ORIGEN, OTRO_MATERIAL);
+
+        await using SqlConnection db = Conexion();
+        await db.ExecuteAsync("""
+            UPDATE almacen.StockProyecto SET FechaMovimiento = '2026-11-01T10:00:00';
+            UPDATE almacen.StockProyecto SET FechaMovimiento = '2026-11-04T18:45:00'
+            WHERE IdProyecto = @ORIGEN AND IdMaterial = @MATERIAL;
+            """, new { ORIGEN, MATERIAL });
+
+        string filtros = $"idProyecto={proyecto}&idEspecialidad={especialidad}&fechaDesde={desde}&fechaHasta={hasta}";
+        List<StockProyecto> filas = (await _client.GetFromJsonAsync<List<StockProyecto>>(
+            $"/api/almacen/kardex/stock-proyecto?{filtros}"))!;
+        HttpResponseMessage response = await _client.GetAsync(
+            $"/api/almacen/kardex/stock-actual/exportar-excel?{filtros}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        using MemoryStream stream = new(await response.Content.ReadAsByteArrayAsync());
+        using XSSFWorkbook workbook = new(stream);
+        ISheet hoja = workbook.GetSheetAt(0);
+
+        Assert.That(filas, Has.Count.EqualTo(cantidadEsperada));
+        Assert.That(hoja.LastRowNum - 6, Is.EqualTo(filas.Count));
+        Assert.That(hoja.GetRow(6).LastCellNum, Is.EqualTo(8));
+        Assert.That(hoja.GetRow(3).GetCell(0).StringCellValue,
+            Does.Contain($"idProyecto={proyecto}").And.Contain($"idEspecialidad={especialidad}")
+                .And.Contain($"fecha={desde}..{hasta}"));
+
+        if (cantidadEsperada > 0)
+        {
+            Assert.That((decimal)hoja.GetRow(7).GetCell(6).NumericCellValue, Is.EqualTo(filas[0].Stock));
+        }
     }
 }

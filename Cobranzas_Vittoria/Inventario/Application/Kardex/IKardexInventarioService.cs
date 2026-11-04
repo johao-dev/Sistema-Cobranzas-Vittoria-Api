@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Inventario.Domain.Model;
+using Cobranzas_Vittoria.Inventario.Application.Kardex.ExportarStock;
 
 namespace Cobranzas_Vittoria.Inventario.Application.Kardex;
 
@@ -74,7 +75,7 @@ public interface IKardexInventarioService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Exporta el stock actual consolidado a un archivo <c>.xlsx</c> (bytes)
+    /// Exporta el stock global o el stock asignado al proyecto a un archivo <c>.xlsx</c> (bytes)
     /// listo para ser devuelto por el controller como <c>FileContentResult</c>.
     /// Los filtros aplicados se incluyen como subtitulo de la hoja.
     /// </summary>
@@ -88,6 +89,6 @@ public interface IKardexInventarioService
     /// filas de datos.
     /// </returns>
     Task<byte[]> ExportarStockActualAsync(
-        FiltroStockKardex filtro,
+        FiltroExportacionStock filtro,
         CancellationToken ct = default);
 }
