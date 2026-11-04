@@ -19,58 +19,58 @@ namespace Cobranzas_Vittoria.Repositories
             using var db = Open();
 
             const string sql = @"
-SELECT
-    r.IdRequerimiento,
-    r.NumeroRequerimiento,
-    r.FechaRequerimiento,
-    x.Especialidades,
-    r.IdProyecto,
-    p.NombreProyecto,
-    r.Descripcion,
-    r.FechaEntrega,
-    r.IdUsuarioSolicitante,
-    LTRIM(RTRIM(CONCAT(u.Nombres, ' ', ISNULL(u.Apellidos, '')))) AS Solicitante,
-    r.Estado,
-    r.Observacion,
-    r.FechaCreacion
-FROM compras.Requerimiento r
-INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
-INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
-OUTER APPLY (
-    SELECT STRING_AGG(q.Nombre, ', ') AS Especialidades
-    FROM (
-        SELECT DISTINCT e2.Nombre
-        FROM compras.RequerimientoDetalle rd2
-        INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
-        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
-        WHERE rd2.IdRequerimiento = r.IdRequerimiento
-    ) q
-) x
-WHERE (@Estado IS NULL OR @Estado = '' OR r.Estado = @Estado)
-  AND (@IdProyecto IS NULL OR r.IdProyecto = @IdProyecto)
-  AND (@IdEspecialidad IS NULL OR EXISTS (
-        SELECT 1
-        FROM compras.RequerimientoDetalle rd2
-        INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
-        WHERE rd2.IdRequerimiento = r.IdRequerimiento
-          AND m2.IdEspecialidad = @IdEspecialidad
-  ))
-GROUP BY
-    x.Especialidades,
-    r.IdRequerimiento,
-    r.NumeroRequerimiento,
-    r.FechaRequerimiento,
-    r.IdProyecto,
-    p.NombreProyecto,
-    r.Descripcion,
-    r.FechaEntrega,
-    r.IdUsuarioSolicitante,
-    u.Nombres,
-    u.Apellidos,
-    r.Estado,
-    r.Observacion,
-    r.FechaCreacion
-ORDER BY r.IdRequerimiento DESC;";
+                SELECT
+                    r.IdRequerimiento,
+                    r.NumeroRequerimiento,
+                    r.FechaRequerimiento,
+                    x.Especialidades,
+                    r.IdProyecto,
+                    p.NombreProyecto,
+                    r.Descripcion,
+                    r.FechaEntrega,
+                    r.IdUsuarioSolicitante,
+                    LTRIM(RTRIM(CONCAT(u.Nombres, ' ', ISNULL(u.Apellidos, '')))) AS Solicitante,
+                    r.Estado,
+                    r.Observacion,
+                    r.FechaCreacion
+                FROM compras.Requerimiento r
+                INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
+                INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
+                OUTER APPLY (
+                    SELECT STRING_AGG(q.Nombre, ', ') AS Especialidades
+                    FROM (
+                        SELECT DISTINCT e2.Nombre
+                        FROM compras.RequerimientoDetalle rd2
+                        INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
+                        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
+                        WHERE rd2.IdRequerimiento = r.IdRequerimiento
+                    ) q
+                ) x
+                WHERE (@Estado IS NULL OR @Estado = '' OR r.Estado = @Estado)
+                AND (@IdProyecto IS NULL OR r.IdProyecto = @IdProyecto)
+                AND (@IdEspecialidad IS NULL OR EXISTS (
+                    SELECT 1
+                    FROM compras.RequerimientoDetalle rd2
+                    INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
+                    WHERE rd2.IdRequerimiento = r.IdRequerimiento
+                    AND m2.IdEspecialidad = @IdEspecialidad
+                ))
+                GROUP BY
+                    x.Especialidades,
+                    r.IdRequerimiento,
+                    r.NumeroRequerimiento,
+                    r.FechaRequerimiento,
+                    r.IdProyecto,
+                    p.NombreProyecto,
+                    r.Descripcion,
+                    r.FechaEntrega,
+                    r.IdUsuarioSolicitante,
+                    u.Nombres,
+                    u.Apellidos,
+                    r.Estado,
+                    r.Observacion,
+                    r.FechaCreacion
+                ORDER BY r.IdRequerimiento DESC;";
 
             return await db.QueryAsync<Requerimiento>(sql, new { Estado = estado, IdEspecialidad = idEspecialidad, IdProyecto = idProyecto });
         }
@@ -80,64 +80,70 @@ ORDER BY r.IdRequerimiento DESC;";
             using var db = Open();
 
             const string sqlHead = @"
-SELECT
-    r.IdRequerimiento,
-    r.NumeroRequerimiento,
-    r.FechaRequerimiento,
-    x.Especialidades,
-    r.IdProyecto,
-    p.NombreProyecto,
-    r.Descripcion,
-    r.FechaEntrega,
-    r.IdUsuarioSolicitante,
-    LTRIM(RTRIM(CONCAT(u.Nombres, ' ', ISNULL(u.Apellidos, '')))) AS Solicitante,
-    r.Estado,
-    r.Observacion,
-    r.FechaCreacion
-FROM compras.Requerimiento r
-INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
-INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
-OUTER APPLY (
-    SELECT STRING_AGG(es.Nombre, ', ') AS Especialidades
-    FROM (
-        SELECT DISTINCT e2.Nombre
-        FROM compras.RequerimientoDetalle rd2
-        INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
-        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
-        WHERE rd2.IdRequerimiento = r.IdRequerimiento
-    ) es
-) x
-WHERE r.IdRequerimiento = @IdRequerimiento;";
+                SELECT
+                    r.IdRequerimiento,
+                    r.NumeroRequerimiento,
+                    r.FechaRequerimiento,
+                    x.Especialidades,
+                    r.IdProyecto,
+                    p.NombreProyecto,
+                    r.Descripcion,
+                    r.FechaEntrega,
+                    r.IdUsuarioSolicitante,
+                    LTRIM(RTRIM(CONCAT(u.Nombres, ' ', ISNULL(u.Apellidos, '')))) AS Solicitante,
+                    r.Estado,
+                    r.Observacion,
+                    r.FechaCreacion
+                FROM compras.Requerimiento r
+                INNER JOIN maestra.Proyecto p ON p.IdProyecto = r.IdProyecto
+                INNER JOIN seguridad.Usuario u ON u.IdUsuario = r.IdUsuarioSolicitante
+                OUTER APPLY (
+                    SELECT STRING_AGG(es.Nombre, ', ') AS Especialidades
+                    FROM (
+                        SELECT DISTINCT e2.Nombre
+                        FROM compras.RequerimientoDetalle rd2
+                        INNER JOIN maestra.Material m2 ON m2.IdMaterial = rd2.IdMaterial
+                        INNER JOIN maestra.Especialidad e2 ON e2.IdEspecialidad = m2.IdEspecialidad
+                        WHERE rd2.IdRequerimiento = r.IdRequerimiento
+                    ) es
+                ) x
+                WHERE r.IdRequerimiento = @IdRequerimiento;";
 
             const string sqlItems = @"
-SELECT
-    rd.IdRequerimientoDetalle,
-    rd.IdRequerimiento,
-    rd.IdMaterial,
-    rd.IdPresupuestoDetalle,
-    cp.Codigo AS CodigoPartida,
-    cp.Nombre AS NombrePartida,
-    m.IdEspecialidad,
-    e.Nombre AS Especialidad,
-    m.Descripcion AS Material,
-    m.UnidadMedida,
-    rd.Cantidad,
-    rd.Observacion
-FROM compras.RequerimientoDetalle rd
-INNER JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
-INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
-LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd
-    ON pd.IdPresupuestoDetalle = rd.IdPresupuestoDetalle
-LEFT JOIN ControlPresupuestario.CatalogoPartida cp
-    ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
-WHERE rd.IdRequerimiento = @IdRequerimiento
-ORDER BY rd.IdRequerimientoDetalle;";
+                SELECT
+                    rd.IdRequerimientoDetalle,
+                    rd.IdRequerimiento,
+                    rd.IdMaterial,
+                    rd.IdPresupuestoDetalle,
+                    cp.Codigo AS CodigoPartida,
+                    cp.Nombre AS NombrePartida,
+                    m.IdEspecialidad,
+                    e.Nombre AS Especialidad,
+                    m.Descripcion AS Material,
+                    m.UnidadMedida,
+                    rd.Cantidad,
+                    rd.Observacion
+                FROM compras.RequerimientoDetalle rd
+                INNER JOIN maestra.Material m ON m.IdMaterial = rd.IdMaterial
+                INNER JOIN maestra.Especialidad e ON e.IdEspecialidad = m.IdEspecialidad
+                LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd ON pd.IdPresupuestoDetalle = rd.IdPresupuestoDetalle
+                LEFT JOIN ControlPresupuestario.CatalogoPartida cp ON cp.IdCatalogoPartida = pd.IdCatalogoPartida
+                WHERE rd.IdRequerimiento = @IdRequerimiento
+                ORDER BY rd.IdRequerimientoDetalle;";
 
             const string sqlValidaciones = @"
-SELECT *
-FROM compras.RequerimientoValidacion
-WHERE IdRequerimiento = @IdRequerimiento
-ORDER BY FechaValidacion DESC;";
+                SELECT
+                    rv.IdRequerimientoValidacion,
+                    rv.IdRequerimiento,
+                    rv.IdUsuario,
+                    LTRIM(RTRIM(CONCAT(u.Nombres, ' ', ISNULL(u.Apellidos, '')))) AS Usuario,
+                    rv.FechaValidacion,
+                    rv.Resultado,
+                    rv.Observacion
+                FROM compras.RequerimientoValidacion rv
+                INNER JOIN seguridad.Usuario u ON u.IdUsuario = rv.IdUsuario
+                WHERE IdRequerimiento = @IdRequerimiento
+                ORDER BY FechaValidacion DESC;";
 
             var head = await db.QueryFirstOrDefaultAsync<Requerimiento>(sqlHead, new { IdRequerimiento = idRequerimiento });
             var items = (await db.QueryAsync<RequerimientoDetalle>(sqlItems, new { IdRequerimiento = idRequerimiento })).AsList();
