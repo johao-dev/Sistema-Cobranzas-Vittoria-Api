@@ -9,12 +9,12 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Application.ConsultaPresupues
 /// histórica se consultan pidiendo su estado o su versión.
 /// </summary>
 public sealed record ConsultaPresupuestariaQuery(int? IdCentroCosto, int? IdPresupuesto, int? IdPresupuestoVersion,
-    int? IdCatalogoPartida, int? IdMoneda, string? EstadoPresupuesto, bool? SoloExcedidos, bool? IncluirInactivos = null)
+    int? IdCatalogoPartida, int? IdMoneda, string? EstadoPresupuesto, bool? IncluirInactivos = null)
 {
     public const string EstadoPorDefecto = "APROBADO";
 
     public FiltroConsultaPresupuestaria AFiltro() => new FiltroConsultaPresupuestaria(IdCentroCosto, IdPresupuesto,
         IdPresupuestoVersion, IdCatalogoPartida, IdMoneda,
         string.IsNullOrWhiteSpace(EstadoPresupuesto) && IdPresupuestoVersion is null ? EstadoPorDefecto : EstadoPresupuesto,
-        SoloExcedidos, SoloPresupuestosActivos: IncluirInactivos != true).Normalizado();
+        SoloPresupuestosActivos: IncluirInactivos != true).Normalizado();
 }

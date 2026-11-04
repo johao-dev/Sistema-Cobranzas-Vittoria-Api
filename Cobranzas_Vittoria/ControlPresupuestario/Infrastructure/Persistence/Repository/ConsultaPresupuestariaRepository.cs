@@ -20,33 +20,32 @@ public sealed class ConsultaPresupuestariaRepository : RepositoryBase, IConsulta
     public ConsultaPresupuestariaRepository(IDbConnectionFactory factory) : base(factory) { }
 
     public async Task<IReadOnlyList<PresupuestoResumenFila>> ResumenAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<PresupuestoResumenEntity>("vw_PresupuestoResumen", filtro, porPartida: true, conSaldo: true, Orden))
+        => (await LeerAsync<PresupuestoResumenEntity>("vw_PresupuestoResumen", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<PresupuestoVsComprometidoFila>> PresupuestoVsComprometidoAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<PresupuestoVsComprometidoEntity>("vw_PresupuestoVsComprometido", filtro, porPartida: true, conSaldo: false, Orden))
+        => (await LeerAsync<PresupuestoVsComprometidoEntity>("vw_PresupuestoVsComprometido", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<PresupuestoVsEjecutadoFila>> PresupuestoVsEjecutadoAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<PresupuestoVsEjecutadoEntity>("vw_PresupuestoVsEjecutado", filtro, porPartida: true, conSaldo: false, Orden))
+        => (await LeerAsync<PresupuestoVsEjecutadoEntity>("vw_PresupuestoVsEjecutado", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<SaldoPartidaFila>> SaldoAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<SaldoPresupuestarioEntity>("vw_Saldo", filtro, porPartida: true, conSaldo: true, Orden))
+        => (await LeerAsync<SaldoPresupuestarioEntity>("vw_Saldo", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<GastoPorPartidaFila>> GastosPorPartidaAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<GastoPorPartidaEntity>("vw_GastosPorPartida", filtro, porPartida: true, conSaldo: false, Orden))
+        => (await LeerAsync<GastoPorPartidaEntity>("vw_GastosPorPartida", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<GastoPorCentroCostoFila>> GastosPorCentroCostoAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<GastoPorCentroCostoEntity>("vw_GastosPorCentroCosto", filtro, porPartida: false, conSaldo: true,
+        => (await LeerAsync<GastoPorCentroCostoEntity>("vw_GastosPorCentroCosto", filtro, porPartida: false,
                 " ORDER BY CodigoCentroCosto, CodigoPresupuesto, NumeroVersion;"))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<SaldoPartidaFila>> VigenteAsync(FiltroConsultaPresupuestaria filtro)
-        => (await LeerAsync<ControlPresupuestarioVigenteEntity>("vw_ControlPresupuestarioVigente", filtro, porPartida: true,
-                conSaldo: true, Orden))
+        => (await LeerAsync<ControlPresupuestarioVigenteEntity>("vw_ControlPresupuestarioVigente", filtro, porPartida: true, Orden))
             .Select(ConsultaPresupuestariaMapper.ToDomain).ToList();
 
     public async Task<IReadOnlyList<EjecucionDiariaFila>> EjecucionDiariaAsync(IReadOnlyCollection<int> idsPresupuesto)
@@ -72,15 +71,15 @@ public sealed class ConsultaPresupuestariaRepository : RepositoryBase, IConsulta
     }
 
     private async Task<IEnumerable<T>> LeerAsync<T>(string vista, FiltroConsultaPresupuestaria filtro, bool porPartida,
-        bool conSaldo, string orden)
+        string orden)
     {
-        var (where, parametros) = ConstruirFiltro(filtro, porPartida, conSaldo);
+        var (where, parametros) = ConstruirFiltro(filtro, porPartida);
         using var db = Open();
         return await db.QueryAsync<T>($"SELECT * FROM ControlPresupuestario.{vista}{where}{orden}", parametros);
     }
 
     private static (string Where, DynamicParameters Parametros) ConstruirFiltro(FiltroConsultaPresupuestaria f,
-        bool porPartida, bool conSaldo)
+        bool porPartida)
     {
         var condiciones = new List<string>();
         var parametros = new DynamicParameters();
@@ -97,7 +96,6 @@ public sealed class ConsultaPresupuestariaRepository : RepositoryBase, IConsulta
         Agregar("IdMoneda", f.IdMoneda);
         if (porPartida) Agregar("IdCatalogoPartida", f.IdCatalogoPartida);
         Agregar("EstadoPresupuesto", f.EstadoPresupuesto);
-        if (f.SoloExcedidos == true && conSaldo) condiciones.Add("SaldoDisponible < 0");
         if (f.SoloPresupuestosActivos)
             condiciones.Add("IdPresupuesto IN (SELECT IdPresupuesto FROM ControlPresupuestario.Presupuesto WHERE Activo = 1)");
 

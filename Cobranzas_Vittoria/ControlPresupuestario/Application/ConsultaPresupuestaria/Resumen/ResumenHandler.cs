@@ -16,9 +16,8 @@ public sealed class ResumenHandler
 
     public async Task<ResumenResult> HandleAsync(ConsultaPresupuestariaQuery query)
     {
-        var filtro = query.AFiltro();
-        var soloExcedidos = filtro.SoloExcedidos == true;
-        var filas = await _repository.ResumenAsync(filtro with { SoloExcedidos = null });
+        FiltroConsultaPresupuestaria filtro = query.AFiltro();
+        IReadOnlyList<PresupuestoResumenFila> filas = await _repository.ResumenAsync(filtro);
 
         var porCentroCosto = filas
             .GroupBy(f => (f.IdCentroCosto, f.IdPresupuesto, f.IdPresupuestoVersion))
@@ -43,12 +42,10 @@ public sealed class ResumenHandler
                     Excedido = saldo < 0
                 };
             })
-            .Where(c => !soloExcedidos || c.Excedido)
             .OrderBy(c => c.CodigoCentroCosto).ThenBy(c => c.CodigoPresupuesto).ThenBy(c => c.NumeroVersion)
             .ToList();
 
         var partidas = filas
-            .Where(f => !soloExcedidos || f.SaldoDisponible < 0)
             .Select(f => new SaldoPartidaFila
             {
                 IdCentroCosto = f.IdCentroCosto, CodigoCentroCosto = f.CodigoCentroCosto, NombreCentroCosto = f.NombreCentroCosto,
