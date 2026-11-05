@@ -7,6 +7,8 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Domain.Persistence;
 public interface IMovimientoPresupuestalRepository
 {
     Task<IReadOnlyList<MovimientoPresupuestal>> ListarPorDetalleAsync(int idPresupuestoDetalle);
+    /// <summary>Ledger APROBADO/HISTORICO de una partida presente en la línea base vigente.</summary>
+    Task<IReadOnlyList<MovimientoPresupuestal>> ListarConsolidadosAsync(int idPresupuesto, int idCatalogoPartida);
     Task<MovimientoPresupuestal?> ObtenerAsync(long idMovimientoPresupuestal);
     Task<MovimientoPresupuestal?> RegistrarAjusteAsync(AjustePresupuestal ajuste);
 }

@@ -4,9 +4,8 @@ using Cobranzas_Vittoria.ControlPresupuestario.Domain.Persistence;
 namespace Cobranzas_Vittoria.ControlPresupuestario.Application.ConsultaPresupuestaria.Resumen;
 
 /// <summary>
-/// Resumen presupuestario armado sobre vw_PresupuestoResumen, la vista base: agrega por centro de
-/// costo y versión con el mismo criterio que vw_GastosPorCentroCosto y marca excedida la partida cuyo
-/// saldo disponible es negativo, como vw_Saldo.
+/// Resumen por centro, presupuesto y versión base. Conserva la lectura individual predeterminada;
+/// en modo consolidado utiliza la línea base vigente y sus movimientos APROBADO/HISTORICO.
 /// </summary>
 public sealed class ResumenHandler
 {
@@ -17,35 +16,13 @@ public sealed class ResumenHandler
     public async Task<ResumenResult> HandleAsync(ConsultaPresupuestariaQuery query)
     {
         FiltroConsultaPresupuestaria filtro = query.AFiltro();
-        IReadOnlyList<PresupuestoResumenFila> filas = await _repository.ResumenAsync(filtro);
+        IReadOnlyList<PresupuestoResumenFila> filas = query.Consolidado
+            ? (await ConsultaConsolidada.LeerAsync(_repository, query)).Select(ConsultaConsolidada.AResumen).ToList()
+            : await _repository.ResumenAsync(filtro);
 
-        var porCentroCosto = filas
-            .GroupBy(f => (f.IdCentroCosto, f.IdPresupuesto, f.IdPresupuestoVersion))
-            .Select(g =>
-            {
-                var p = g.First();
-                var presupuestado = g.Sum(f => f.MontoPresupuestado);
-                var ejecutado = g.Sum(f => f.MontoEjecutado);
-                var saldo = g.Sum(f => f.SaldoDisponible);
-                return new GastoPorCentroCostoFila
-                {
-                    IdCentroCosto = p.IdCentroCosto, CodigoCentroCosto = p.CodigoCentroCosto, NombreCentroCosto = p.NombreCentroCosto,
-                    IdPresupuesto = p.IdPresupuesto, CodigoPresupuesto = p.CodigoPresupuesto, NombrePresupuesto = p.NombrePresupuesto,
-                    IdMoneda = p.IdMoneda, CodigoMoneda = p.CodigoMoneda, SimboloMoneda = p.SimboloMoneda,
-                    IdPresupuestoVersion = p.IdPresupuestoVersion, NumeroVersion = p.NumeroVersion,
-                    EstadoPresupuesto = p.EstadoPresupuesto,
-                    MontoPresupuestado = presupuestado,
-                    MontoComprometido = g.Sum(f => f.MontoComprometido),
-                    MontoEjecutado = ejecutado,
-                    SaldoDisponible = saldo,
-                    PorcentajeEjecutado = presupuestado == 0 ? 0m : ejecutado * 100m / presupuestado,
-                    Excedido = saldo < 0
-                };
-            })
-            .OrderBy(c => c.CodigoCentroCosto).ThenBy(c => c.CodigoPresupuesto).ThenBy(c => c.NumeroVersion)
-            .ToList();
+        IReadOnlyList<GastoPorCentroCostoFila> porCentroCosto = ConsultaConsolidada.AgruparPorCentro(filas);
 
-        var partidas = filas
+        List<SaldoPartidaFila> partidas = filas
             .Select(f => new SaldoPartidaFila
             {
                 IdCentroCosto = f.IdCentroCosto, CodigoCentroCosto = f.CodigoCentroCosto, NombreCentroCosto = f.NombreCentroCosto,
@@ -61,11 +38,11 @@ public sealed class ResumenHandler
                 Excedido = f.SaldoDisponible < 0
             })
             .ToList();
-        var excedidas = partidas.Where(p => p.Excedido).OrderByDescending(p => p.MontoExcedido).ToList();
+        List<SaldoPartidaFila> excedidas = partidas.Where(p => p.Excedido).OrderByDescending(p => p.MontoExcedido).ToList();
 
-        var totalPresupuestado = porCentroCosto.Sum(c => c.MontoPresupuestado);
-        var totalEjecutado = porCentroCosto.Sum(c => c.MontoEjecutado);
-        var totales = new ResumenTotales(
+        decimal totalPresupuestado = porCentroCosto.Sum(c => c.MontoPresupuestado);
+        decimal totalEjecutado = porCentroCosto.Sum(c => c.MontoEjecutado);
+        ResumenTotales totales = new(
             totalPresupuestado,
             porCentroCosto.Sum(c => c.MontoComprometido),
             totalEjecutado,

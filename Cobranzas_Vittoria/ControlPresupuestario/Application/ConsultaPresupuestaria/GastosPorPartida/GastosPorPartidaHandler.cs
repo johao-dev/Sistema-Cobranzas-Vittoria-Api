@@ -10,5 +10,12 @@ public sealed class GastosPorPartidaHandler
 
     public GastosPorPartidaHandler(IConsultaPresupuestariaRepository repository) => _repository = repository;
 
-    public Task<IReadOnlyList<GastoPorPartidaFila>> HandleAsync(ConsultaPresupuestariaQuery query) => _repository.GastosPorPartidaAsync(query.AFiltro());
+    public async Task<IReadOnlyList<GastoPorPartidaFila>> HandleAsync(ConsultaPresupuestariaQuery query)
+    {
+        if (!query.Consolidado)
+            return await _repository.GastosPorPartidaAsync(query.AFiltro());
+
+        IReadOnlyList<SaldoPartidaFila> filas = await ConsultaConsolidada.LeerAsync(_repository, query);
+        return filas.Select(ConsultaConsolidada.AGastoPorPartida).ToList();
+    }
 }

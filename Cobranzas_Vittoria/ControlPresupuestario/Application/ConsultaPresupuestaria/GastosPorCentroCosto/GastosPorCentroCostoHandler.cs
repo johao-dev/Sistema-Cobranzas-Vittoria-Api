@@ -10,5 +10,12 @@ public sealed class GastosPorCentroCostoHandler
 
     public GastosPorCentroCostoHandler(IConsultaPresupuestariaRepository repository) => _repository = repository;
 
-    public Task<IReadOnlyList<GastoPorCentroCostoFila>> HandleAsync(ConsultaPresupuestariaQuery query) => _repository.GastosPorCentroCostoAsync(query.AFiltro());
+    public async Task<IReadOnlyList<GastoPorCentroCostoFila>> HandleAsync(ConsultaPresupuestariaQuery query)
+    {
+        if (!query.Consolidado)
+            return await _repository.GastosPorCentroCostoAsync(query.AFiltro());
+
+        IReadOnlyList<SaldoPartidaFila> filas = await ConsultaConsolidada.LeerAsync(_repository, query);
+        return ConsultaConsolidada.AgruparPorCentro(filas.Select(ConsultaConsolidada.AResumen).ToList());
+    }
 }

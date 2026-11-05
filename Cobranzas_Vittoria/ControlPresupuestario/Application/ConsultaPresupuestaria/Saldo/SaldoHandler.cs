@@ -10,5 +10,12 @@ public sealed class SaldoHandler
 
     public SaldoHandler(IConsultaPresupuestariaRepository repository) => _repository = repository;
 
-    public Task<IReadOnlyList<SaldoPartidaFila>> HandleAsync(ConsultaPresupuestariaQuery query) => _repository.SaldoAsync(query.AFiltro());
+    public async Task<IReadOnlyList<SaldoPartidaFila>> HandleAsync(ConsultaPresupuestariaQuery query)
+    {
+        if (!query.Consolidado)
+            return await _repository.SaldoAsync(query.AFiltro());
+
+        IReadOnlyList<SaldoPartidaFila> filas = await ConsultaConsolidada.LeerAsync(_repository, query);
+        return filas;
+    }
 }

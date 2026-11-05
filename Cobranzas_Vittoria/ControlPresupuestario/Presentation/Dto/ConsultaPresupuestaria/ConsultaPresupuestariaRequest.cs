@@ -3,7 +3,7 @@ using Cobranzas_Vittoria.ControlPresupuestario.Application.ConsultaPresupuestari
 namespace Cobranzas_Vittoria.ControlPresupuestario.Presentation.Dto.ConsultaPresupuestaria;
 
 /// <summary>Filtros de lectura de las consultas presupuestarias (query string).</summary>
-public sealed class ConsultaPresupuestariaRequest
+public class ConsultaPresupuestariaRequest
 {
     public int? IdCentroCosto { get; set; }
     public int? IdPresupuesto { get; set; }
@@ -14,6 +14,14 @@ public sealed class ConsultaPresupuestariaRequest
     /// <summary>true para incluir presupuestos inactivos (por defecto se descartan).</summary>
     public bool? IncluirInactivos { get; set; }
 
-    public ConsultaPresupuestariaQuery AQuery() => new(IdCentroCosto, IdPresupuesto, IdPresupuestoVersion,
+    public virtual ConsultaPresupuestariaQuery AQuery() => new(IdCentroCosto, IdPresupuesto, IdPresupuestoVersion,
         IdCatalogoPartida, IdMoneda, EstadoPresupuesto, IncluirInactivos);
+}
+
+/// <summary>Modo aditivo disponible en los seis reportes del Panel de Control.</summary>
+public sealed class ReportePresupuestarioRequest : ConsultaPresupuestariaRequest
+{
+    public bool Consolidado { get; set; }
+
+    public override ConsultaPresupuestariaQuery AQuery() => base.AQuery() with { Consolidado = Consolidado };
 }

@@ -10,5 +10,12 @@ public sealed class PresupuestoVsComprometidoHandler
 
     public PresupuestoVsComprometidoHandler(IConsultaPresupuestariaRepository repository) => _repository = repository;
 
-    public Task<IReadOnlyList<PresupuestoVsComprometidoFila>> HandleAsync(ConsultaPresupuestariaQuery query) => _repository.PresupuestoVsComprometidoAsync(query.AFiltro());
+    public async Task<IReadOnlyList<PresupuestoVsComprometidoFila>> HandleAsync(ConsultaPresupuestariaQuery query)
+    {
+        if (!query.Consolidado)
+            return await _repository.PresupuestoVsComprometidoAsync(query.AFiltro());
+
+        IReadOnlyList<SaldoPartidaFila> filas = await ConsultaConsolidada.LeerAsync(_repository, query);
+        return filas.Select(ConsultaConsolidada.AComprometido).ToList();
+    }
 }

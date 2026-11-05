@@ -29,6 +29,39 @@ public sealed class MovimientoPresupuestalRepository : RepositoryBase, IMovimien
         return filas.Select(MovimientoPresupuestalMapper.ToDomain).ToList();
     });
 
+    public async Task<IReadOnlyList<MovimientoPresupuestal>> ListarConsolidadosAsync(
+        int idPresupuesto, int idCatalogoPartida)
+    {
+        using IDbConnection db = Open();
+        IEnumerable<MovimientoPresupuestalEntity> filas = await db.QueryAsync<MovimientoPresupuestalEntity>("""
+            SELECT mp.IdMovimientoPresupuestal, mp.IdPresupuestoDetalle, mp.IdTipoMovimientoPresupuestal,
+                tm.Codigo AS TipoMovimiento, tm.Nombre AS NombreTipoMovimiento, mp.ClaveEvento,
+                mp.Origen, mp.IdOrigen, mp.Afectacion, mp.Direccion, mp.Fecha, mp.Monto, mp.Observacion,
+                v.IdPresupuesto, v.IdPresupuestoVersion, v.NumeroVersion, e.Codigo AS EstadoPresupuesto,
+                d.IdCatalogoPartida, c.Codigo AS CodigoPartida, c.Nombre AS NombrePartida,
+                p.Codigo AS CodigoPresupuesto, p.IdMoneda, m.Codigo AS CodigoMoneda, m.Simbolo AS SimboloMoneda
+            FROM ControlPresupuestario.MovimientoPresupuestal mp
+            JOIN ControlPresupuestario.TipoMovimientoPresupuestal tm
+                ON tm.IdTipoMovimientoPresupuestal = mp.IdTipoMovimientoPresupuestal
+            JOIN ControlPresupuestario.PresupuestoDetalle d ON d.IdPresupuestoDetalle = mp.IdPresupuestoDetalle
+            JOIN ControlPresupuestario.CatalogoPartida c ON c.IdCatalogoPartida = d.IdCatalogoPartida
+            JOIN ControlPresupuestario.PresupuestoVersion v ON v.IdPresupuestoVersion = d.IdPresupuestoVersion
+            JOIN ControlPresupuestario.EstadoPresupuesto e ON e.IdEstadoPresupuesto = v.IdEstadoPresupuesto
+            JOIN ControlPresupuestario.Presupuesto p ON p.IdPresupuesto = v.IdPresupuesto
+            JOIN maestra.Moneda m ON m.IdMoneda = p.IdMoneda
+            WHERE v.IdPresupuesto = @IdPresupuesto AND d.IdCatalogoPartida = @IdCatalogoPartida
+              AND e.Codigo IN ('APROBADO', 'HISTORICO')
+              AND (tm.Codigo IN ('COMPROMISO', 'LIBERACION', 'EJECUCION')
+                  OR (tm.Codigo = 'AJUSTE' AND mp.Afectacion IN ('COMPROMISO', 'EJECUCION')
+                      AND mp.Direccion IN ('INCREMENTO', 'DECREMENTO')))
+              AND EXISTS (SELECT 1 FROM ControlPresupuestario.vw_ControlPresupuestarioVigente vigente
+                  WHERE vigente.IdPresupuesto = v.IdPresupuesto AND vigente.IdCatalogoPartida = d.IdCatalogoPartida)
+            ORDER BY mp.Fecha, mp.IdMovimientoPresupuestal;
+            """, new { IdPresupuesto = idPresupuesto, IdCatalogoPartida = idCatalogoPartida });
+
+        return filas.Select(MovimientoPresupuestalMapper.ToDomain).ToList();
+    }
+
     public Task<MovimientoPresupuestal?> ObtenerAsync(long idMovimientoPresupuestal) => TraductorErroresSql.EjecutarAsync(async () =>
     {
         using var db = Open();
