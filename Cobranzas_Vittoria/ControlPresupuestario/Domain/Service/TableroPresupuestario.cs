@@ -44,7 +44,11 @@ public sealed record TableroAlCorte(decimal? PresupuestoAcumulado, decimal RealA
     decimal? DesviacionPorcentaje);
 
 public sealed record Tablero(TableroEncabezado Encabezado, TableroResumen Resumen, IReadOnlyList<TableroRubro> Rubros,
-    IReadOnlyList<TableroPuntoSemana> Semanas, TableroAlCorte AlCorte, IReadOnlyList<TableroDesviacionRubro> DesviacionPorRubro);
+    IReadOnlyList<TableroPuntoSemana> Semanas, TableroAlCorte AlCorte, IReadOnlyList<TableroDesviacionRubro> DesviacionPorRubro)
+{
+    /// <summary>Distribución para el donut; sin exclusiones contiene los mismos valores que Rubros.</summary>
+    public IReadOnlyList<TableroRubro> RubrosFiltrados { get; init; } = Rubros;
+}
 
 /// <summary>
 /// Arma el tablero de un centro de costo: distribución del gasto por rubro y evolución semanal
@@ -69,12 +73,7 @@ public static class TableroPresupuestario
         var ejecutado = rubros.Sum(r => r.MontoEjecutado);
         var comprometido = rubros.Sum(r => r.MontoComprometido);
 
-        var distribucion = rubros
-            .OrderByDescending(r => r.MontoEjecutado).ThenBy(r => r.CodigoPartida, StringComparer.Ordinal)
-            .Select(r => new TableroRubro(r.IdCatalogoPartida, r.CodigoPartida, r.NombrePartida,
-                r.MontoPresupuestado, r.MontoComprometido, r.MontoEjecutado,
-                Porcentaje(r.MontoEjecutado, ejecutado) ?? 0m))
-            .ToList();
+        IReadOnlyList<TableroRubro> distribucion = ConstruirDistribucion(rubros);
 
         // Rango del gráfico: del inicio del presupuesto al fin (o hoy). La curva real siempre parte de 0:
         // si no hay fecha de inicio, o hay gastos anteriores a ella, el rango arranca una semana antes
@@ -142,6 +141,19 @@ public static class TableroPresupuestario
             new TableroResumen(presupuestado, comprometido, ejecutado, ejecutado - presupuestado,
                 Porcentaje(ejecutado - presupuestado, presupuestado), Porcentaje(ejecutado, presupuestado)),
             distribucion, semanas, alCorte, desviaciones);
+    }
+
+    /// <summary>Distribución sobre los rubros incluidos, conservando importes con signo y total neto.</summary>
+    public static IReadOnlyList<TableroRubro> ConstruirDistribucion(IReadOnlyList<RubroTablero> rubros)
+    {
+        decimal ejecutado = rubros.Sum(r => r.MontoEjecutado);
+
+        return rubros
+            .OrderByDescending(r => r.MontoEjecutado).ThenBy(r => r.CodigoPartida, StringComparer.Ordinal)
+            .Select(r => new TableroRubro(r.IdCatalogoPartida, r.CodigoPartida, r.NombrePartida,
+                r.MontoPresupuestado, r.MontoComprometido, r.MontoEjecutado,
+                Porcentaje(r.MontoEjecutado, ejecutado) ?? 0m))
+            .ToList();
     }
 
     private static decimal? Porcentaje(decimal parte, decimal total)

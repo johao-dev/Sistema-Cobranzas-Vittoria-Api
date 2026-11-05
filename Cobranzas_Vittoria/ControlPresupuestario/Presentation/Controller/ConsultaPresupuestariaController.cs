@@ -55,11 +55,14 @@ public sealed class ConsultaPresupuestariaController : ControllerBase
     /// Tablero de un centro de costo: distribución por rubro y curva acumulada real vs presupuesto.
     /// nivel agrupa los rubros en la partida ancestra de ese nivel de anidamiento (1 = raíces);
     /// idPartidaPadre limita todo el tablero a esa rama y, sin nivel, agrupa por sus hijas.
+    /// partidasExcluidas acepta identificadores repetidos en query string y solo afecta a rubrosFiltrados.
     /// </summary>
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard([FromServices] ObtenerDashboardHandler handler, [FromQuery] int idCentroCosto,
-        [FromQuery] int? idPresupuesto, [FromQuery] int? nivel, [FromQuery] int? idPartidaPadre)
-        => Ok(await handler.HandleAsync(new ObtenerDashboardQuery(idCentroCosto, idPresupuesto, nivel, idPartidaPadre)));
+        [FromQuery] int? idPresupuesto, [FromQuery] int? nivel, [FromQuery] int? idPartidaPadre,
+        [FromQuery] ExclusionPartidasRequest filtro)
+        => Ok(await handler.HandleAsync(new ObtenerDashboardQuery(idCentroCosto, idPresupuesto, nivel, idPartidaPadre,
+            filtro.PartidasExcluidas)));
 
     /// <summary>
     /// Árbol de partidas del centro de costo con subtotales por categoría (montos vigentes): lista plana

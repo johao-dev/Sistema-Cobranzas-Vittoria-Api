@@ -277,6 +277,85 @@ public sealed class ArbolYEstructuraApiTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Dashboard_Exclusiones_EnlazaColeccionYConservaElRestoDelContrato()
+    {
+        (int idPresupuesto, int idVersion, int cc) = await CrearPresupuestoAsync();
+        string ruta = $"{Base}/presupuestos/{idPresupuesto}/versiones/{idVersion}";
+        Assert.That((await SubirAsync($"{ruta}/partidas/importar-estructura", PresupuestoPorNiveles)).StatusCode,
+            Is.EqualTo(HttpStatusCode.OK));
+        Assert.That((await _client.PostAsync($"{ruta}/aprobar", null)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        JsonElement partidas = await _client.GetFromJsonAsync<JsonElement>($"{ruta}/partidas");
+        foreach ((string codigo, decimal monto) in new[] { ("1.1.1", 400m), ("1.1.2", 100m), ("2.1", 50m) })
+        {
+            int detalle = partidas.EnumerateArray().Single(p => p.GetProperty("codigo").GetString() == codigo)
+                .GetProperty("idPresupuestoDetalle").GetInt32();
+            HttpResponseMessage ajuste = await _client.PostAsJsonAsync($"{ruta}/partidas/{detalle}/ajustes",
+                new { afectacion = "EJECUCION", direccion = "INCREMENTO", monto, observacion = "Prueba de exclusiones" });
+            Assert.That(ajuste.StatusCode, Is.EqualTo(HttpStatusCode.Created), await ajuste.Content.ReadAsStringAsync());
+        }
+
+        int concreto = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT IdCatalogoPartida FROM ControlPresupuestario.CatalogoPartida WHERE Codigo = '1.1.1'");
+        int estructuras = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT IdCatalogoPartida FROM ControlPresupuestario.CatalogoPartida WHERE Codigo = '1.1'");
+        int directos = await DbHelpers.QueryScalarAsync<int>(
+            "SELECT IdCatalogoPartida FROM ControlPresupuestario.CatalogoPartida WHERE Codigo = '1'");
+        string url = $"{Base}/consultas/dashboard?idCentroCosto={cc}&idPresupuesto={idPresupuesto}";
+
+        foreach (string agrupacion in new[] { "", "&nivel=1", "&nivel=2", "&nivel=9", $"&idPartidaPadre={directos}" })
+        {
+            JsonElement original = await _client.GetFromJsonAsync<JsonElement>(url + agrupacion);
+            JsonElement filtrado = await _client.GetFromJsonAsync<JsonElement>(
+                $"{url}{agrupacion}&partidasExcluidas={concreto}&partidasExcluidas={concreto}");
+
+            Assert.That(original.GetProperty("rubrosFiltrados").GetRawText(), Is.EqualTo(original.GetProperty("rubros").GetRawText()));
+            Assert.That(filtrado.GetProperty("rubrosFiltrados").EnumerateArray().Sum(r => r.GetProperty("ejecutado").GetDecimal()),
+                Is.EqualTo(agrupacion.Contains("idPartidaPadre") ? 100m : 150m));
+            Assert.That(filtrado.GetProperty("rubrosFiltrados").EnumerateArray().Sum(r => r.GetProperty("presupuestado").GetDecimal()),
+                Is.EqualTo(agrupacion.Contains("idPartidaPadre") ? 750m : 1050m));
+
+            foreach (JsonProperty propiedad in original.EnumerateObject().Where(p => p.Name != "rubrosFiltrados"))
+                Assert.That(filtrado.GetProperty(propiedad.Name).GetRawText(), Is.EqualTo(propiedad.Value.GetRawText()), propiedad.Name);
+        }
+
+        JsonElement padre = await _client.GetFromJsonAsync<JsonElement>(
+            $"{url}&nivel=1&partidasExcluidas={estructuras}&partidasExcluidas={concreto}");
+        JsonElement soloPadre = await _client.GetFromJsonAsync<JsonElement>($"{url}&nivel=1&partidasExcluidas={estructuras}");
+        Assert.That(padre.GetProperty("rubrosFiltrados").GetRawText(), Is.EqualTo(soloPadre.GetProperty("rubrosFiltrados").GetRawText()));
+        Assert.That(padre.GetProperty("rubrosFiltrados").EnumerateArray().Sum(r => r.GetProperty("ejecutado").GetDecimal()), Is.EqualTo(50m));
+
+        JsonElement nivel1 = await _client.GetFromJsonAsync<JsonElement>($"{url}&nivel=1&partidasExcluidas={concreto}");
+        Assert.That(nivel1.GetProperty("rubrosFiltrados").EnumerateArray().Select(r => r.GetProperty("porcentajeDelTotal").GetDecimal()),
+            Is.EqualTo(new[] { 66.67m, 33.33m }));
+
+        JsonElement ramaExcluida = await _client.GetFromJsonAsync<JsonElement>(
+            $"{url}&idPartidaPadre={estructuras}&partidasExcluidas={directos}");
+        Assert.That(ramaExcluida.GetProperty("rubrosFiltrados").GetArrayLength(), Is.Zero);
+        Assert.That(ramaExcluida.GetProperty("resumen").GetProperty("ejecutado").GetDecimal(), Is.EqualTo(500m));
+    }
+
+    [Test]
+    public async Task Dashboard_ExclusionesInvalidas_UsaValidacionHttpYErroresDelModulo()
+    {
+        (int _, int _, int cc) = await CrearPresupuestoAsync();
+        string url = $"{Base}/consultas/dashboard?idCentroCosto={cc}";
+
+        foreach (string valor in new[] { "0", "-1", "abc", "2147483648", "1,2", "" })
+        {
+            HttpResponseMessage respuesta = await _client.GetAsync($"{url}&partidasExcluidas={valor}");
+            Assert.That(respuesta.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest), valor);
+            JsonElement error = await Json(respuesta);
+            Assert.That(error.GetProperty("errors").EnumerateObject().Any(p => p.Name.Contains("PartidasExcluidas", StringComparison.OrdinalIgnoreCase)),
+                Is.True, await respuesta.Content.ReadAsStringAsync());
+        }
+
+        HttpResponseMessage inexistente = await _client.GetAsync($"{url}&partidasExcluidas=2147483647");
+        Assert.That(inexistente.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That((await Json(inexistente)).GetProperty("error").GetString(), Is.EqualTo("PARTIDA_NO_ENCONTRADA"));
+    }
+
+    [Test]
     public async Task PlantillaEstructura_TraeCategoriasConSubtotalYHojasConMonto()
     {
         var (idPresupuesto, idVersion, _) = await CrearPresupuestoAsync();

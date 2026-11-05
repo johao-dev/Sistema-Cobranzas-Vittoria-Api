@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.ControlPresupuestario.Domain.Excepciones;
+using Modelo = Cobranzas_Vittoria.ControlPresupuestario.Domain.Model;
 using Cobranzas_Vittoria.ControlPresupuestario.Domain.Model.Consultas;
 using Cobranzas_Vittoria.ControlPresupuestario.Domain.Persistence;
 using Cobranzas_Vittoria.ControlPresupuestario.Domain.Service;
@@ -39,45 +40,45 @@ public sealed class ObtenerDashboardHandler
         if (query.IdPartidaPadre is <= 0)
             throw new ValidacionPresupuestariaException("IDENTIFICADOR_INVALIDO", "La partida indicada no es válida.");
 
-        var centro = await _centros.ObtenerAsync(query.IdCentroCosto)
+        Modelo.CentroCosto centro = await _centros.ObtenerAsync(query.IdCentroCosto)
             ?? throw new CentroCostoNoEncontradoException(query.IdCentroCosto);
-        var presupuestos = (await _presupuestos.ListarAsync(true, query.IdCentroCosto, null, null))
+        List<Modelo.Presupuesto> presupuestos = (await _presupuestos.ListarAsync(true, query.IdCentroCosto, null, null))
             .Where(p => p.TieneVersionAprobada && (query.IdPresupuesto is null || p.IdPresupuesto == query.IdPresupuesto))
             .ToList();
         if (presupuestos.Select(p => p.IdMoneda).Distinct().Count() > 1)
             throw new ValidacionPresupuestariaException("MONEDAS_MIXTAS",
                 "El centro de costo tiene presupuestos en distintas monedas: elige un presupuesto para ver el dashboard.");
 
-        var ids = presupuestos.Select(p => p.IdPresupuesto).ToHashSet();
-        var vigente = ids.Count == 0 ? Array.Empty<SaldoPartidaFila>()
+        HashSet<int> ids = presupuestos.Select(p => p.IdPresupuesto).ToHashSet();
+        IReadOnlyList<SaldoPartidaFila> vigente = ids.Count == 0 ? Array.Empty<SaldoPartidaFila>()
             : await _consultas.VigenteAsync(new FiltroConsultaPresupuestaria(IdCentroCosto: query.IdCentroCosto,
                 IdPresupuesto: query.IdPresupuesto));
         // Cada partida final se agrupa en su ancestra del nivel pedido; una rama menos profunda
         // que ese nivel se queda en su propia hoja. Sin nivel, el rubro es la partida final.
-        var catalogo = (await _partidas.ListarAsync(new FiltroPartidas())).ToDictionary(p => p.IdCatalogoPartida);
-        Domain.Model.CatalogoPartida? rama = null;
+        Dictionary<int, Modelo.CatalogoPartida> catalogo = (await _partidas.ListarAsync(new FiltroPartidas()))
+            .ToDictionary(p => p.IdCatalogoPartida);
+        IReadOnlySet<int> partidasExcluidas = ExclusionPartidas.Resolver(catalogo, query.PartidasExcluidas);
+
+        Modelo.CatalogoPartida? rama = null;
         if (query.IdPartidaPadre is int idRama && !catalogo.TryGetValue(idRama, out rama))
             throw new CatalogoPartidaNoEncontradoException(idRama);
         // Dentro de una rama, sin nivel explícito se agrupa por sus hijas directas.
-        var nivelAgrupacion = query.Nivel ?? (rama is null ? null : rama.Nivel + 1);
+        int? nivelAgrupacion = query.Nivel ?? (rama is null ? null : rama.Nivel + 1);
 
-        IEnumerable<Domain.Model.CatalogoPartida> Camino(int idPartida)
+        IEnumerable<Modelo.CatalogoPartida> Camino(int idPartida)
         {
-            for (var actual = catalogo.GetValueOrDefault(idPartida); actual is not null;
+            for (Modelo.CatalogoPartida? actual = catalogo.GetValueOrDefault(idPartida); actual is not null;
                  actual = actual.IdPartidaPadre is int padre ? catalogo.GetValueOrDefault(padre) : null)
                 yield return actual;
         }
         bool EnRama(int idPartida) => rama is null || Camino(idPartida).Any(p => p.IdCatalogoPartida == rama.IdCatalogoPartida);
-        Domain.Model.CatalogoPartida? Rubro(int idPartida)
+        Modelo.CatalogoPartida? Rubro(int idPartida)
         {
-            var camino = Camino(idPartida).ToList();
+            List<Modelo.CatalogoPartida> camino = Camino(idPartida).ToList();
             if (camino.Count == 0) return null;
             return nivelAgrupacion is int nivel ? camino.LastOrDefault(p => p.Nivel >= nivel) ?? camino[0] : camino[0];
         }
-        var filas = vigente.Where(f => ids.Contains(f.IdPresupuesto) && EnRama(f.IdCatalogoPartida)).ToList();
-        var nivelMaximo = filas.Select(f => catalogo.TryGetValue(f.IdCatalogoPartida, out var p) ? p.Nivel : 1)
-            .DefaultIfEmpty(0).Max();
-        var rubros = filas
+        List<RubroTablero> AgruparRubros(IEnumerable<SaldoPartidaFila> filasIncluidas) => filasIncluidas
             .GroupBy(f => Rubro(f.IdCatalogoPartida) is { } r
                 ? (r.IdCatalogoPartida, (string?)r.Codigo, (string?)r.Nombre)
                 : (f.IdCatalogoPartida, f.CodigoPartida, f.NombrePartida))
@@ -86,19 +87,32 @@ public sealed class ObtenerDashboardHandler
                 g.Key.Item3 ?? string.Empty, g.Sum(f => f.MontoPresupuestado), g.Sum(f => f.MontoComprometido),
                 g.Sum(f => f.MontoEjecutado)))
             .ToList();
-        var ejecuciones = (await _consultas.EjecucionDiariaAsync(ids))
+
+        List<SaldoPartidaFila> filas = vigente.Where(f => ids.Contains(f.IdPresupuesto) && EnRama(f.IdCatalogoPartida)).ToList();
+        int nivelMaximo = filas.Select(f => catalogo.TryGetValue(f.IdCatalogoPartida, out Modelo.CatalogoPartida? p) ? p.Nivel : 1)
+            .DefaultIfEmpty(0).Max();
+        List<RubroTablero> rubros = AgruparRubros(filas);
+        List<EjecucionTablero> ejecuciones = (await _consultas.EjecucionDiariaAsync(ids))
             .Where(e => EnRama(e.IdCatalogoPartida))
             .GroupBy(e => (e.Fecha.Date, IdCatalogoPartida: Rubro(e.IdCatalogoPartida)?.IdCatalogoPartida ?? e.IdCatalogoPartida))
             .Select(g => new EjecucionTablero(g.Key.Date, g.Key.IdCatalogoPartida, g.Sum(e => e.MontoEjecutado)))
             .ToList();
 
-        var moneda = presupuestos.OrderBy(p => p.IdMoneda).FirstOrDefault();
-        var encabezado = new EncabezadoTablero(centro.IdCentroCosto, centro.Codigo, centro.Nombre, centro.NombreProyecto,
+        Modelo.Presupuesto? moneda = presupuestos.OrderBy(p => p.IdMoneda).FirstOrDefault();
+        EncabezadoTablero encabezado = new(centro.IdCentroCosto, centro.Codigo, centro.Nombre, centro.NombreProyecto,
             moneda?.IdMoneda, moneda?.CodigoMoneda, moneda?.SimboloMoneda, presupuestos.Select(p => p.IdMoneda).Distinct().Count(),
             presupuestos.Count, presupuestos.Min(p => p.FechaInicio), presupuestos.Max(p => p.FechaFin));
-        var tablero = TableroPresupuestario.Construir(encabezado, rubros, ejecuciones, _reloj.GetLocalNow().DateTime);
+        Tablero tablero = TableroPresupuestario.Construir(encabezado, rubros, ejecuciones, _reloj.GetLocalNow().DateTime);
+
+        // La exclusión se aplica sobre partidas originales, antes de agrupar; el resto del tablero
+        // conserva las filas y ejecuciones completas de la rama seleccionada.
+        IReadOnlyList<TableroRubro> rubrosFiltrados = partidasExcluidas.Count == 0 ? tablero.Rubros
+            : TableroPresupuestario.ConstruirDistribucion(
+                AgruparRubros(filas.Where(f => !partidasExcluidas.Contains(f.IdCatalogoPartida))));
+
         return tablero with
         {
+            RubrosFiltrados = rubrosFiltrados,
             Encabezado = tablero.Encabezado with
             {
                 Nivel = nivelAgrupacion is int n ? Math.Min(n, Math.Max(nivelMaximo, 1)) : null,
