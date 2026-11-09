@@ -1,3 +1,4 @@
+using System.Net.Mail;
 using Cobranzas_Vittoria.Notificaciones.Domain.Exception;
 using static Cobranzas_Vittoria.Notificaciones.Domain.Model.NotificacionDestinatario;
 
@@ -16,6 +17,16 @@ internal static class NotificacionDestinatarioValidator
             throw new ValidacionNegocioNotificacionException(
                 "NOTIFICACION_DESTINATARIO_CORREO_INVALIDO",
                 $"El correo del destinatario debe contener entre 1 y {LONGITUD_MAXIMA_CORREO} caracteres.");
+        }
+
+        // MailAddress también admite nombres de presentación; aquí se requiere una dirección única y pura.
+        if (correo.Contains('\r') || correo.Contains('\n')
+            || !MailAddress.TryCreate(correo, out MailAddress? direccion)
+            || !string.Equals(direccion.Address, correo, StringComparison.Ordinal))
+        {
+            throw new ValidacionNegocioNotificacionException(
+                "NOTIFICACION_DESTINATARIO_CORREO_INVALIDO",
+                "El destinatario debe contener una única dirección de correo con formato válido.");
         }
 
         if (nombre is not null && nombre.Length > LONGITUD_MAXIMA_NOMBRE)

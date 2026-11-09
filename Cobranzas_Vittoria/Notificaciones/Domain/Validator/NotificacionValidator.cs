@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Notificaciones.Domain.Exception;
+using Cobranzas_Vittoria.Notificaciones.Domain.Model;
 
 namespace Cobranzas_Vittoria.Notificaciones.Domain.Validator;
 
@@ -48,6 +49,44 @@ internal static class NotificacionValidator
                 "NOTIFICACION_CUERPO_REQUERIDO",
                 "El contenido del correo es obligatorio.");
         }
+    }
+
+    internal static IReadOnlyCollection<NotificacionDestinatario> ValidarYCopiarDestinatarios(
+        int idCodigoEventoNotificacion, IEnumerable<NotificacionDestinatario> destinatarios)
+    {
+        if (destinatarios is null)
+        {
+            throw new NotificacionSinDestinatariosException(idCodigoEventoNotificacion);
+        }
+
+        List<NotificacionDestinatario> copia = destinatarios.ToList();
+
+        if (copia.Count == 0)
+        {
+            throw new NotificacionSinDestinatariosException(idCodigoEventoNotificacion);
+        }
+
+        HashSet<(string Correo, NotificacionDestinatario.TipoEnvioConfig TipoEnvio)> claves = new();
+
+        foreach (NotificacionDestinatario destinatario in copia)
+        {
+            if (destinatario is null || destinatario.IdNotificacion != 0 || destinatario.IdNotificacionDestinatario != 0)
+            {
+                throw new ValidacionNegocioNotificacionException(
+                    "NOTIFICACION_DESTINATARIO_NO_NUEVO", "Los destinatarios deben ser nuevos y no pertenecer a una notificación persistida.");
+            }
+
+            NotificacionDestinatarioValidator.ValidarCreacion(destinatario.Correo, destinatario.Nombre, destinatario.TipoEnvio);
+
+            // No repetimos la misma dirección y participación; los distintos tipos de envío siguen siendo explícitos.
+            if (!claves.Add((destinatario.Correo.ToUpperInvariant(), destinatario.TipoEnvio)))
+            {
+                throw new ValidacionNegocioNotificacionException(
+                    "NOTIFICACION_DESTINATARIO_DUPLICADO", "La notificación contiene una dirección repetida para el mismo tipo de envío.");
+            }
+        }
+
+        return copia.AsReadOnly();
     }
 
     internal static void ValidarFallo(string error, int maxIntentos, TimeSpan intervaloReintento)

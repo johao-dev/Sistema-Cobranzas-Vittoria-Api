@@ -23,6 +23,9 @@ public class Notificacion
     public int Intentos { get; private set; }
     public string? UltimoError { get; private set; }
 
+    /// <summary>Instantánea de los destinatarios originales, independiente de cambios posteriores de configuración.</summary>
+    public IReadOnlyCollection<NotificacionDestinatario> Destinatarios { get; private set; } = Array.Empty<NotificacionDestinatario>();
+
     public enum EstadoNotificacion
     {
         Pendiente,
@@ -39,7 +42,8 @@ public class Notificacion
         int idReferencia,
         string asuntoGenerado,
         string cuerpoHtmlGenerado,
-        DateTime fechaCreacionUtc)
+        DateTime fechaCreacionUtc,
+        IEnumerable<NotificacionDestinatario> destinatarios)
     {
         NotificacionValidator.ValidarCreacion(
             idEvento,
@@ -47,6 +51,9 @@ public class Notificacion
             idReferencia,
             asuntoGenerado,
             cuerpoHtmlGenerado);
+
+        IReadOnlyCollection<NotificacionDestinatario> destinatariosValidados =
+            NotificacionValidator.ValidarYCopiarDestinatarios(idCodigoEventoNotificacion, destinatarios);
 
         return new Notificacion
         {
@@ -57,7 +64,8 @@ public class Notificacion
             CuerpoHtmlGenerado = cuerpoHtmlGenerado,
             Estado = EstadoNotificacion.Pendiente,
             FechaCreacion = fechaCreacionUtc,
-            Intentos = 0
+            Intentos = 0,
+            Destinatarios = destinatariosValidados
         };
     }
 
@@ -141,6 +149,7 @@ public class Notificacion
     /// <param name="fechaEnvioUtc">Fecha del envío satisfactorio en UTC, si se realizó.</param>
     /// <param name="intentos">Cantidad de intentos de procesamiento iniciados.</param>
     /// <param name="ultimoError">Descripción persistida del último fallo, si existe.</param>
+    /// <param name="destinatarios">Destinatarios persistidos; se copia la colección sin aplicar las reglas de alta.</param>
     /// <returns>La notificación con su identidad, contenido e información de procesamiento originales.</returns>
     public static Notificacion Reconstruir(
         long idNotificacion,
@@ -155,8 +164,12 @@ public class Notificacion
         DateTime? fechaProximoIntentoUtc,
         DateTime? fechaEnvioUtc,
         int intentos,
-        string? ultimoError)
+        string? ultimoError,
+        IEnumerable<NotificacionDestinatario> destinatarios)
     {
+        ArgumentNullException.ThrowIfNull(destinatarios);
+        IReadOnlyCollection<NotificacionDestinatario> destinatariosPersistidos = destinatarios.ToList().AsReadOnly();
+
         return new Notificacion
         {
             IdNotificacion = idNotificacion,
@@ -171,7 +184,8 @@ public class Notificacion
             FechaProximoIntento = fechaProximoIntentoUtc,
             FechaEnvio = fechaEnvioUtc,
             Intentos = intentos,
-            UltimoError = ultimoError
+            UltimoError = ultimoError,
+            Destinatarios = destinatariosPersistidos
         };
     }
 }

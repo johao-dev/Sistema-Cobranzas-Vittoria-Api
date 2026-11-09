@@ -7,6 +7,20 @@ namespace Cobranzas_Vittoria.Tests.Unit.Notificaciones.Domain;
 
 public class NotificacionDestinatarioTests
 {
+    [TestCase("sin-arroba")]
+    [TestCase("@example.com")]
+    [TestCase("uno@example.com, dos@example.com")]
+    [TestCase("uno@example.com;dos@example.com")]
+    [TestCase("Nombre <uno@example.com>")]
+    [TestCase("uno@example.com\r\nBcc: dos@example.com")]
+    public void Crear_ConCorreoMalformadoOVariosDestinatarios_RechazaSinExponerLaDireccion(string correo)
+    {
+        ValidacionNegocioNotificacionException? error = Assert.Throws<ValidacionNegocioNotificacionException>(() =>
+            NotificacionDestinatario.Crear(correo, null, TipoEnvioConfig.To));
+
+        Assert.That(error!.Message, Does.Not.Contain(correo));
+    }
+
     [TestCase(TipoEnvioConfig.To)]
     [TestCase(TipoEnvioConfig.Cc)]
     [TestCase(TipoEnvioConfig.Bcc)]

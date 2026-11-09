@@ -18,4 +18,11 @@ public sealed class NotificacionSinDestinatariosException : ValidacionNegocioNot
         : base(CODIGO, $"La notificación del evento {codigoEvento} no dispone de destinatarios válidos.")
     {
     }
+
+    /// <summary>Inicializa el error cuando el dominio dispone del ID del catálogo en lugar de su código funcional.</summary>
+    /// <param name="idCodigoEventoNotificacion">Identificador del código de evento que genera la notificación.</param>
+    public NotificacionSinDestinatariosException(int idCodigoEventoNotificacion)
+        : base(CODIGO, $"La notificación del código de evento con ID {idCodigoEventoNotificacion} no dispone de destinatarios válidos.")
+    {
+    }
 }
