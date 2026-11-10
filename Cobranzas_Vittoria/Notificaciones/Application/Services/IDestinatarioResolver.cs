@@ -5,6 +5,8 @@ namespace Cobranzas_Vittoria.Notificaciones.Application.Services;
 /// <summary>Resuelve una instrucción ROL o USUARIO sin limitarla por proyectos o compradores.</summary>
 public interface IDestinatarioResolver
 {
+    TipoDestinatario Tipo { get; }
+
     /// <summary>Devuelve cero o más direcciones; omite usuarios sin correo y conserva todos los usuarios del rol.</summary>
     /// <remarks>
     /// No asigna TipoEnvio: lo determina la instrucción. Application valida con la fábrica del dominio

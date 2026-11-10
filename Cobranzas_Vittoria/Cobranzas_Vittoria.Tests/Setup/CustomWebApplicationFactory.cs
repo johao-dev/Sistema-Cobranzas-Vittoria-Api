@@ -23,6 +23,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Reemplaza HttpClient y servicios externos con stubs
         builder.ConfigureTestServices(services =>
         {
+            services.PostConfigure<Cobranzas_Vittoria.Notificaciones.Infrastructure.BackgroundJobs.NotificacionesWorkerOptions>(
+                options => options.Habilitado = false);
             // Quita el HttpClient real registrado por AddHttpClient<ISunatService,...>
             // y vuelve a registrar ISunatService con el stub. AddSingleton es importante
             // para que SunatFake conserve estado entre invocaciones del mismo test.

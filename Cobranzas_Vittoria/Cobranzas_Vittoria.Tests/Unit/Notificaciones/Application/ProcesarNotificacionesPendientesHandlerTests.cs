@@ -41,7 +41,7 @@ public class ProcesarNotificacionesPendientesHandlerTests
             Assert.That(resultado, Is.EqualTo(new ResultadoProcesamientoLote(0, 0, 0)));
             Assert.That(_sender.Solicitudes, Is.Empty);
             Assert.That(_repository.Resultados, Is.Empty);
-            Assert.That(_repository.CantidadSolicitada, Is.EqualTo(10));
+            Assert.That(_repository.CantidadSolicitada, Is.EqualTo(3));
             Assert.That(_repository.AhoraReclamacion, Is.EqualTo(DatosNotificaciones.AHORA));
             Assert.That(_repository.AhoraReclamacion!.Value.Kind, Is.EqualTo(DateTimeKind.Utc));
         });
@@ -165,7 +165,7 @@ public class ProcesarNotificacionesPendientesHandlerTests
             Assert.That(_repository.Almacenadas[1].Estado, Is.EqualTo(Notificacion.EstadoNotificacion.Procesando));
             Assert.That(_repository.Almacenadas[1].Intentos, Is.EqualTo(2));
             Assert.That(_repository.Almacenadas[1].FechaEnvio, Is.Null);
-            Assert.That(_logger.Mensajes.Single(), Does.Contain("Conflicto"));
+            Assert.That(_logger.Mensajes.Single(m => m.Contains("Conflicto", StringComparison.Ordinal)), Does.Contain("Conflicto"));
         });
     }
 

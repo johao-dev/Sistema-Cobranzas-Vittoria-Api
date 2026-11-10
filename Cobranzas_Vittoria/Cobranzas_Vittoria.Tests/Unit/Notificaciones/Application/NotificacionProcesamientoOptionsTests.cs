@@ -18,7 +18,7 @@ public class NotificacionProcesamientoOptionsTests
         Assert.Multiple(() =>
         {
             Assert.DoesNotThrow(options.Validar);
-            Assert.That(options.TamanoLote, Is.EqualTo(10));
+            Assert.That(options.TamanoLote, Is.EqualTo(3));
             Assert.That(options.MaximoIntentos, Is.EqualTo(3));
             Assert.That(options.IntervaloReintentoMinutos, Is.EqualTo(5));
             Assert.That(options.TimeoutProcesamientoMinutos, Is.EqualTo(10));

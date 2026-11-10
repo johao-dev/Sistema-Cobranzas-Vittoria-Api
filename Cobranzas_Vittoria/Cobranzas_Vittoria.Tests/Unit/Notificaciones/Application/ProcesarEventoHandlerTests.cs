@@ -21,7 +21,7 @@ public class ProcesarEventoHandlerTests
         _repository = new();
         _resolver = new();
         _renderer = new();
-        _handler = new(_configuracion, _repository, _resolver, _renderer, new RelojNotificaciones());
+        _handler = new(_configuracion, _repository, new DestinatarioResolver([_resolver, new EstrategiaUsuarioStub(_resolver)]), _renderer, new RelojNotificaciones());
     }
 
     [Test]

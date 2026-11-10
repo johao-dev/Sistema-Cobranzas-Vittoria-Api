@@ -9,7 +9,7 @@ namespace Cobranzas_Vittoria.Notificaciones.Application.ProcesarEvento;
 public sealed class ProcesarEventoHandler(
     IConfiguracionNotificacionRepository configuracionRepository,
     INotificacionRepository notificacionRepository,
-    IDestinatarioResolver destinatarioResolver,
+    DestinatarioResolver destinatarioResolver,
     IPlantillaRenderer plantillaRenderer,
     TimeProvider timeProvider)
 {
@@ -85,11 +85,6 @@ public sealed class ProcesarEventoHandler(
         foreach (ReglaDestinatario instruccion in regla.Destinatarios)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            if (instruccion.TipoDestinatario is not (TipoDestinatario.Rol or TipoDestinatario.Usuario))
-            {
-                throw new TipoDestinatarioNoSoportadoException(instruccion.TipoDestinatario.ToString());
-            }
 
             IReadOnlyCollection<DireccionCorreo> direcciones = await destinatarioResolver.ResolverAsync(
                 instruccion, cancellationToken);

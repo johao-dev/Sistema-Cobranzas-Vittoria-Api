@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Cobranzas_Vittoria.Notificaciones.Application.Options;
 using Cobranzas_Vittoria.Notificaciones.Application.Services;
 using Cobranzas_Vittoria.Notificaciones.Domain.Exception;
@@ -51,6 +52,7 @@ public sealed class ProcesarNotificacionesPendientesHandler
         {
             cancellationToken.ThrowIfCancellationRequested();
             int intentoEsperado = notificacion.Intentos;
+            Stopwatch duracion = Stopwatch.StartNew();
 
             SolicitudEnvioCorreo solicitud = new(
                 notificacion.AsuntoGenerado,
@@ -66,7 +68,14 @@ public sealed class ProcesarNotificacionesPendientesHandler
             {
                 await _emailSender.EnviarAsync(solicitud, cancellationToken);
             }
-            catch (EnvioCorreoException excepcion) when (!cancellationToken.IsCancellationRequested)
+            catch (EnvioCorreoException excepcion) when (excepcion.RequiereIntervencion)
+            {
+                _logger.LogError("Fallo operativo SMTP en notificación {IdNotificacion}, intento {Intento}, " +
+                    "duración {DuracionMs} ms; se requiere intervención", notificacion.IdNotificacion,
+                    intentoEsperado, duracion.ElapsedMilliseconds);
+                throw;
+            }
+            catch (EnvioCorreoException excepcion) when (!cancellationToken.IsCancellationRequested && !excepcion.RequiereIntervencion)
             {
                 fallo = excepcion;
             }
@@ -104,6 +113,10 @@ public sealed class ProcesarNotificacionesPendientesHandler
                 _logger.LogWarning("Conflicto al guardar notificación {IdNotificacion}, intento {Intento}",
                     notificacion.IdNotificacion, intentoEsperado);
             }
+
+            _logger.LogInformation("Notificación {IdNotificacion}, intento {Intento}, resultado {Estado}, " +
+                "guardada {Guardada}, duración {DuracionMs} ms", notificacion.IdNotificacion, intentoEsperado,
+                notificacion.Estado, guardada, duracion.ElapsedMilliseconds);
         }
 
         return new ResultadoProcesamientoLote(notificaciones.Count, guardadas, conflictos);

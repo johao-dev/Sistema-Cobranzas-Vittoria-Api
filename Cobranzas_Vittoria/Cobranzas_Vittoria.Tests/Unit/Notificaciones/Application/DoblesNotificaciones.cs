@@ -194,6 +194,7 @@ internal sealed class NotificacionRepositoryStub : INotificacionRepository
 
 internal sealed class DestinatarioResolverStub : IDestinatarioResolver
 {
+    public TipoDestinatario Tipo { get; init; } = TipoDestinatario.Rol;
     internal Func<ReglaDestinatario, IReadOnlyCollection<DireccionCorreo>> Resolver { get; set; }
         = _ => [new DireccionCorreo("usuario@example.com", "Usuario")];
     internal List<ReglaDestinatario> Instrucciones { get; } = new();
@@ -265,4 +266,11 @@ internal sealed class LoggerNotificacionesStub<T> : ILogger<T>
             Mensajes.Add(exception.ToString());
         }
     }
+}
+
+internal sealed class EstrategiaUsuarioStub(DestinatarioResolverStub resolver) : IDestinatarioResolver
+{
+    public TipoDestinatario Tipo => TipoDestinatario.Usuario;
+    public Task<IReadOnlyCollection<DireccionCorreo>> ResolverAsync(ReglaDestinatario instruccion, CancellationToken cancellationToken = default)
+        => resolver.ResolverAsync(instruccion, cancellationToken);
 }

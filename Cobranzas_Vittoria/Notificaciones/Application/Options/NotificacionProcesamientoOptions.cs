@@ -5,7 +5,7 @@ namespace Cobranzas_Vittoria.Notificaciones.Application.Options;
 public sealed class NotificacionProcesamientoOptions
 {
     [Range(1, int.MaxValue)]
-    public int TamanoLote { get; set; } = 10;
+    public int TamanoLote { get; set; } = 3;
 
     [Range(1, int.MaxValue)]
     public int MaximoIntentos { get; set; } = 3;

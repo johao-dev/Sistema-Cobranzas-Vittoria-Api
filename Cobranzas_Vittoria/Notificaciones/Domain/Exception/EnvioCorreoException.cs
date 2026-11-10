@@ -18,16 +18,22 @@ public sealed class EnvioCorreoException : NotificacionesException
     /// <remarks>Un fallo desconocido no debe clasificarse automáticamente como permanente.</remarks>
     public bool? EsTransitorio { get; }
 
+    /// <summary>El transporte requiere corregir configuración y reanudar el proceso antes de otro envío.</summary>
+    public bool RequiereIntervencion { get; }
+
     /// <summary>Inicializa el fallo de envío con su clasificación y causa original.</summary>
     /// <param name="mensaje">Descripción del fallo sin credenciales, correos ni contenido del mensaje.</param>
     /// <param name="esTransitorio">True si es transitorio, false si es permanente o null si se desconoce.</param>
     /// <param name="innerException">Excepción original del transporte, si está disponible.</param>
+    /// <param name="requiereIntervencion">True si debe suspenderse el procesamiento hasta corregir el transporte.</param>
     public EnvioCorreoException(
         string mensaje,
         bool? esTransitorio = null,
-        System.Exception? innerException = null)
+        System.Exception? innerException = null,
+        bool requiereIntervencion = false)
         : base(CODIGO, mensaje, innerException)
     {
         EsTransitorio = esTransitorio;
+        RequiereIntervencion = requiereIntervencion;
     }
 }
