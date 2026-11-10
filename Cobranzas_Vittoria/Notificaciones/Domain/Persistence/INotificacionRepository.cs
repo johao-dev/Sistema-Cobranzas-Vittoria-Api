@@ -9,6 +9,10 @@ public interface INotificacionRepository
     /// <remarks>
     /// La unicidad SQL de IdEvento resuelve también carreras concurrentes. Si ya existe, devuelve su ID
     /// sin modificar contenido ni destinatarios; la entrega duplicada no constituye un error de negocio.
+    /// Debe poder utilizar la conexión y transacción del emisor, suministradas al adaptador por su ámbito
+    /// de ejecución. En ese caso no confirma, revierte ni dispone recursos del emisor; cabecera y
+    /// destinatarios participan en su misma transacción. Sin transacción externa, el adaptador garantiza
+    /// la atomicidad de su propia operación. Application no crea ni confirma transacciones.
     /// </remarks>
     Task<ResultadoRegistroNotificacion> RegistrarSiNoExisteAsync(
         Notificacion notificacion,
@@ -27,6 +31,19 @@ public interface INotificacionRepository
     Task<IReadOnlyCollection<Notificacion>> ReclamarPendientesAsync(
         int cantidad,
         DateTime ahoraUtc,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Lee hasta cantidad procesamientos cuyo inicio sea estrictamente anterior al límite UTC.</summary>
+    /// <remarks>
+    /// Devuelve instantáneas en PROCESANDO con sus destinatarios y número de intento, sin incrementar
+    /// intentos ni modificar filas. Exige cantidad positiva y fecha UTC. Una colección vacía es normal.
+    /// No mantiene bloqueos o transacciones abiertos después de retornar. Application aplica RegistrarFallo
+    /// y usa GuardarResultadoAsync con el intento observado: dos recuperadores o un envío concurrente
+    /// no deben sobrescribir resultados ni intentos posteriores.
+    /// </remarks>
+    Task<IReadOnlyCollection<Notificacion>> ObtenerProcesamientosVencidosAsync(
+        int cantidad,
+        DateTime fechaLimiteUtc,
         CancellationToken cancellationToken = default);
 
     /// <summary>Guarda el resultado de un intento sin modificar el contenido ni los destinatarios originales.</summary>

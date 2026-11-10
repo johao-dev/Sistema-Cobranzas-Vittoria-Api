@@ -18,6 +18,13 @@ public class CsvFileParserTests
 {
     private readonly CsvFileParser _sut = new();
 
+    [OneTimeSetUp]
+    public void RegistrarCodificaciones()
+    {
+        // La creación de archivos de prueba no debe depender del arranque de la API de integración.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    }
+
     // ====================================================================
     // Delimitador: ';' (default, el caso tipico de Excel en espanol)
     // ====================================================================

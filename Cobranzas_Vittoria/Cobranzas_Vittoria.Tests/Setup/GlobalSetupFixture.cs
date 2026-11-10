@@ -3,7 +3,8 @@ using Cobranzas_Vittoria.Tests.Setup;
 using Cobranzas_Vittoria.Tests.Integration.Common;
 using System.Net.Http.Headers;
 
-namespace Cobranzas_Vittoria.Tests;
+// El contenedor SQL solo es requisito de las pruebas de integración.
+namespace Cobranzas_Vittoria.Tests.Integration;
 
 [SetUpFixture]
 public class GlobalSetupFixture

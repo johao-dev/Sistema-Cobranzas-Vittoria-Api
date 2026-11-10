@@ -97,11 +97,18 @@ public class Notificacion
         UltimoError = null;
     }
 
+    /// <summary>Registra el resultado fallido conservando el contador del intento reclamado.</summary>
+    /// <param name="error">Diagnóstico sin credenciales, direcciones ni contenido del correo.</param>
+    /// <param name="ahoraUtc">Instante del resultado en UTC.</param>
+    /// <param name="maxIntentos">Máximo de intentos configurado por Application.</param>
+    /// <param name="intervaloReintento">Espera configurada para un fallo recuperable.</param>
+    /// <param name="permitirReintento">False termina en Error ante un fallo permanente, aunque queden intentos.</param>
     public void RegistrarFallo(
         string error,
         DateTime ahoraUtc,
         int maxIntentos,
-        TimeSpan intervaloReintento)
+        TimeSpan intervaloReintento,
+        bool permitirReintento = true)
     {
         ValidarEstado(EstadoNotificacion.Procesando, nameof(RegistrarFallo));
         NotificacionValidator.ValidarFallo(error, maxIntentos, intervaloReintento);
@@ -109,7 +116,7 @@ public class Notificacion
         UltimoError = error;
         FechaInicioProcesamiento = null;
 
-        if (Intentos >= maxIntentos)
+        if (!permitirReintento || Intentos >= maxIntentos)
         {
             Estado = EstadoNotificacion.Error;
             FechaProximoIntento = null;
