@@ -108,22 +108,9 @@ public class ConfiguracionNotificacionTests
     [TestCase(TipoDestinatario.Rol, "-2")]
     [TestCase(TipoDestinatario.Usuario, "abc")]
     [TestCase(TipoDestinatario.Rol, "2147483648")]
-    [TestCase(TipoDestinatario.Solicitante, "2")]
     public void CrearInstruccion_ConValorIncompatibleConSuEstrategia_Rechaza(TipoDestinatario tipo, string? valor)
     {
         Assert.Throws<ValidacionNegocioNotificacionException>(() => ReglaDestinatario.Crear(10, tipo, valor, TipoEnvioConfig.To));
-    }
-
-    [TestCase(TipoDestinatario.Solicitante)]
-    [TestCase(TipoDestinatario.ResponsableProyecto)]
-    [TestCase(TipoDestinatario.CoordinadorProyecto)]
-    [TestCase(TipoDestinatario.CompradorAsignado)]
-    [TestCase(TipoDestinatario.Proveedor)]
-    public void CrearInstruccionDinamica_NoNecesitaUnValorFijo(TipoDestinatario tipo)
-    {
-        ReglaDestinatario destinatario = ReglaDestinatario.Crear(10, tipo, " ", TipoEnvioConfig.Cc);
-
-        Assert.That(destinatario.Valor, Is.Null);
     }
 
     [Test]

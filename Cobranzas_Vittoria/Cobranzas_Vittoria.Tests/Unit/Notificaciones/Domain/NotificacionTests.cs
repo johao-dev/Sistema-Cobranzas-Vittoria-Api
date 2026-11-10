@@ -25,16 +25,30 @@ public class NotificacionTests
             Assert.That(notificacion.Intentos, Is.EqualTo(1));
             Assert.That(notificacion.FechaInicioProcesamiento, Is.Null);
             Assert.That(notificacion.FechaProximoIntento, Is.EqualTo(fechaReintento));
-            Assert.That(notificacion.PuedeProcesarse(fechaReintento.AddSeconds(-1)), Is.False);
-            Assert.That(notificacion.PuedeProcesarse(fechaReintento), Is.True);
         });
 
         Assert.Throws<ValidacionNegocioNotificacionException>(() =>
             notificacion.IniciarProcesamiento(fechaReintento.AddSeconds(-1)));
 
-        Assert.That(notificacion.Intentos, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(notificacion.Estado, Is.EqualTo(EstadoNotificacion.Pendiente));
+            Assert.That(notificacion.Intentos, Is.EqualTo(1));
+            Assert.That(notificacion.FechaInicioProcesamiento, Is.Null);
+            Assert.That(notificacion.FechaProximoIntento, Is.EqualTo(fechaReintento));
+            Assert.That(notificacion.UltimoError, Is.EqualTo("Fallo temporal del transporte."));
+        });
 
         notificacion.IniciarProcesamiento(fechaReintento);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(notificacion.Estado, Is.EqualTo(EstadoNotificacion.Procesando));
+            Assert.That(notificacion.Intentos, Is.EqualTo(2));
+            Assert.That(notificacion.FechaInicioProcesamiento, Is.EqualTo(fechaReintento));
+            Assert.That(notificacion.FechaProximoIntento, Is.Null);
+        });
+
         notificacion.MarcarComoEnviada(fechaReintento);
 
         Assert.Multiple(() =>
@@ -45,7 +59,6 @@ public class NotificacionTests
             Assert.That(notificacion.FechaInicioProcesamiento, Is.Null);
             Assert.That(notificacion.FechaProximoIntento, Is.Null);
             Assert.That(notificacion.UltimoError, Is.Null);
-            Assert.That(notificacion.PuedeProcesarse(fechaReintento), Is.False);
         });
     }
 
@@ -57,6 +70,9 @@ public class NotificacionTests
 
         notificacion.RegistrarFallo("No se pudo enviar.", INSTANTE, 1, INTERVALO_REINTENTO);
 
+        Assert.Throws<TransicionEstadoNotificacionInvalidaException>(() =>
+            notificacion.IniciarProcesamiento(INSTANTE.AddDays(1)));
+
         Assert.Multiple(() =>
         {
             Assert.That(notificacion.Estado, Is.EqualTo(EstadoNotificacion.Error));
@@ -64,7 +80,24 @@ public class NotificacionTests
             Assert.That(notificacion.UltimoError, Is.EqualTo("No se pudo enviar."));
             Assert.That(notificacion.FechaInicioProcesamiento, Is.Null);
             Assert.That(notificacion.FechaProximoIntento, Is.Null);
-            Assert.That(notificacion.PuedeProcesarse(INSTANTE.AddDays(1)), Is.False);
+        });
+    }
+
+    [Test]
+    public void IniciarProcesamiento_ConIntentoEnCurso_RechazaSinModificarlo()
+    {
+        Notificacion notificacion = CrearNotificacion();
+        notificacion.IniciarProcesamiento(INSTANTE);
+
+        Assert.Throws<TransicionEstadoNotificacionInvalidaException>(() =>
+            notificacion.IniciarProcesamiento(INSTANTE.AddMinutes(1)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(notificacion.Estado, Is.EqualTo(EstadoNotificacion.Procesando));
+            Assert.That(notificacion.Intentos, Is.EqualTo(1));
+            Assert.That(notificacion.FechaInicioProcesamiento, Is.EqualTo(INSTANTE));
+            Assert.That(notificacion.FechaProximoIntento, Is.Null);
         });
     }
 

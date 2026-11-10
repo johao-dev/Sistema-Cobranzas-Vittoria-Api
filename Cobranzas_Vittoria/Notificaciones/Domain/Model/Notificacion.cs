@@ -69,13 +69,6 @@ public class Notificacion
         };
     }
 
-    public bool PuedeProcesarse(DateTime ahoraUtc)
-    {
-        return Estado == EstadoNotificacion.Pendiente
-            && (!FechaProximoIntento.HasValue ||
-                FechaProximoIntento.Value <= ahoraUtc);
-    }
-
     public void IniciarProcesamiento(DateTime ahoraUtc)
     {
         ValidarEstado(EstadoNotificacion.Pendiente, nameof(IniciarProcesamiento));
