@@ -41,6 +41,17 @@ public sealed class RequerimientosAuthorizationTests : IntegrationTestBase
     }
 
     [Test]
+    public async Task Crear_SinToken_Retorna401YSinPersistir()
+    {
+        using HttpClient client = GlobalSetupFixture.Factory.CreateClient();
+        HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/compras/requerimientos", RequerimientoBuilder.Nuevo().Build());
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(await DbHelpers.QueryScalarAsync<int>("SELECT COUNT(*) FROM compras.Requerimiento"), Is.Zero);
+    }
+
+    [Test]
     public async Task Crear_TokenSoloConPermisoVer_Retorna403()
     {
         using HttpClient client = CrearClienteConPermisos([Permisos.Requerimientos.Ver]);

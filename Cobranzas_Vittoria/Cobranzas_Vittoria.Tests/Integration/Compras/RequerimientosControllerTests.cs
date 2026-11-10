@@ -25,8 +25,8 @@ namespace Cobranzas_Vittoria.Tests.Integration.Compras;
 /// Resultados válidos (CHECK): Conforme, Observado.
 ///
 /// Reglas de negocio:
-///   - Crear: NumeroRequerimiento es requerido. Si el enviado ya existe, el repo
-///     calcula el siguiente como MAX(TRY_CONVERT(INT, NumeroRequerimiento))+1.
+///   - Crear: el caso de uso modular conserva el número disponible; si está vacío o repetido,
+///     obtiene el siguiente como MAX(TRY_CONVERT(INT, NumeroRequerimiento))+1.
 ///   - Update: el SP reemplaza el set completo de items (DELETE + INSERT). El repo
 ///     lanza InvalidOperationException si el requerimiento ya tiene OC o estado != 'REGISTRADO'.
 ///   - Get devuelve { requerimiento, items, validaciones, puedeEditar }.

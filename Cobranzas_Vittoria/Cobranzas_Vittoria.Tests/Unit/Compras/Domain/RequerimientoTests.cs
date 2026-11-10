@@ -23,9 +23,9 @@ public class RequerimientoTests
             Assert.That(requerimiento.FechaRequerimiento, Is.EqualTo(FECHA));
             Assert.That(requerimiento.IdProyecto, Is.EqualTo(3));
             Assert.That(requerimiento.IdUsuarioSolicitante, Is.EqualTo(5));
-            Assert.That(requerimiento.Descripcion, Is.EqualTo("Obra"));
+            Assert.That(requerimiento.Descripcion, Is.EqualTo("  Obra  "));
             Assert.That(requerimiento.FechaEntrega, Is.EqualTo(FECHA.AddDays(2)));
-            Assert.That(requerimiento.Observacion, Is.EqualTo("Urgente"));
+            Assert.That(requerimiento.Observacion, Is.EqualTo("  Urgente  "));
             Assert.That(requerimiento.FechaCreacion, Is.EqualTo(INSTANTE));
             Assert.That(requerimiento.Estado, Is.EqualTo(EstadoRequerimiento.Registrado));
             Assert.That(requerimiento.Items.Single().IdRequerimientoDetalle, Is.Zero);
@@ -64,9 +64,21 @@ public class RequerimientoTests
             [ItemRequerimiento.Crear(0, 20, null, 1m, null)]));
 
     [Test]
-    public void Crear_ConEntregaAnteriorALaSolicitud_Rechaza()
-        => Assert.Throws<ValidacionComprasException>(() => Requerimiento.Crear("REQ-001", FECHA, 3, 5,
-            [ItemRequerimiento.Crear(0, 20, null, 1m, null)], fechaEntrega: FECHA.AddDays(-1)));
+    public void Crear_ConEntregaAnteriorALaSolicitud_ConservaElContratoDelAlta()
+    {
+        Requerimiento requerimiento = Requerimiento.Crear("REQ-001", FECHA, 3, 5,
+            [ItemRequerimiento.CrearParaNuevoRequerimiento(20, null, 1m, "   ")],
+            descripcion: "", fechaEntrega: FECHA.AddDays(-1), observacion: "   ");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requerimiento.FechaEntrega, Is.EqualTo(FECHA.AddDays(-1)));
+            Assert.That(requerimiento.Descripcion, Is.Empty);
+            Assert.That(requerimiento.Observacion, Is.EqualTo("   "));
+            Assert.That(requerimiento.Items.Single().Observacion, Is.EqualTo("   "));
+            Assert.That(requerimiento.FechaCreacion, Is.EqualTo(default(DateTime)));
+        });
+    }
 
     [Test]
     public void Crear_ConFechaOmitida_Rechaza()

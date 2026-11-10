@@ -185,6 +185,9 @@ public class RequerimientoItemHandlerTests
         public CancellationToken UltimoToken { get; private set; }
         public Exception? ErrorEscritura { get; init; }
 
+        public Task<int> CrearAsync(Requerimiento requerimiento, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<Requerimiento?> ObtenerConItemsAsync(int idRequerimiento, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

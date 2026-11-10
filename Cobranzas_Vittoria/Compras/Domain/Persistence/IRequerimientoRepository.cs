@@ -5,6 +5,8 @@ namespace Cobranzas_Vittoria.Compras.Domain.Persistence;
 
 public interface IRequerimientoRepository
 {
+    Task<int> CrearAsync(Requerimiento requerimiento, CancellationToken cancellationToken = default);
+
     Task<Requerimiento?> ObtenerConItemsAsync(int idRequerimiento, CancellationToken cancellationToken = default);
 
     // La escritura vuelve a comprobar estado, pertenencia y referencias dentro de su transacción.

@@ -33,8 +33,6 @@ namespace Cobranzas_Vittoria.Services
             };
         }
 
-        public Task<int> CrearAsync(RequerimientoCreateDto dto) => _repo.CrearAsync(dto);
-
         public async Task UpdateAsync(int idRequerimiento, int idUsuarioActual, RequerimientoUpdateDto dto)
         {
             await ValidarSolicitanteAsync(idRequerimiento, idUsuarioActual);

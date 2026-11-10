@@ -1,13 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Cobranzas_Vittoria.Dtos.Compras;
+using Cobranzas_Vittoria.Compras.Presentation.Dto;
 using Cobranzas_Vittoria.Dtos.Compras.Requerimientos;
 
 namespace Cobranzas_Vittoria.Tests.Integration.Common;
 
 /// <summary>
-/// Fluent builder para construir y crear <see cref="RequerimientoCreateDto"/>.
+/// Fluent builder para construir y crear <see cref="CrearRequerimientoRequest"/>.
 /// Reutilizable entre controllers que necesitan un requerimiento previo
 /// (OrdenesCompra, Compras, Kardex, etc.).
 ///
@@ -20,7 +20,7 @@ namespace Cobranzas_Vittoria.Tests.Integration.Common;
 /// </summary>
 public class RequerimientoBuilder
 {
-    private readonly RequerimientoCreateDto _dto = new();
+    private readonly CrearRequerimientoRequest _dto = new();
 
     public static RequerimientoBuilder Nuevo() => new();
 
@@ -68,7 +68,7 @@ public class RequerimientoBuilder
     
     public RequerimientoBuilder ConItem(int idMaterial, decimal cantidad, string? observacion = null, int? idPresupuestoDetalle = null)
     {
-        _dto.Items.Add(new RequerimientoDetalleCreateDto
+        _dto.Items!.Add(new CrearItemRequerimientoRequest
         {
             IdMaterial = idMaterial,
             IdPresupuestoDetalle = idPresupuestoDetalle,
@@ -82,7 +82,7 @@ public class RequerimientoBuilder
     /// Aplica los defaults si los campos no fueron configurados, y retorna el DTO.
     /// NO ejecuta el POST.
     /// </summary>
-    public RequerimientoCreateDto Build()
+    public CrearRequerimientoRequest Build()
     {
         if (string.IsNullOrEmpty(_dto.NumeroRequerimiento))
             _dto.NumeroRequerimiento = Guid.NewGuid().ToString("N").Substring(0, 8);
@@ -92,8 +92,8 @@ public class RequerimientoBuilder
             _dto.IdProyecto = SeedIds.ProyectoMaytaCapacII;
         if (_dto.IdUsuarioSolicitante == 0)
             _dto.IdUsuarioSolicitante = SeedIds.IngenieroId;
-        if (_dto.Items.Count == 0)
-            _dto.Items.Add(new RequerimientoDetalleCreateDto
+        if (_dto.Items!.Count == 0)
+            _dto.Items!.Add(new CrearItemRequerimientoRequest
             {
                 IdMaterial = 2,
                 Cantidad = 10m,

@@ -14,6 +14,44 @@ public sealed class RequerimientoRepository(IDbConnectionFactory factory) : IReq
 {
     static RequerimientoRepository() => SqlMapper.AddTypeHandler(new FechaSqlHandler());
 
+    public Task<int> CrearAsync(Requerimiento requerimiento, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(requerimiento);
+        if (requerimiento.IdRequerimiento != 0 || requerimiento.Estado != EstadoRequerimiento.Registrado)
+            throw new ConflictoComprasException("REQUERIMIENTO_ALTA_INVALIDA", "Solo se pueden insertar requerimientos nuevos registrados.");
+
+        return TraductorErroresSql.EjecutarCreacionAsync(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using IDbConnection db = factory.CreateConnection();
+            (RequerimientoEntity cabecera, IReadOnlyList<RequerimientoDetalleEntity> items) = RequerimientoMapper.ToEntityConItems(requerimiento);
+
+            using DataTable tabla = new DataTable();
+            tabla.Columns.Add("IdMaterial", typeof(int));
+            tabla.Columns.Add("Cantidad", typeof(decimal));
+            tabla.Columns.Add("Observacion", typeof(string));
+            tabla.Columns.Add("IdPresupuestoDetalle", typeof(int));
+
+            foreach (RequerimientoDetalleEntity item in items)
+                tabla.Rows.Add(item.IdMaterial, item.Cantidad, (object?)item.Observacion ?? DBNull.Value,
+                    (object?)item.IdPresupuestoDetalle ?? DBNull.Value);
+
+            // FechaCreacion se deja al default SQL; no se cambia la auditoría local existente por UTC.
+            return await db.ExecuteScalarAsync<int>(new CommandDefinition("compras.usp_Requerimiento_Crear",
+                new
+                {
+                    cabecera.NumeroRequerimiento,
+                    FechaRequerimiento = cabecera.FechaRequerimiento.ToDateTime(TimeOnly.MinValue),
+                    cabecera.IdProyecto,
+                    cabecera.Descripcion,
+                    FechaEntrega = cabecera.FechaEntrega?.ToDateTime(TimeOnly.MinValue),
+                    cabecera.IdUsuarioSolicitante,
+                    cabecera.Observacion,
+                    Items = tabla.AsTableValuedParameter("compras.TVP_RequerimientoDetalle")
+                }, commandType: CommandType.StoredProcedure, cancellationToken: cancellationToken));
+        });
+    }
+
     public Task<Requerimiento?> ObtenerConItemsAsync(int idRequerimiento, CancellationToken cancellationToken = default)
         => TraductorErroresSql.EjecutarAsync(async () =>
         {

@@ -1029,6 +1029,8 @@ END;
 GO
 
 
+-- El caso de uso modular valida negocio en C#. Estas comprobaciones protegen
+-- referencias mutables y numeración durante la escritura, incluidos consumidores SQL.
 CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Crear]
     @NumeroRequerimiento NVARCHAR(30),
     @FechaRequerimiento DATE,
@@ -1040,138 +1042,83 @@ CREATE OR ALTER PROCEDURE [compras].[usp_Requerimiento_Crear]
     @Items compras.TVP_RequerimientoDetalle READONLY
 AS
 BEGIN
-    SET
-    NOCOUNT ON;
-    
-    SET
-    XACT_ABORT ON;
-    
-    IF NULLIF(LTRIM(RTRIM(@NumeroRequerimiento)), '') IS NULL
-        THROW 50040,
-    'NumeroRequerimiento es requerido.',
-    1;
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
-IF EXISTS (
-SELECT
-    1
-FROM
-    compras.Requerimiento
-WHERE
-    NumeroRequerimiento = @NumeroRequerimiento)
-        THROW 50041,
-'Ya existe el Número de Requerimiento.',
-1;
+    DECLARE @TranCount INT = @@TRANCOUNT;
+    IF XACT_STATE() = -1
+        THROW 51475, 'TRANSACCION_NO_CONFIRMABLE: se requiere rollback externo.', 1;
 
+    BEGIN TRY
+        IF @TranCount = 0 BEGIN TRANSACTION;
+        ELSE SAVE TRANSACTION CrearRequerimiento;
 
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    maestra.Proyecto
-WHERE
-    IdProyecto = @IdProyecto)
-        THROW 50043,
-'Proyecto no existe.',
-1;
+        IF NULLIF(LTRIM(RTRIM(@NumeroRequerimiento)), '') IS NULL
+            THROW 51470, 'REQUERIMIENTO_NUMERO_REQUERIDO: el número es obligatorio.', 1;
 
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    seguridad.Usuario
-WHERE
-    IdUsuario = @IdUsuarioSolicitante)
-        THROW 50044,
-'Usuario solicitante no existe.',
-1;
+        -- No hay índice UNIQUE global del número. TABLOCKX evita candidatos iguales
+        -- y escrituras de otros flujos entre la comprobación final y el commit.
+        IF EXISTS (SELECT 1 FROM compras.Requerimiento WITH (TABLOCKX, HOLDLOCK)
+                   WHERE NumeroRequerimiento = @NumeroRequerimiento)
+            THROW 51471, 'REQUERIMIENTO_NUMERO_OCUPADO: el número ya existe.', 1;
 
-IF NOT EXISTS (
-SELECT
-    1
-FROM
-    @Items)
-        THROW 50045,
-'Debe registrar al menos un item.',
-1;
+        IF NOT EXISTS (SELECT 1 FROM maestra.Proyecto WITH (HOLDLOCK) WHERE IdProyecto = @IdProyecto)
+            THROW 51472, 'PROYECTO_NO_EXISTE: el proyecto no existe.', 1;
 
-IF EXISTS
-(
-    SELECT 1
-    FROM @Items i
-    LEFT JOIN ControlPresupuestario.PresupuestoDetalle pd
-        ON pd.IdPresupuestoDetalle = i.IdPresupuestoDetalle
-    LEFT JOIN ControlPresupuestario.PresupuestoVersion pv
-        ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
-    LEFT JOIN ControlPresupuestario.EstadoPresupuesto ep
-        ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
-    LEFT JOIN ControlPresupuestario.Presupuesto p
-        ON p.IdPresupuesto = pv.IdPresupuesto
-    LEFT JOIN ControlPresupuestario.CentroCosto cc
-        ON cc.IdCentroCosto = p.IdCentroCosto
-    WHERE i.IdPresupuestoDetalle IS NOT NULL
-      AND (pd.IdPresupuestoDetalle IS NULL OR ep.Codigo <> 'APROBADO'
-           OR p.Activo <> 1 OR cc.Activo <> 1 OR cc.IdProyecto <> @IdProyecto)
-)
-    THROW 51420, 'PARTIDA_REQUERIMIENTO_INVALIDA: debe pertenecer a la versión APROBADA vigente del CentroCosto del Proyecto.', 1;
+        IF NOT EXISTS (SELECT 1 FROM seguridad.Usuario WITH (HOLDLOCK) WHERE IdUsuario = @IdUsuarioSolicitante)
+            THROW 51472, 'SOLICITANTE_NO_EXISTE: el usuario solicitante no existe.', 1;
 
-BEGIN TRAN;
-BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM @Items)
+            THROW 51470, 'REQUERIMIENTO_SIN_ITEMS: debe registrar al menos un ítem.', 1;
 
-INSERT
-    INTO
-    compras.Requerimiento
-    (
-        NumeroRequerimiento,
-    FechaRequerimiento,
-    IdProyecto,
-        Descripcion,
-    FechaEntrega,
-    IdUsuarioSolicitante,
-    Estado,
-    Observacion
-    )
-VALUES
-    (
-        @NumeroRequerimiento,
-@FechaRequerimiento,
-@IdProyecto,
-        @Descripcion,
-@FechaEntrega,
-@IdUsuarioSolicitante,
-N'Registrado',
-@Observacion
-    );
+        IF EXISTS (SELECT 1 FROM @Items WHERE Cantidad <= 0)
+            THROW 51470, 'REQUERIMIENTO_CANTIDAD_INVALIDA: la cantidad debe ser mayor que cero.', 1;
 
-DECLARE @IdRequerimiento INT = SCOPE_IDENTITY();
+        IF EXISTS (SELECT IdMaterial FROM @Items GROUP BY IdMaterial HAVING COUNT(*) > 1)
+            THROW 51474, 'MATERIAL_DUPLICADO: cada material puede aparecer una sola vez.', 1;
 
-INSERT
-    INTO
-    compras.RequerimientoDetalle
-    (
-        IdRequerimiento,
-    IdMaterial,
-    Cantidad,
-    Observacion,
-    IdPresupuestoDetalle
-    )
-    SELECT
-    @IdRequerimiento,
-    IdMaterial,
-    Cantidad,
-    Observacion,
-    IdPresupuestoDetalle
-FROM
-    @Items;
+        IF EXISTS (SELECT 1 FROM @Items i WHERE NOT EXISTS (
+            SELECT 1 FROM maestra.Material m WITH (HOLDLOCK) WHERE m.IdMaterial = i.IdMaterial))
+            THROW 51472, 'MATERIAL_NO_EXISTE: uno de los materiales no existe.', 1;
 
-COMMIT;
-END TRY
-BEGIN CATCH
-    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-    THROW;
-END CATCH;
+        IF EXISTS (
+            SELECT 1 FROM @Items i
+            WHERE i.IdPresupuestoDetalle IS NOT NULL AND NOT EXISTS (
+                SELECT 1
+                FROM ControlPresupuestario.PresupuestoDetalle pd WITH (HOLDLOCK)
+                JOIN ControlPresupuestario.PresupuestoVersion pv WITH (HOLDLOCK)
+                    ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
+                JOIN ControlPresupuestario.EstadoPresupuesto ep WITH (HOLDLOCK)
+                    ON ep.IdEstadoPresupuesto = pv.IdEstadoPresupuesto
+                JOIN ControlPresupuestario.Presupuesto p WITH (HOLDLOCK)
+                    ON p.IdPresupuesto = pv.IdPresupuesto
+                JOIN ControlPresupuestario.CentroCosto cc WITH (HOLDLOCK)
+                    ON cc.IdCentroCosto = p.IdCentroCosto
+                WHERE pd.IdPresupuestoDetalle = i.IdPresupuestoDetalle
+                  AND ep.Codigo = 'APROBADO' AND p.Activo = 1 AND cc.Activo = 1
+                  AND cc.IdProyecto = @IdProyecto))
+            THROW 51420, 'PARTIDA_REQUERIMIENTO_INVALIDA: debe pertenecer a la versión APROBADA vigente del CentroCosto del Proyecto.', 1;
 
-SELECT
-    @IdRequerimiento AS IdRequerimiento;
+        INSERT INTO compras.Requerimiento
+            (NumeroRequerimiento, FechaRequerimiento, IdProyecto, Descripcion, FechaEntrega,
+             IdUsuarioSolicitante, Estado, Observacion)
+        VALUES (@NumeroRequerimiento, @FechaRequerimiento, @IdProyecto, @Descripcion, @FechaEntrega,
+                @IdUsuarioSolicitante, N'Registrado', @Observacion);
+
+        DECLARE @IdRequerimiento INT = CONVERT(INT, SCOPE_IDENTITY());
+
+        INSERT INTO compras.RequerimientoDetalle
+            (IdRequerimiento, IdMaterial, Cantidad, Observacion, IdPresupuestoDetalle)
+        SELECT @IdRequerimiento, IdMaterial, Cantidad, Observacion, IdPresupuestoDetalle FROM @Items;
+
+        IF @TranCount = 0 COMMIT TRANSACTION;
+        SELECT @IdRequerimiento AS IdRequerimiento;
+    END TRY
+    BEGIN CATCH
+        IF @TranCount = 0 AND XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+        ELSE IF @TranCount > 0 AND XACT_STATE() = 1 ROLLBACK TRANSACTION CrearRequerimiento;
+        THROW;
+    END CATCH;
 END;
 GO
 

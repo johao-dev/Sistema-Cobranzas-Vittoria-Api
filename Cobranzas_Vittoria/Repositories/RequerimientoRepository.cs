@@ -152,41 +152,6 @@ namespace Cobranzas_Vittoria.Repositories
             return (head, items, validaciones);
         }
 
-        public async Task<int> CrearAsync(RequerimientoCreateDto dto)
-        {
-            using var db = Open();
-
-            var numeroRequerimiento = await EnsureNumeroRequerimientoAsync(db, (dto.NumeroRequerimiento ?? string.Empty).Trim());
-            var fechaRequerimiento = dto.FechaRequerimiento == default ? DateTime.Today : dto.FechaRequerimiento.Date;
-
-            foreach (var item in dto.Items) ComprasNumeros.ValidarDecimal(item.Cantidad, "cantidad");
-
-            var tvp = new DataTable();
-            tvp.Columns.Add("IdMaterial", typeof(int));
-            tvp.Columns.Add("Cantidad", typeof(decimal));
-            tvp.Columns.Add("Observacion", typeof(string));
-            tvp.Columns.Add("IdPresupuestoDetalle", typeof(int));
-
-            foreach (var it in dto.Items)
-                tvp.Rows.Add(it.IdMaterial, it.Cantidad, (object?)it.Observacion ?? DBNull.Value, (object?)it.IdPresupuestoDetalle ?? DBNull.Value);
-
-            var p = new DynamicParameters();
-            p.Add("NumeroRequerimiento", numeroRequerimiento);
-            p.Add("FechaRequerimiento", fechaRequerimiento);
-            p.Add("IdProyecto", dto.IdProyecto);
-            p.Add("Descripcion", dto.Descripcion);
-            p.Add("FechaEntrega", dto.FechaEntrega);
-            p.Add("IdUsuarioSolicitante", dto.IdUsuarioSolicitante);
-            p.Add("Observacion", dto.Observacion);
-            p.Add("Items", tvp.AsTableValuedParameter("compras.TVP_RequerimientoDetalle"));
-
-            return await db.ExecuteScalarAsync<int>(
-                "compras.usp_Requerimiento_Crear",
-                p,
-                commandType: CommandType.StoredProcedure
-            );
-        }
-
         public async Task<bool> PuedeEditarAsync(int idRequerimiento)
         {
             using var db = Open();
@@ -247,24 +212,6 @@ END";
             );
         }
 
-        private async Task<string> EnsureNumeroRequerimientoAsync(IDbConnection db, string numeroSolicitado)
-        {
-            if (!string.IsNullOrWhiteSpace(numeroSolicitado))
-            {
-                var existe = await db.ExecuteScalarAsync<int>(
-                    "SELECT COUNT(1) FROM compras.Requerimiento WHERE NumeroRequerimiento = @NumeroRequerimiento",
-                    new { NumeroRequerimiento = numeroSolicitado });
-
-                if (existe == 0)
-                    return numeroSolicitado;
-            }
-
-            var siguiente = await db.QuerySingleAsync<int>(@"
-SELECT ISNULL(MAX(TRY_CONVERT(INT, NumeroRequerimiento)), 0) + 1
-FROM compras.Requerimiento;");
-
-            return siguiente.ToString();
-        }
         public async Task<bool> EsSolicitanteAsync(int idRequerimiento, int idUsuario)
         {
             using var db = Open();

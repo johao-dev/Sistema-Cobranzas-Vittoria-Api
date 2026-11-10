@@ -6,7 +6,7 @@ namespace Cobranzas_Vittoria.Compras.Domain.Model;
 /// <summary>
 /// Agregado de cabecera e ítems. Los nombres de proyecto, solicitante y material son datos de consulta,
 /// no estado propio del requerimiento. La existencia de referencias y la compatibilidad presupuestaria
-/// se comprueban en persistencia; este modelo no consulta otros módulos.
+/// se comprueban en aplicación y se protegen en persistencia; este modelo no consulta otros módulos.
 /// </summary>
 public sealed class Requerimiento
 {
@@ -48,15 +48,18 @@ public sealed class Requerimiento
             IdProyecto = ReglasCompras.Id(idProyecto, nameof(IdProyecto)),
             IdUsuarioSolicitante = ReglasCompras.Id(idUsuarioSolicitante, nameof(IdUsuarioSolicitante)),
             // Los límites corresponden a las columnas actuales; evitan truncamiento al persistir.
-            Descripcion = ReglasCompras.TextoOpcional(descripcion, nameof(Descripcion), 250),
-            Observacion = ReglasCompras.TextoOpcional(observacion, nameof(Observacion), 250),
+            Descripcion = ReglasCompras.TextoOpcionalSinNormalizar(descripcion, nameof(Descripcion), 250),
+            Observacion = ReglasCompras.TextoOpcionalSinNormalizar(observacion, nameof(Observacion), 250),
             FechaRequerimiento = fechaRequerimiento,
             FechaEntrega = fechaEntrega,
-            // Se permite suministrar el instante desde el caso de uso para usar un reloj controlado.
-            FechaCreacion = fechaCreacion ?? DateTime.UtcNow
+            // La identidad y fecha definitivas las asigna SQL al persistir el documento.
+            FechaCreacion = fechaCreacion ?? default
         };
 
-        ValidarFechas(fechaRequerimiento, fechaEntrega);
+        if (fechaRequerimiento == default)
+            throw ValidacionComprasException.CampoRequerido(nameof(FechaRequerimiento));
+
+        // El alta existente admite entregas anteriores a la solicitud. La edición conserva su regla propia.
         ArgumentNullException.ThrowIfNull(items);
 
         foreach (ItemRequerimiento item in items)
@@ -67,6 +70,8 @@ public sealed class Requerimiento
             if (item.IdRequerimiento != 0 || item.IdRequerimientoDetalle != 0)
                 throw new ConflictoComprasException("REQUERIMIENTO_ITEM_YA_ASOCIADO",
                     "Un requerimiento nuevo solo admite ítems nuevos sin identidad persistida.");
+
+            ReglasCompras.TextoOpcionalSinNormalizar(item.Observacion, nameof(ItemRequerimiento.Observacion), 250);
 
             requerimiento._items.Add(CopiarItem(item));
         }

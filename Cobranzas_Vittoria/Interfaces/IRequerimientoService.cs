@@ -4,7 +4,6 @@ namespace Cobranzas_Vittoria.Interfaces
     {
         Task<IEnumerable<Cobranzas_Vittoria.Entities.Requerimiento>> ListAsync(string? estado, int? idEspecialidad, int? idProyecto);
         Task<object?> GetAsync(int idRequerimiento);
-        Task<int> CrearAsync(Cobranzas_Vittoria.Dtos.Compras.RequerimientoCreateDto dto);
         Task UpdateAsync(int idRequerimiento, int idUsuarioActual, Cobranzas_Vittoria.Dtos.Compras.RequerimientoUpdateDto dto);
 
         Task<bool> PuedeEditarAsync(int idRequerimiento);

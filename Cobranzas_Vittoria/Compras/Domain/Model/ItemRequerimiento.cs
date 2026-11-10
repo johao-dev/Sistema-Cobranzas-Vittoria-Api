@@ -14,6 +14,16 @@ public sealed class ItemRequerimiento
 
     private ItemRequerimiento() { }
 
+    public static ItemRequerimiento CrearParaNuevoRequerimiento(
+        int idMaterial, int? idPresupuestoDetalle, decimal cantidad, string? observacion)
+        => new ItemRequerimiento
+        {
+            IdMaterial = ReglasCompras.Id(idMaterial, nameof(IdMaterial)),
+            IdPresupuestoDetalle = ReglasCompras.IdOpcional(idPresupuestoDetalle, nameof(IdPresupuestoDetalle)),
+            Cantidad = ReglasCompras.Cantidad(cantidad),
+            Observacion = ReglasCompras.TextoOpcionalSinNormalizar(observacion, nameof(Observacion), 250)
+        };
+
     public static ItemRequerimiento Crear(
         int idRequerimiento,
         int idMaterial,

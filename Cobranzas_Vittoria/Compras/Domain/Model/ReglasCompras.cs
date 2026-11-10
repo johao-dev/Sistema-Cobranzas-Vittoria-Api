@@ -32,6 +32,15 @@ internal static class ReglasCompras
         return texto;
     }
 
+    public static string? TextoOpcionalSinNormalizar(string? valor, string campo, int maximo)
+    {
+        // El alta conserva los espacios y blancos admitidos por el contrato previo.
+        if (valor?.Length > maximo)
+            throw ValidacionComprasException.Longitud(campo, maximo);
+
+        return valor;
+    }
+
     public static decimal Cantidad(decimal cantidad)
     {
         if (cantidad <= 0)

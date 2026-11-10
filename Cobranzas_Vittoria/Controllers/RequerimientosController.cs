@@ -34,15 +34,6 @@ public class RequerimientosController : ControllerBase
         return res is null ? NotFound() : Ok(res);
     }
 
-    [HttpPost]
-    [AuthorizePermission(Permisos.Requerimientos.Crear)]
-    public async Task<IActionResult> Crear([FromBody] RequerimientoCreateDto dto)
-    {
-        dto.IdUsuarioSolicitante = ObtenerIdUsuarioActual();
-        var id = await _service.CrearAsync(dto);
-        return Ok(new { idRequerimiento = id });
-    }
-
     [HttpPut("{id:int}")]
     [AuthorizePermission(Permisos.Requerimientos.EditarBorrador)]
     public async Task<IActionResult> Update(int id, [FromBody] RequerimientoUpdateDto dto)
