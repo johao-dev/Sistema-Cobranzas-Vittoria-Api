@@ -1,4 +1,8 @@
 using Cobranzas_Vittoria.Notificaciones.Application.Options;
+using Cobranzas_Vittoria.Application.Common.Eventos;
+using Cobranzas_Vittoria.Compras.Contracts.Eventos;
+using Cobranzas_Vittoria.Notificaciones.Application.RequerimientoCreado;
+using Cobranzas_Vittoria.Notificaciones.Infrastructure.Persistence;
 using Cobranzas_Vittoria.Notificaciones.Application.ProcesarEvento;
 using Cobranzas_Vittoria.Notificaciones.Application.ProcesarNotificacionesPendientes;
 using Cobranzas_Vittoria.Notificaciones.Application.RecuperarNotificacionesInterrumpidas;
@@ -18,6 +22,8 @@ public static class NotificacionesModule
 {
     public static IServiceCollection AddNotificaciones(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<NotificacionEnlacesOptions>()
+            .Bind(configuration.GetSection("Notificaciones:Enlaces"));
         services.AddOptions<NotificacionProcesamientoOptions>()
             .Bind(configuration.GetSection("Notificaciones:Procesamiento"))
             .ValidateDataAnnotations().ValidateOnStart();
@@ -37,6 +43,8 @@ public static class NotificacionesModule
         services.AddSingleton<IPlantillaRenderer, PlantillaRenderer>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<ProcesarEventoHandler>();
+        services.AddScoped<IConsultaRequerimientoCreado, ConsultaRequerimientoCreado>();
+        services.AddScoped<IEventHandler<RequerimientoCreadoEvent>, RequerimientoCreadoEventHandler>();
         services.AddScoped<RecuperarNotificacionesInterrumpidasHandler>();
         services.AddScoped<ProcesarNotificacionesPendientesHandler>();
         services.AddHostedService<NotificacionesWorker>();

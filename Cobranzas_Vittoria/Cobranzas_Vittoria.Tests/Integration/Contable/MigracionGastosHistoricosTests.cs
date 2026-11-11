@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Entities;
+using Cobranzas_Vittoria.Tests.Setup;
 using Dapper;
 using DbUp;
 using DbUp.Engine;
@@ -44,14 +45,14 @@ public class MigracionGastosHistoricosTests
     private DatabaseUpgradeResult Upgrade(Func<string, bool> filtro) => DeployChanges.To
         .SqlDatabase(_connectionString)
         .WithScriptsEmbeddedInAssembly(typeof(OrdenCompra).Assembly, filtro)
-        .LogToConsole().Build().PerformUpgrade();
+        .LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
 
     private DatabaseUpgradeResult SincronizarRepeatables() => DeployChanges.To
         .SqlDatabase(_connectionString)
         .WithScriptsEmbeddedInAssembly(typeof(OrdenCompra).Assembly,
             name => name.Contains(".Migrations.Repeatable."))
         .JournalTo(new NullJournal())
-        .LogToConsole().Build().PerformUpgrade();
+        .LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
 
     [Test]
     public async Task Upgrade_ConservaGastosYPartidasHistoricas_YTerminaConSchemaFinal()

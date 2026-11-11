@@ -319,7 +319,8 @@ public sealed partial class GastosDirectosControllerTests
             _client.PostAsync($"/api/contable/gastos-directos/{idGasto}/confirmar", null),
             _client.PostAsync($"/api/contable/gastos-directos/{idGasto}/confirmar", null));
 
-        Assert.That(respuestas.Select(respuesta => respuesta.StatusCode), Is.All.EqualTo(HttpStatusCode.OK));
+        Assert.That(respuestas.Select(respuesta => respuesta.StatusCode), Is.All.EqualTo(HttpStatusCode.OK),
+            await DescribirRespuestasConcurrentesAsync(respuestas));
         Assert.That((await LeerGastoVersionAsync(idGasto)).IdPresupuestoDetalle, Is.EqualTo(vigente.IdPresupuestoDetalle));
         Assert.That(await ContarMovimientosAsync(idGasto), Is.EqualTo(1));
         await VerificarControlVigenteAsync(presupuesto, ejecutado: 100m, saldo: 900m);
@@ -338,7 +339,8 @@ public sealed partial class GastosDirectosControllerTests
             _client.PostAsync($"/api/contable/gastos-directos/{segundo}/confirmar", null));
 
         Assert.That(respuestas.Select(respuesta => respuesta.StatusCode),
-            Is.EquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }));
+            Is.EquivalentTo(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }),
+            await DescribirRespuestasConcurrentesAsync(respuestas));
         int confirmado = respuestas[0].StatusCode == HttpStatusCode.OK ? primero : segundo;
         int pendiente = confirmado == primero ? segundo : primero;
         Assert.That((await LeerGastoVersionAsync(confirmado)).IdPresupuestoDetalle, Is.EqualTo(vigente.IdPresupuestoDetalle));
@@ -360,12 +362,71 @@ public sealed partial class GastosDirectosControllerTests
             _client.PostAsync($"/api/contable/gastos-directos/{idGasto}/confirmar", null),
             _client.PostAsync($"/api/contable/gastos-directos/{idGasto}/anular", null));
 
-        Assert.That(respuestas[0].StatusCode, Is.AnyOf(HttpStatusCode.OK, HttpStatusCode.Conflict));
-        Assert.That(respuestas[1].StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        string diagnostico = await DescribirRespuestasConcurrentesAsync(respuestas);
+        Assert.That(respuestas[0].StatusCode, Is.AnyOf(HttpStatusCode.OK, HttpStatusCode.Conflict), diagnostico);
+        Assert.That(respuestas[1].StatusCode, Is.EqualTo(HttpStatusCode.OK), diagnostico);
         Assert.That((await LeerGastoVersionAsync(idGasto)).Estado, Is.EqualTo("ANULADO"));
         Assert.That(await ContarMovimientosAsync(idGasto, "AJUSTE"),
             Is.EqualTo(await ContarMovimientosAsync(idGasto, "EJECUCION")));
         await VerificarControlVigenteAsync(presupuesto, ejecutado: 0m, saldo: 1_000m);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Concurrencia_LocalizacionSerializable_RespetaPresupuestoAntesDelGasto(bool anularSegunda)
+    {
+        PresupuestoGastoPrueba presupuesto = await PrepararPresupuestoGastoAsync();
+        int idGasto = await CrearAsync(presupuesto.IdDetalleOriginal, presupuesto.IdMoneda, 100m);
+        await CrearRevisionGastoAsync(presupuesto);
+        await using SqlConnection primera = await DbHelpers.OpenTestConnectionAsync();
+        await using SqlConnection segunda = await DbHelpers.OpenTestConnectionAsync();
+        int sesionPrimera = await primera.QuerySingleAsync<int>("SELECT @@SPID;");
+        int sesionSegunda = await segunda.QuerySingleAsync<int>("SELECT @@SPID;");
+        using SqlTransaction transaccionPrimera = primera.BeginTransaction(IsolationLevel.ReadCommitted);
+        using SqlTransaction transaccionSegunda = segunda.BeginTransaction(IsolationLevel.Serializable);
+
+        // El primer actor tiene el mutex. El segundo debe localizar y esperar sin retener el gasto.
+        await primera.ExecuteAsync("""
+            SELECT IdPresupuesto FROM ControlPresupuestario.Presupuesto WITH (UPDLOCK, HOLDLOCK, INDEX(PK_Presupuesto))
+            WHERE IdPresupuesto=@IdPresupuesto;
+            """, presupuesto, transaccionPrimera);
+
+        string procedimientoSegunda = anularSegunda ? "contable.usp_GastoDirecto_Anular" : "contable.usp_GastoDirecto_Confirmar";
+        Task operacionSegunda = segunda.ExecuteAsync(procedimientoSegunda, new { IdGastoDirecto = idGasto },
+            transaccionSegunda, commandType: CommandType.StoredProcedure, commandTimeout: 15);
+        bool esperoPresupuesto = await EsperarBloqueoPresupuestarioAsync(sesionSegunda, sesionPrimera);
+
+        try
+        {
+            await ConfirmarGastoPorSpAsync(idGasto, primera, transaccionPrimera);
+            transaccionPrimera.Commit();
+        }
+        finally
+        {
+            if (transaccionPrimera.Connection is not null) transaccionPrimera.Rollback();
+            // También observar la tarea secundaria si la primera falla, antes de liberar su conexión.
+            await operacionSegunda.WaitAsync(TimeSpan.FromSeconds(20));
+        }
+
+        transaccionSegunda.Commit();
+
+        Assert.That(esperoPresupuesto, Is.True, "El segundo actor debe esperar al mutex del presupuesto.");
+        Assert.That((await LeerGastoVersionAsync(idGasto)).Estado, Is.EqualTo(anularSegunda ? "ANULADO" : "CONFIRMADO"));
+        Assert.That(await ContarMovimientosAsync(idGasto, "EJECUCION"), Is.EqualTo(1));
+        Assert.That(await ContarMovimientosAsync(idGasto, "AJUSTE"), Is.EqualTo(anularSegunda ? 1 : 0));
+        await VerificarControlVigenteAsync(presupuesto, ejecutado: anularSegunda ? 0m : 100m,
+            saldo: anularSegunda ? 1_000m : 900m);
+    }
+
+    private static async Task<string> DescribirRespuestasConcurrentesAsync(IEnumerable<HttpResponseMessage> respuestas)
+    {
+        List<string> detalles = [];
+        foreach (HttpResponseMessage respuesta in respuestas)
+        {
+            detalles.Add($"{respuesta.RequestMessage?.RequestUri}: {(int)respuesta.StatusCode} {await respuesta.Content.ReadAsStringAsync()}");
+        }
+
+        return string.Join(Environment.NewLine, detalles);
     }
 
     private static async Task<PresupuestoGastoPrueba> PrepararPresupuestoGastoAsync()

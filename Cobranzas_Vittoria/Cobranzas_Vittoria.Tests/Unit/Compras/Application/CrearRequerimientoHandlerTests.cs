@@ -1,4 +1,7 @@
 using Cobranzas_Vittoria.Compras.Application.Requerimiento.Crear;
+using Cobranzas_Vittoria.Application.Common.Eventos;
+using Cobranzas_Vittoria.Compras.Contracts.Eventos;
+using Cobranzas_Vittoria.Tests.Unit.Notificaciones.Application;
 using Cobranzas_Vittoria.Compras.Domain.Excepciones;
 using Cobranzas_Vittoria.Compras.Domain.Model;
 using Cobranzas_Vittoria.Compras.Domain.Persistence;
@@ -189,12 +192,128 @@ public class CrearRequerimientoHandlerTests
         Assert.That(persistencia.ConsultasContexto, Is.Zero);
     }
 
+    [Test]
+    public async Task Crear_PublicaUnaVezDespuesDeConfirmar_ConDatosRealesYUtc()
+    {
+        PersistenciaDoble persistencia = new() { Colisiones = 1 };
+        PublicadorDoble publicador = new()
+        {
+            AlPublicar = _ =>
+            {
+                Assert.That(persistencia.Confirmado, Is.True);
+                return Task.CompletedTask;
+            }
+        };
+
+        CrearRequerimientoResult resultado = await Handler(persistencia, publicador: publicador).HandleAsync(Command());
+
+        RequerimientoCreadoEvent evento = publicador.Eventos.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(evento.IdEvento, Is.Not.EqualTo(Guid.Empty));
+            Assert.That(evento.IdRequerimiento, Is.EqualTo(resultado.IdRequerimiento));
+            Assert.That(evento.NumeroRequerimiento, Is.EqualTo("MANUAL"));
+            Assert.That(evento.FechaRequerimiento, Is.EqualTo(FECHA));
+            Assert.That(evento.FechaOcurrenciaUtc, Is.EqualTo(new DateTime(2026, 11, 11, 2, 0, 0, DateTimeKind.Utc)));
+            Assert.That(evento.FechaOcurrenciaUtc.Kind, Is.EqualTo(DateTimeKind.Utc));
+        });
+    }
+
+    [Test]
+    public void Crear_FalloAntesDelCommit_NoPublica()
+    {
+        PersistenciaDoble persistencia = new() { Error = new TimeoutException() };
+        PublicadorDoble publicador = new();
+
+        Assert.ThrowsAsync<TimeoutException>(() => Handler(persistencia, publicador: publicador).HandleAsync(Command()));
+        Assert.That(publicador.Eventos, Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task Crear_FalloSecundarioInclusoCancelacion_ConservaExitoYRegistraUnaVez(bool cancelacion)
+    {
+        PersistenciaDoble persistencia = new();
+        LoggerNotificacionesStub<CrearRequerimientoHandler> logger = new();
+        PublicadorDoble publicador = new()
+        {
+            AlPublicar = _ => throw (cancelacion ? new OperationCanceledException("dato sensible") : new InvalidOperationException("dato sensible"))
+        };
+        CrearRequerimientoHandler handler = new(persistencia, persistencia, new StubUsuarioActualService(),
+            new RelojFijo(), logger, publicador);
+
+        CrearRequerimientoResult resultado = await handler.HandleAsync(Command());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resultado.IdRequerimiento, Is.EqualTo(123));
+            Assert.That(persistencia.Confirmado, Is.True);
+            Assert.That(persistencia.Creaciones, Has.Count.EqualTo(1));
+            Assert.That(logger.Mensajes.Count(m => m.Contains("Falló la publicación")), Is.EqualTo(1));
+            Assert.That(logger.Mensajes.Last(), Does.Contain(publicador.Eventos.Single().IdEvento.ToString()).And.Contain("123"));
+            Assert.That(string.Join(" ", logger.Mensajes), Does.Not.Contain("dato sensible"));
+        });
+    }
+
+    [Test]
+    public async Task Crear_CancelacionHttpDespuesDelCommit_PublicaConTokenIndependiente()
+    {
+        using CancellationTokenSource cts = new();
+        PersistenciaDoble persistencia = new() { DespuesDeConfirmar = cts.Cancel };
+        PublicadorDoble publicador = new();
+
+        CrearRequerimientoResult resultado = await Handler(persistencia, publicador: publicador).HandleAsync(Command(), cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cts.IsCancellationRequested, Is.True);
+            Assert.That(resultado.IdRequerimiento, Is.EqualTo(123));
+            Assert.That(publicador.Eventos, Has.Count.EqualTo(1));
+            Assert.That(publicador.TokenRecibido, Is.EqualTo(CancellationToken.None));
+        });
+    }
+
+    [Test]
+    public async Task Crear_EsperaLaPublicacionAntesDeRetornar()
+    {
+        TaskCompletionSource completada = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        PublicadorDoble publicador = new() { AlPublicar = _ => completada.Task };
+        Task<CrearRequerimientoResult> creacion = Handler(new PersistenciaDoble(), publicador: publicador).HandleAsync(Command());
+
+        try
+        {
+            Assert.That(publicador.Eventos, Has.Count.EqualTo(1));
+            Assert.That(creacion.IsCompleted, Is.False);
+        }
+        finally
+        {
+            completada.SetResult();
+            await creacion;
+        }
+    }
+
     private static CrearRequerimientoCommand Command() => new("MANUAL", FECHA, 3, null, null, null,
         [new CrearItemRequerimientoCommand(2, null, 1.25m, "  Ítem  ")]);
 
-    private static CrearRequerimientoHandler Handler(PersistenciaDoble persistencia, StubUsuarioActualService? usuario = null)
+    private static CrearRequerimientoHandler Handler(PersistenciaDoble persistencia, StubUsuarioActualService? usuario = null,
+        PublicadorDoble? publicador = null)
         => new(persistencia, persistencia, usuario ?? new StubUsuarioActualService(), new RelojFijo(),
-            NullLogger<CrearRequerimientoHandler>.Instance);
+            NullLogger<CrearRequerimientoHandler>.Instance, publicador ?? new PublicadorDoble());
+
+    private sealed class PublicadorDoble : IEventPublisher
+    {
+        public List<RequerimientoCreadoEvent> Eventos { get; } = [];
+        public CancellationToken TokenRecibido { get; private set; }
+        public Func<RequerimientoCreadoEvent, Task>? AlPublicar { get; init; }
+
+        public Task PublishAsync<TEvent>(TEvent evento, CancellationToken cancellationToken = default)
+        {
+            RequerimientoCreadoEvent creado = (RequerimientoCreadoEvent)(object)evento!;
+            Eventos.Add(creado);
+            TokenRecibido = cancellationToken;
+            return AlPublicar?.Invoke(creado) ?? Task.CompletedTask;
+        }
+    }
 
     private sealed class RelojFijo : TimeProvider
     {
@@ -210,6 +329,8 @@ public class CrearRequerimientoHandlerTests
         public int ConsultasNumeracion { get; private set; }
         public int Colisiones { get; set; }
         public Exception? Error { get; init; }
+        public bool Confirmado { get; private set; }
+        public Action? DespuesDeConfirmar { get; init; }
         public List<Requerimiento> Creaciones { get; } = [];
         public List<CancellationToken> Tokens { get; } = [];
 
@@ -234,6 +355,8 @@ public class CrearRequerimientoHandlerTests
             Tokens.Add(cancellationToken);
             if (Colisiones-- > 0) throw new NumeroRequerimientoOcupadoException();
             if (Error is not null) throw Error;
+            Confirmado = true;
+            DespuesDeConfirmar?.Invoke();
             return Task.FromResult(123);
         }
 

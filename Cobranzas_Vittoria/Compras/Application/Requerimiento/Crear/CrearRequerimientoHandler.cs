@@ -1,4 +1,6 @@
 using System.Globalization;
+using Cobranzas_Vittoria.Application.Common.Eventos;
+using Cobranzas_Vittoria.Compras.Contracts.Eventos;
 using Cobranzas_Vittoria.Compras.Domain.Excepciones;
 using Cobranzas_Vittoria.Compras.Domain.Model;
 using Cobranzas_Vittoria.Compras.Domain.Persistence;
@@ -13,7 +15,8 @@ public sealed class CrearRequerimientoHandler(
     IConsultaCreacionRequerimiento consultas,
     IUsuarioActualService usuarioActual,
     TimeProvider reloj,
-    ILogger<CrearRequerimientoHandler> logger)
+    ILogger<CrearRequerimientoHandler> logger,
+    IEventPublisher eventPublisher)
 {
     private const int MAXIMO_INTENTOS = 5;
 
@@ -50,17 +53,37 @@ public sealed class CrearRequerimientoHandler(
             RequerimientoDomain requerimiento = RequerimientoDomain.Crear(numero, fecha, command.IdProyecto,
                 idSolicitante, items, command.Descripcion, command.FechaEntrega, command.Observacion);
 
+            int id;
             try
             {
-                int id = await repository.CrearAsync(requerimiento, ct);
-                logger.LogInformation("Requerimiento {IdRequerimiento} creado por el usuario {IdSolicitante}", id, idSolicitante);
-                return new CrearRequerimientoResult(id);
+                id = await repository.CrearAsync(requerimiento, ct);
             }
             catch (NumeroRequerimientoOcupadoException) when (intento < MAXIMO_INTENTOS)
             {
                 // Solo esta colisión acredita rollback del SP. Un timeout puede tener commit desconocido.
                 logger.LogInformation("Colisión de numeración al crear requerimiento; reintento {Intento}", intento);
+                continue;
             }
+
+            logger.LogInformation("Requerimiento {IdRequerimiento} creado por el usuario {IdSolicitante}", id, idSolicitante);
+
+            RequerimientoCreadoEvent evento = new(Guid.NewGuid(), id, requerimiento.NumeroRequerimiento,
+                requerimiento.FechaRequerimiento, reloj.GetUtcNow().UtcDateTime);
+
+            try
+            {
+                // El SP ya confirmó. La desconexión HTTP no cancela la generación secundaria.
+                await eventPublisher.PublishAsync(evento, CancellationToken.None);
+            }
+            catch (Exception excepcion)
+            {
+                // No registrar mensajes del proveedor: pueden contener SQL, HTML o datos personales.
+                logger.LogError(
+                    "Falló la publicación del evento {IdEvento} del requerimiento confirmado {IdRequerimiento}. Tipo: {TipoError}",
+                    evento.IdEvento, id, excepcion.GetType().Name);
+            }
+
+            return new CrearRequerimientoResult(id);
         }
 
         throw new InvalidOperationException("Se agotaron los intentos de creación.");

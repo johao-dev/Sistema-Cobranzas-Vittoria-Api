@@ -1,4 +1,5 @@
 using System.Data;
+using Cobranzas_Vittoria.Application.Common.Eventos;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -292,7 +293,8 @@ public class CrearRequerimientoTests : IntegrationTestBase
         [ItemRequerimiento.CrearParaNuevoRequerimiento(2, partida, 1.25m, null)]);
 
     private static CrearRequerimientoHandler Handler(IConsultaCreacionRequerimiento consultas) => new(Repository, consultas,
-        new StubUsuarioActualService(), TimeProvider.System, NullLogger<CrearRequerimientoHandler>.Instance);
+        new StubUsuarioActualService(), TimeProvider.System, NullLogger<CrearRequerimientoHandler>.Instance,
+        GlobalSetupFixture.Factory.Services.GetRequiredService<IEventPublisher>());
 
     private static async Task CambiarPartidaAsync(int partida, string caso)
     {

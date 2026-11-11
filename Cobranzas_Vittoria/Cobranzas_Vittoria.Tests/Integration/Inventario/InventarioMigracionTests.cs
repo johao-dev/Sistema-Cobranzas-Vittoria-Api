@@ -1,4 +1,5 @@
 using Dapper;
+using Cobranzas_Vittoria.Tests.Setup;
 using DbUp;
 using DbUp.Engine;
 using Microsoft.Data.SqlClient;
@@ -16,7 +17,7 @@ public class InventarioMigracionTests
     private DatabaseUpgradeResult Upgrade(Func<string, bool> filtro)
         => DeployChanges.To.SqlDatabase(_connectionString)
             .WithScriptsEmbeddedInAssembly(typeof(Cobranzas_Vittoria.Inventario.InventarioModule).Assembly, filtro)
-            .LogToConsole().LogScriptOutput().Build().PerformUpgrade();
+            .LogTo(new LogMigracionPrueba()).LogScriptOutput().Build().PerformUpgrade();
 
     [SetUp]
     public async Task CrearBaseAnteriorALaMigracion()

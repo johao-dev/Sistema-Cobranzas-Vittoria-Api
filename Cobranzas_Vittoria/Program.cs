@@ -12,6 +12,7 @@ using Cobranzas_Vittoria.ControlPresupuestario;
 using Cobranzas_Vittoria.Contable.GastosDirectos;
 using Cobranzas_Vittoria.Data;
 using Cobranzas_Vittoria.Infrastructure.Repositories.Importacion;
+using Cobranzas_Vittoria.Infrastructure.Eventos;
 using Cobranzas_Vittoria.Interfaces;
 using Cobranzas_Vittoria.Middleware;
 using Cobranzas_Vittoria.Repositories;
@@ -59,6 +60,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton<IDbConnectionFactory, SqlConnectionFactory>();
 builder.Services.AddNotificaciones(builder.Configuration);
+builder.Services.AddEventosEnMemoria();
 builder.Services.AddHttpClient<ISunatService, SunatService>();
 builder.Services.AddMemoryCache(); // soporte para caché
 builder.Services.AddTransient<ApiExceptionMiddleware>();

@@ -23,6 +23,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Reemplaza HttpClient y servicios externos con stubs
         builder.ConfigureTestServices(services =>
         {
+            services.PostConfigure<Cobranzas_Vittoria.Notificaciones.Application.Options.NotificacionEnlacesOptions>(
+                options => options.UrlBaseFrontend = "https://erp.example.com");
             services.PostConfigure<Cobranzas_Vittoria.Notificaciones.Infrastructure.BackgroundJobs.NotificacionesWorkerOptions>(
                 options => options.Habilitado = false);
             // Quita el HttpClient real registrado por AddHttpClient<ISunatService,...>

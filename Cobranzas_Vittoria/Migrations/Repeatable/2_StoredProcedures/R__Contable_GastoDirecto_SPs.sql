@@ -309,11 +309,13 @@ BEGIN
 
         -- Lectura de localización; el detalle se revalida tras tomar el mutex.
         -- Aprobación, confirmación y anulación bloquean el presupuesto antes del gasto.
+        -- El pool puede entregar una sesión SERIALIZABLE. Esta lectura orientativa
+        -- libera sus S al terminar; retenerlos invertiría el orden presupuesto -> gasto.
         SELECT @IdPresupuesto = pv.IdPresupuesto
-        FROM contable.GastoDirecto gd
-        JOIN ControlPresupuestario.PresupuestoDetalle pd
+        FROM contable.GastoDirecto gd WITH (READCOMMITTEDLOCK)
+        JOIN ControlPresupuestario.PresupuestoDetalle pd WITH (READCOMMITTEDLOCK)
             ON pd.IdPresupuestoDetalle = gd.IdPresupuestoDetalle
-        JOIN ControlPresupuestario.PresupuestoVersion pv
+        JOIN ControlPresupuestario.PresupuestoVersion pv WITH (READCOMMITTEDLOCK)
             ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
         WHERE gd.IdGastoDirecto = @IdGastoDirecto;
         IF @IdPresupuesto IS NULL
@@ -460,11 +462,13 @@ BEGIN
             @IdPresupuesto INT, @PresupuestoBloqueado INT;
 
         -- Mismo orden que aprobación y confirmación: presupuesto antes del gasto.
+        -- La localización no debe retener S bajo el aislamiento heredado del pool.
+        -- Las referencias se revalidan después de adquirir el mutex del presupuesto.
         SELECT @IdPresupuesto = pv.IdPresupuesto
-        FROM contable.GastoDirecto gd
-        JOIN ControlPresupuestario.PresupuestoDetalle pd
+        FROM contable.GastoDirecto gd WITH (READCOMMITTEDLOCK)
+        JOIN ControlPresupuestario.PresupuestoDetalle pd WITH (READCOMMITTEDLOCK)
             ON pd.IdPresupuestoDetalle = gd.IdPresupuestoDetalle
-        JOIN ControlPresupuestario.PresupuestoVersion pv
+        JOIN ControlPresupuestario.PresupuestoVersion pv WITH (READCOMMITTEDLOCK)
             ON pv.IdPresupuestoVersion = pd.IdPresupuestoVersion
         WHERE gd.IdGastoDirecto = @IdGastoDirecto;
         IF @IdPresupuesto IS NULL

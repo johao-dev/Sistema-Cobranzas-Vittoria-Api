@@ -1,4 +1,5 @@
 using Cobranzas_Vittoria.Entities;
+using Cobranzas_Vittoria.Tests.Setup;
 using Dapper;
 using DbUp;
 using DbUp.Engine;
@@ -46,7 +47,7 @@ public class NormalizacionMigracionesTests
     private DatabaseUpgradeResult Upgrade(Func<string, bool> filter) => DeployChanges.To
         .SqlDatabase(_connectionString)
         .WithScriptsEmbeddedInAssembly(typeof(OrdenCompra).Assembly, filter)
-        .LogToConsole().LogScriptOutput().Build().PerformUpgrade();
+        .LogTo(new LogMigracionPrueba()).LogScriptOutput().Build().PerformUpgrade();
 
     private DatabaseUpgradeResult NormalizarHasta(int version = 8) => Upgrade(name =>
         name.Contains(".Migrations.Versioned.V2_1_") &&
@@ -106,7 +107,7 @@ public class NormalizacionMigracionesTests
                 return new SqlScript(name, reader.ReadToEnd().Replace("maestra.Moneda", "ControlPresupuestario.Moneda"));
             }).ToArray();
         var legacy = DeployChanges.To.SqlDatabase(_connectionString).WithScripts(scripts)
-            .LogToConsole().Build().PerformUpgrade();
+            .LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
         Assert.That(legacy.Successful, Is.True, legacy.Error?.ToString());
         await using var cn = await Conexion();
         var viewId = await cn.QuerySingleAsync<int>("SELECT OBJECT_ID('ControlPresupuestario.vw_ControlPresupuestarioVigente')");

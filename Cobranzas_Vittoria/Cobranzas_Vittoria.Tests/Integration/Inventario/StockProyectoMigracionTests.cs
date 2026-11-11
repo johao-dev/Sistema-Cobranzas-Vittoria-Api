@@ -1,4 +1,5 @@
 using System.Data;
+using Cobranzas_Vittoria.Tests.Setup;
 using Cobranzas_Vittoria.Inventario;
 using Cobranzas_Vittoria.Inventario.Domain.Model;
 using Dapper;
@@ -63,7 +64,7 @@ public class StockProyectoMigracionTests
         DatabaseUpgradeResult historicos = DeployChanges.To.SqlDatabase(_cadena)
             .WithScriptsEmbeddedInAssembly(typeof(StockProyectoMigracionTests).Assembly,
                 nombre => nombre.EndsWith("StockProyecto_PreLimpieza.sql", StringComparison.Ordinal))
-            .JournalTo(new NullJournal()).LogToConsole().Build().PerformUpgrade();
+            .JournalTo(new NullJournal()).LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
         Assert.That(historicos.Successful, Is.True, historicos.Error?.ToString());
 
         await using SqlConnection db = new(_cadena);
@@ -206,11 +207,11 @@ public class StockProyectoMigracionTests
     private DatabaseUpgradeResult Migrar(Func<string, bool> filtro)
         => DeployChanges.To.SqlDatabase(_cadena)
             .WithScriptsEmbeddedInAssembly(typeof(InventarioModule).Assembly, filtro)
-            .LogToConsole().Build().PerformUpgrade();
+            .LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
 
     private DatabaseUpgradeResult SincronizarRepeatables()
         => DeployChanges.To.SqlDatabase(_cadena)
             .WithScriptsEmbeddedInAssembly(typeof(InventarioModule).Assembly,
                 nombre => nombre.Contains(".Migrations.Repeatable."))
-            .JournalTo(new NullJournal()).LogToConsole().Build().PerformUpgrade();
+            .JournalTo(new NullJournal()).LogTo(new LogMigracionPrueba()).Build().PerformUpgrade();
 }
