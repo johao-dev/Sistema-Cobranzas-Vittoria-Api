@@ -62,19 +62,26 @@ public class NotificacionesPersistenceTests(bool rcsi)
 
         using IDbConnection db = _factory.CreateConnection();
         await db.ExecuteAsync("CREATE SCHEMA seguridad;");
-        Assembly assembly = typeof(Notificacion).Assembly;
-        string[] migraciones = ["V1_0_2__Seguridad_DDL.sql", "V3_0_0__Notificaciones_CreaSchema.sql",
+        string[] migraciones = ["V1_0_2__Seguridad_DDL.sql", "V1_3_0__Seguridad_Actualiza_Tabla_Rol.sql",
+            "V3_0_0__Notificaciones_CreaSchema.sql",
             "V3_0_1__Notificaciones_CreaTablas.sql", "V3_0_2__Notificaciones_CatalogoInicialRequerimientoCreado.sql"];
 
         foreach (string nombre in migraciones)
         {
-            string recurso = assembly.GetManifestResourceNames().Single(n => n.EndsWith(nombre, StringComparison.Ordinal));
-            using StreamReader lector = new(assembly.GetManifestResourceStream(recurso)!);
-            string sql = await lector.ReadToEndAsync();
-            foreach (string lote in Regex.Split(sql, @"^\s*GO\s*\r?$", RegexOptions.Multiline | RegexOptions.IgnoreCase))
-            {
-                if (!string.IsNullOrWhiteSpace(lote)) await db.ExecuteAsync(lote);
-            }
+            await EjecutarMigracionAsync(db, nombre);
+        }
+    }
+
+    private static async Task EjecutarMigracionAsync(IDbConnection db, string nombre)
+    {
+        Assembly assembly = typeof(Notificacion).Assembly;
+        string recurso = assembly.GetManifestResourceNames().Single(n => n.EndsWith(nombre, StringComparison.Ordinal));
+        using StreamReader lector = new(assembly.GetManifestResourceStream(recurso)!);
+        string sql = await lector.ReadToEndAsync();
+
+        foreach (string lote in Regex.Split(sql, @"^\s*GO\s*\r?$", RegexOptions.Multiline | RegexOptions.IgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(lote)) await db.ExecuteAsync(lote);
         }
     }
 
@@ -260,6 +267,42 @@ public class NotificacionesPersistenceTests(bool rcsi)
     }
 
     [Test]
+    public async Task CatalogoPresupuestoAprobado_ConfiguraCoordinadorGlobalSinCopiasYPlantillaValida()
+    {
+        using IDbConnection db = _factory.CreateConnection();
+        // El ID difiere del 6 usado en el catálogo inicial de requerimientos.
+        await db.ExecuteAsync("""
+            SET IDENTITY_INSERT seguridad.Rol ON;
+            INSERT INTO seguridad.Rol (IdRol, Nombre) VALUES (42, N'Coordinador');
+            SET IDENTITY_INSERT seguridad.Rol OFF;
+            """);
+
+        await EjecutarMigracionAsync(db, "V3_0_5__Notificaciones_CatalogoPresupuestoAprobado.sql");
+
+        ConfiguracionNotificacion configuracion = (await _configuracion.ObtenerPorCodigoEventoAsync("PRESUPUESTO_APROBADO"))!;
+        ReglaDestinatario destinatario = configuracion.Regla!.Destinatarios.Single();
+        ContenidoCorreoRenderizado contenido = await new PlantillaRenderer().RenderizarAsync(configuracion.CodigoEvento,
+            configuracion.Plantilla!, new Dictionary<string, string?>
+            {
+                ["CodigoPresupuesto"] = "PRE-001", ["NombrePresupuesto"] = "Obra <Norte>",
+                ["NumeroVersion"] = "2", ["Proyecto"] = "Proyecto <Norte>",
+                ["Fecha"] = "13/11/2026"
+            });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configuracion.Regla.Activo, Is.True);
+            Assert.That(configuracion.Plantilla!.Activo, Is.True);
+            Assert.That(destinatario.TipoDestinatario, Is.EqualTo(TipoDestinatario.Rol));
+            Assert.That(destinatario.Valor, Is.EqualTo("42"));
+            Assert.That(destinatario.TipoEnvio, Is.EqualTo(NotificacionDestinatario.TipoEnvioConfig.To));
+            Assert.That(contenido.Asunto, Is.EqualTo("Presupuesto aprobado: PRE-001 - versión 2"));
+            Assert.That(contenido.CuerpoHtml, Does.Contain("Obra &lt;Norte&gt;").And.Contain("Proyecto &lt;Norte&gt;"));
+            Assert.That(contenido.CuerpoHtml, Does.Not.Contain("{{"));
+        });
+    }
+
+    [Test]
     public async Task FlujoAislado_EventoPersisteProcesaSmtpYFinalizaEnviada()
     {
         (int evento, _) = await CrearEvento();
@@ -376,7 +419,7 @@ public class NotificacionesPersistenceTests(bool rcsi)
     public async Task EstrategiasSql_ResuelvenMultiplesUsuariosYExcluyenInactivosOSinCorreo()
     {
         using IDbConnection db = _factory.CreateConnection();
-        int rol = await db.QuerySingleAsync<int>("INSERT INTO seguridad.Rol (NombreRol) OUTPUT INSERTED.IdRol VALUES (N'RolPrueba')");
+        int rol = await db.QuerySingleAsync<int>("INSERT INTO seguridad.Rol (Nombre) OUTPUT INSERTED.IdRol VALUES (N'RolPrueba')");
         List<int> usuarios = new();
         foreach ((string? correo, bool activo) in new[] { ("uno@example.com", true), ("dos@example.com", true),
                      ("inactivo@example.com", false), ((string?)null, true), ("  ", true) })
