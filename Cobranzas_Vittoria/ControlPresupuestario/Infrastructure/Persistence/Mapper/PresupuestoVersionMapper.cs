@@ -5,6 +5,10 @@ namespace Cobranzas_Vittoria.ControlPresupuestario.Infrastructure.Persistence.Ma
 
 public static class PresupuestoVersionMapper
 {
+    public static VersionAprobada ToDomain(VersionAprobadaEntity e) => new(
+        e.IdPresupuesto, e.IdPresupuestoVersionAprobada, e.NumeroVersion,
+        DateTime.SpecifyKind(e.FechaAprobacion, DateTimeKind.Utc));
+
     public static PresupuestoVersion ToDomain(PresupuestoVersionEntity e) => PresupuestoVersion.Reconstruir(
         e.IdPresupuestoVersion, e.IdPresupuesto, e.NumeroVersion, e.IdEstadoPresupuesto, e.EstadoPresupuesto ?? string.Empty,
         e.NombreEstadoPresupuesto, e.Descripcion, e.MotivoCambio, e.MotivoAnulacion, e.FechaCreacion, e.FechaAprobacion,

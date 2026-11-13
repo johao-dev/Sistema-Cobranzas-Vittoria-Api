@@ -1,6 +1,8 @@
 using Cobranzas_Vittoria.Notificaciones.Application.Options;
 using Cobranzas_Vittoria.Application.Common.Eventos;
 using Cobranzas_Vittoria.Compras.Contracts.Eventos;
+using Cobranzas_Vittoria.ControlPresupuestario.Contracts.Eventos;
+using Cobranzas_Vittoria.Notificaciones.Application.PresupuestoAprobado;
 using Cobranzas_Vittoria.Notificaciones.Application.RequerimientoCreado;
 using Cobranzas_Vittoria.Notificaciones.Infrastructure.Persistence;
 using Cobranzas_Vittoria.Notificaciones.Application.ProcesarEvento;
@@ -35,16 +37,24 @@ public static class NotificacionesModule
         services.AddSingleton<IValidateOptions<SmtpOptions>, ValidacionSmtp>();
 
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+
+        // contrato de repositorios
         services.AddScoped<INotificacionRepository, NotificacionRepository>();
         services.AddScoped<IConfiguracionNotificacionRepository, ConfiguracionNotificacionRepository>();
+
+        // servicios de infraestructura
         services.AddScoped<IDestinatarioResolver, DestinatarioRolResolver>();
         services.AddScoped<IDestinatarioResolver, DestinatarioUsuarioResolver>();
         services.AddScoped<DestinatarioResolver>();
         services.AddSingleton<IPlantillaRenderer, PlantillaRenderer>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+
+        // servicios de aplicación
         services.AddScoped<ProcesarEventoHandler>();
         services.AddScoped<IConsultaRequerimientoCreado, ConsultaRequerimientoCreado>();
         services.AddScoped<IEventHandler<RequerimientoCreadoEvent>, RequerimientoCreadoEventHandler>();
+        services.AddScoped<IConsultaPresupuestoAprobado, ConsultaPresupuestoAprobado>();
+        services.AddScoped<IEventHandler<PresupuestoAprobadoEvent>, PresupuestoAprobadoEventHandler>();
         services.AddScoped<RecuperarNotificacionesInterrumpidasHandler>();
         services.AddScoped<ProcesarNotificacionesPendientesHandler>();
         services.AddHostedService<NotificacionesWorker>();

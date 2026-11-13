@@ -9,6 +9,6 @@ public interface IPresupuestoVersionRepository
     Task<IReadOnlyList<PresupuestoVersion>> ListarAsync(int idPresupuesto);
     Task<PresupuestoVersion?> ObtenerAsync(int idPresupuestoVersion);
     Task<VersionCreada> CrearNuevaAsync(int idPresupuesto, string? descripcion, string? motivoCambio, string usuario);
-    Task AprobarAsync(int idPresupuestoVersion, string usuario);
+    Task<VersionAprobada> AprobarAsync(int idPresupuestoVersion, string usuario);
     Task AnularAsync(int idPresupuestoVersion, string motivo, string usuario);
 }

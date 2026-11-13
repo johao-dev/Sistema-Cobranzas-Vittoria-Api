@@ -43,12 +43,14 @@ public sealed class PresupuestoVersionRepository : RepositoryBase, IPresupuestoV
         return PresupuestoVersionMapper.ToDomain(fila);
     });
 
-    public Task AprobarAsync(int idPresupuestoVersion, string usuario) => TraductorErroresSql.EjecutarAsync(async () =>
+    public Task<VersionAprobada> AprobarAsync(int idPresupuestoVersion, string usuario) => TraductorErroresSql.EjecutarAsync(async () =>
     {
-        using var db = Open();
-        await db.ExecuteAsync(Schema + "usp_PresupuestoVersion_Aprobar",
+        using IDbConnection db = Open();
+        VersionAprobadaEntity fila = await db.QuerySingleAsync<VersionAprobadaEntity>(Schema + "usp_PresupuestoVersion_Aprobar",
             new { IdPresupuestoVersion = idPresupuestoVersion, UsuarioAprobacion = usuario },
             commandType: CommandType.StoredProcedure);
+
+        return PresupuestoVersionMapper.ToDomain(fila);
     });
 
     public Task AnularAsync(int idPresupuestoVersion, string motivo, string usuario) => TraductorErroresSql.EjecutarAsync(async () =>

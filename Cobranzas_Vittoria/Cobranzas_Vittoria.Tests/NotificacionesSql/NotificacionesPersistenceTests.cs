@@ -278,6 +278,7 @@ public class NotificacionesPersistenceTests(bool rcsi)
             """);
 
         await EjecutarMigracionAsync(db, "V3_0_5__Notificaciones_CatalogoPresupuestoAprobado.sql");
+        await EjecutarMigracionAsync(db, "V3_0_6__Notificaciones_PresupuestoAprobado_MotivoCambio.sql");
 
         ConfiguracionNotificacion configuracion = (await _configuracion.ObtenerPorCodigoEventoAsync("PRESUPUESTO_APROBADO"))!;
         ReglaDestinatario destinatario = configuracion.Regla!.Destinatarios.Single();
@@ -286,7 +287,7 @@ public class NotificacionesPersistenceTests(bool rcsi)
             {
                 ["CodigoPresupuesto"] = "PRE-001", ["NombrePresupuesto"] = "Obra <Norte>",
                 ["NumeroVersion"] = "2", ["Proyecto"] = "Proyecto <Norte>",
-                ["Fecha"] = "13/11/2026"
+                ["Fecha"] = "13/11/2026", ["MotivoCambio"] = "Ajuste <estructura>"
             });
 
         Assert.Multiple(() =>
@@ -297,7 +298,8 @@ public class NotificacionesPersistenceTests(bool rcsi)
             Assert.That(destinatario.Valor, Is.EqualTo("42"));
             Assert.That(destinatario.TipoEnvio, Is.EqualTo(NotificacionDestinatario.TipoEnvioConfig.To));
             Assert.That(contenido.Asunto, Is.EqualTo("Presupuesto aprobado: PRE-001 - versión 2"));
-            Assert.That(contenido.CuerpoHtml, Does.Contain("Obra &lt;Norte&gt;").And.Contain("Proyecto &lt;Norte&gt;"));
+            Assert.That(contenido.CuerpoHtml, Does.Contain("Obra &lt;Norte&gt;").And.Contain("Proyecto &lt;Norte&gt;")
+                .And.Contain("Ajuste &lt;estructura&gt;"));
             Assert.That(contenido.CuerpoHtml, Does.Not.Contain("{{"));
         });
     }
